@@ -88,12 +88,25 @@ public:
     void executeInstruction();
 
 private:
+    struct SegmentDescriptorCache
+    {
+        uint32_t flags;
+        uint32_t base;
+        uint32_t limit;
+    };
+
     uint16_t readMem16(uint16_t offset, uint32_t segment);
     uint32_t readMem32(uint16_t offset, uint32_t segment);
     void writeMem16(uint16_t offset, uint32_t segment, uint16_t data);
     void writeMem32(uint16_t offset, uint32_t segment, uint32_t data);
 
     std::tuple<uint16_t, uint32_t> getEffectiveAddress(int mod, int rm, int &cycles, bool rw, uint32_t addr);
+
+    SegmentDescriptorCache &getCachedSegmentDescriptor(Reg16 r) {return segmentDescriptorCache[static_cast<int>(r) - static_cast<int>(Reg16::ES)];}
+    uint32_t getSegmentOffset(Reg16 r) {return getCachedSegmentDescriptor(r).base;}
+    void setSegmentReg(Reg16 r, uint16_t value);
+
+    bool isProtectedMode() {return reg(Reg32::CR0) & 1;}
 
     // R/M helpers
 
@@ -129,6 +142,8 @@ private:
     // registers
     uint32_t regs[18]; // segment regs are only 16-bit...
     uint32_t flags;
+
+    SegmentDescriptorCache segmentDescriptorCache[6];
 
     uint32_t gdtBase, ldtBase, idtBase;
     uint16_t gdtLimit, ldtLimit, idtLimit;
