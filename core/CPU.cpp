@@ -620,6 +620,29 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto opcode2 = sys.readMem(addr + 1);
             switch(opcode2)
             {
+                case 0x20: // MOV from control reg
+                {
+                    auto modRM = sys.readMem(addr + 2);
+                    auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+                    auto rm = static_cast<Reg32>(modRM & 0x7);
+
+                    reg(rm) = reg(r);
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
+                case 0x22: // MOV to control reg
+                {
+                    auto modRM = sys.readMem(addr + 2);
+                    auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+                    auto rm = static_cast<Reg32>(modRM & 0x7);
+
+                    reg(r) = reg(rm);
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
                 default:
                     printf("op 0f %02x @%05x\n", (int)opcode2, addr);
                     exit(1);
