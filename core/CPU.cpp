@@ -615,6 +615,19 @@ void RAM_FUNC(CPU::executeInstruction)()
             doALU16AImm<doOr>(addr);
             break;
 
+        case 0x0F:
+        {
+            auto opcode2 = sys.readMem(addr + 1);
+            switch(opcode2)
+            {
+                default:
+                    printf("op 0f %02x @%05x\n", (int)opcode2, addr);
+                    exit(1);
+                    break;
+            }
+            break;
+        }
+
         case 0x10: // ADC r/m8 r8
             doALU8<doAddWithCarry, false, 3, 16>(addr);
             break;
