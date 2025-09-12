@@ -2995,9 +2995,8 @@ void RAM_FUNC(CPU::executeInstruction)()
                 case 2: // CALL near indirect
                 {
                     // push
-                    reg(Reg16::SP) -= 2;
                     auto retAddr = reg(Reg32::EIP) + 1;
-                    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), retAddr);
+                    push(retAddr, operandSize32);
 
                     setIP(v);
                     cyclesExecuted(isReg ? 16 + 4 : 21 + 2 * 4 + cycles);
