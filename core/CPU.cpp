@@ -967,6 +967,25 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
         }
 
+        case 0x68: // PUSH imm16/32
+        {
+            uint32_t imm;
+  
+            if(operandSize32)
+            {
+                imm = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8 | sys.readMem(addr + 3) << 16 | sys.readMem(addr + 4) << 24;
+                reg(Reg32::EIP) += 4;
+            }
+            else
+            {
+                imm = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
+                reg(Reg32::EIP) += 2;
+            }
+
+            push(imm, operandSize32);
+            break;
+        }
+
         case 0x70: // JO
         case 0x71: // JNO
         case 0x72: // JB/JNAE
