@@ -1265,9 +1265,18 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             int cycles = (modRM >> 6) == 3 ? 2 : 9 + 4;
 
-            auto srcReg = static_cast<Reg16>(r);
+            if(operandSize32)
+            {
+                auto srcReg = static_cast<Reg32>(r);
 
-            writeRM16(modRM, reg(srcReg), cycles, addr);
+                writeRM32(modRM, reg(srcReg), cycles, addr);
+            }
+            else
+            {
+                auto srcReg = static_cast<Reg16>(r);
+
+                writeRM16(modRM, reg(srcReg), cycles, addr);
+            }
 
             reg(Reg32::EIP)++;
             cyclesExecuted(cycles);
@@ -1996,9 +2005,18 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xBE:
         case 0xBF:
         {
-            auto r = static_cast<Reg16>(opcode & 7);
-            reg(r) = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
-            reg(Reg32::EIP) += 2;
+            if(operandSize32)
+            {
+                auto r = static_cast<Reg32>(opcode & 7);
+                reg(r) = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8 | sys.readMem(addr + 3) << 16 | sys.readMem(addr + 4) << 24;
+                reg(Reg32::EIP) += 4;
+            }
+            else
+            {
+                auto r = static_cast<Reg16>(opcode & 7);
+                reg(r) = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
+                reg(Reg32::EIP) += 2;
+            }
             cyclesExecuted(4);
             break;
         }
