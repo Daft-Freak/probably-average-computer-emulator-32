@@ -95,10 +95,10 @@ private:
         uint32_t limit;
     };
 
-    uint16_t readMem16(uint16_t offset, uint32_t segment);
-    uint32_t readMem32(uint16_t offset, uint32_t segment);
-    void writeMem16(uint16_t offset, uint32_t segment, uint16_t data);
-    void writeMem32(uint16_t offset, uint32_t segment, uint32_t data);
+    uint16_t readMem16(uint32_t offset, uint32_t segment);
+    uint32_t readMem32(uint32_t offset, uint32_t segment);
+    void writeMem16(uint32_t offset, uint32_t segment, uint16_t data);
+    void writeMem32(uint32_t offset, uint32_t segment, uint32_t data);
 
     std::tuple<uint16_t, uint32_t> getEffectiveAddress(int mod, int rm, int &cycles, bool rw, uint32_t addr);
 

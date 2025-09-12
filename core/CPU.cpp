@@ -2840,31 +2840,31 @@ void RAM_FUNC(CPU::executeInstruction)()
     }
 }
 
-uint16_t RAM_FUNC(CPU::readMem16)(uint16_t offset, uint32_t segment)
+uint16_t RAM_FUNC(CPU::readMem16)(uint32_t offset, uint32_t segment)
 {
-    return sys.readMem(offset + segment) | sys.readMem(((offset + 1) & 0xFFFF) + segment) << 8;
+    return sys.readMem(offset + segment) | sys.readMem((offset + 1) + segment) << 8;
 }
 
-uint32_t RAM_FUNC(CPU::readMem32)(uint16_t offset, uint32_t segment)
+uint32_t RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t segment)
 {
-    return sys.readMem(  offset +                segment)       |
-           sys.readMem(((offset + 1) & 0xFFFF) + segment) <<  8 |
-           sys.readMem(((offset + 2) & 0xFFFF) + segment) << 16 |
-           sys.readMem(((offset + 3) & 0xFFFF) + segment) << 24;
+    return sys.readMem(offset +     segment)       |
+           sys.readMem(offset + 1 + segment) <<  8 |
+           sys.readMem(offset + 2 + segment) << 16 |
+           sys.readMem(offset + 3 + segment) << 24;
 }
 
-void RAM_FUNC(CPU::writeMem16)(uint16_t offset, uint32_t segment, uint16_t data)
+void RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint32_t segment, uint16_t data)
 {
     sys.writeMem(offset + segment, data & 0xFF);
-    sys.writeMem(((offset + 1) & 0xFFFF) + segment, data >> 8);
+    sys.writeMem(offset + 1 + segment, data >> 8);
 }
 
-void RAM_FUNC(CPU::writeMem32)(uint16_t offset, uint32_t segment, uint32_t data)
+void RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t segment, uint32_t data)
 {
-    sys.writeMem(offset + segment, data & 0xFF);
-    sys.writeMem(((offset + 1) & 0xFFFF) + segment, data >> 8);
-    sys.writeMem(((offset + 2) & 0xFFFF) + segment, data >> 16);
-    sys.writeMem(((offset + 3) & 0xFFFF) + segment, data >> 24);
+    sys.writeMem(offset +     segment, data & 0xFF);
+    sys.writeMem(offset + 1 + segment, data >> 8);
+    sys.writeMem(offset + 2 + segment, data >> 16);
+    sys.writeMem(offset + 3 + segment, data >> 24);
 }
 
 
