@@ -686,6 +686,88 @@ void RAM_FUNC(CPU::executeInstruction)()
                     reg(Reg32::EIP) += 2;
                     break;
                 }
+
+                case 0x80: // JO
+                case 0x81: // JNO
+                case 0x82: // JB/JNAE
+                case 0x83: // JAE/JNB
+                case 0x84: // JE/JZ
+                case 0x85: // JNE/JNZ
+                case 0x86: // JBE/JNA
+                case 0x87: // JNBE/JA
+                case 0x88: // JS
+                case 0x89: // JNS
+                case 0x8A: // JP/JPE
+                case 0x8B: // JNP/JPO
+                case 0x8C: // JL/JNGE
+                case 0x8D: // JNL/JGE
+                case 0x8E: // JLE/JNG
+                case 0x8F: // JNLE/JG
+                {
+                    int cond = opcode & 0xF;
+
+                    int off;
+
+                    if(operandSize32)
+                        off = static_cast<int32_t>(sys.readMem(addr + 2) | sys.readMem(addr + 3) << 8 | sys.readMem(addr + 4) << 16 | sys.readMem(addr + 5) << 24);
+                    else
+                        off = static_cast<int16_t>(sys.readMem(addr + 2) | sys.readMem(addr + 3) << 8);
+        
+                    bool condVal = false;
+
+                    // dedup?
+                    switch(cond)
+                    {
+                        case 0x0: // JO
+                        case 0x1: // JNO
+                            condVal = flags & Flag_O;
+                            break;
+                        case 0x2: // JB/JNAE
+                        case 0x3: // JAE/JNB
+                            condVal = flags & Flag_C;
+                            break;
+                        case 0x4: // JE/JZ
+                        case 0x5: // JNE/JNZ
+                            condVal = flags & Flag_Z;
+                            break;
+                        case 0x6: // JBE/JNA
+                        case 0x7: // JNBE/JA
+                            condVal = flags & (Flag_C | Flag_Z);
+                            break;
+                        case 0x8: // JS
+                        case 0x9: // JNS
+                            condVal = flags & Flag_S;
+                            break;
+                        case 0xA: // JP/JPE
+                        case 0xB: // JNP/JPO
+                            condVal = flags & Flag_P;
+                            break;
+                        case 0xC: // JL/JNGE
+                        case 0xD: // JNL/JGE
+                            condVal = !!(flags & Flag_S) != !!(flags & Flag_O);
+                            break;
+                        case 0xE: // JLE/JNG
+                        case 0xF: // JNLE/JG
+                            condVal = !!(flags & Flag_S) != !!(flags & Flag_O) || (flags & Flag_Z);
+                            break;
+                    }
+
+                    if(cond & 1)
+                        condVal = !condVal;
+
+                    if(condVal)
+                    {
+                        setIP(reg(Reg32::EIP) + (operandSize32 ? 5 : 3) + off);
+                        cyclesExecuted(16);
+                    }
+                    else
+                    {
+                        reg(Reg32::EIP) += operandSize32 ? 5 : 3;
+                        cyclesExecuted(4);
+                    }
+                    break;
+                }
+
                 default:
                     printf("op 0f %02x @%05x\n", (int)opcode2, addr);
                     exit(1);
