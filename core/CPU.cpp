@@ -523,6 +523,32 @@ void RAM_FUNC(CPU::executeInstruction)()
         reg(Reg32::EIP) = newIP;
     };
 
+    //push/pop
+    auto push = [this](uint32_t val, bool is32)
+    {
+        // FIXME: stack-address size (B in SS descriptor)
+        reg(Reg16::SP) -= is32 ? 4 : 2;
+        if(is32)
+            writeMem32(reg(Reg16::SP), getSegmentOffset(Reg16::SS), val);
+        else
+            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), val);
+    };
+
+    auto pop = [this]( bool is32)
+    {
+        // FIXME: stack-address size (B in SS descriptor)
+        uint32_t ret;
+        
+        if(is32)
+            ret = readMem32(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
+        else
+            ret = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
+
+        reg(Reg16::SP) += is32 ? 4 : 2;
+
+        return ret;
+    };
+
     switch(opcode)
     {
         case 0x00: // ADD r/m8 r8
@@ -551,8 +577,7 @@ void RAM_FUNC(CPU::executeInstruction)()
         {
             auto r = static_cast<Reg16>(((opcode >> 3) & 7) + static_cast<int>(Reg16::ES));
 
-            reg(Reg16::SP) -= 2;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), reg(r));
+            push(reg(r), operandSize32);
 
             cyclesExecuted(10 + 4);
             break;
@@ -565,8 +590,7 @@ void RAM_FUNC(CPU::executeInstruction)()
         {
             auto r = static_cast<Reg16>(((opcode >> 3) & 7) + static_cast<int>(Reg16::ES));
 
-            setSegmentReg(r, readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS)));
-            reg(Reg16::SP) += 2;
+            setSegmentReg(r, pop(operandSize32));
 
             cyclesExecuted(8 + 4);
             break;
@@ -839,10 +863,9 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0x56:
         case 0x57:
         {
-            auto r = static_cast<Reg16>(opcode & 7);
+            auto r = static_cast<Reg32>(opcode & 7);
 
-            reg(Reg16::SP) -= 2;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), reg(r));
+            push(reg(r), operandSize32);
 
             cyclesExecuted(11 + 4);
             break;
@@ -857,11 +880,9 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0x5E:
         case 0x5F:
         {
-            auto r = static_cast<Reg16>(opcode & 7);
+            auto r = static_cast<Reg32>(opcode & 7);
 
-            auto v = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
-            reg(r) = v;
+            reg(r) = pop(operandSize32);
 
             cyclesExecuted(8 + 4);
             break;
@@ -1260,8 +1281,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             int cycles = ((modRM >> 6) == 3 ? 8 : 17 + 4) + 4;
 
-            auto v = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto v = pop(operandSize32);
             writeRM16(modRM, v, cycles, addr);
 
             reg(Reg32::EIP)++;
@@ -1317,13 +1337,11 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto newCS = sys.readMem(addr + 3) | sys.readMem(addr + 4) << 8;
 
             // push CS
-            reg(Reg16::SP) -= 2;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), reg(Reg16::CS));
+            push(reg(Reg16::CS), operandSize32);
 
             // push IP
-            reg(Reg16::SP) -= 2;
             auto retAddr = reg(Reg32::EIP) + 4;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), retAddr);
+            push(retAddr, operandSize32);
 
             setSegmentReg(Reg16::CS, newCS);
             setIP(newIP);
@@ -1333,17 +1351,15 @@ void RAM_FUNC(CPU::executeInstruction)()
 
         case 0x9C: // PUSHF
         {
-            reg(Reg16::SP) -= 2;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), flags);
+            push(flags, operandSize32);
 
             cyclesExecuted(10 + 4);
             break;
         }
         case 0x9D: // POPF
         {
-            flags = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
+            flags = pop(operandSize32);
             flags = (flags & 0xFD5) | 0xF002;
-            reg(Reg16::SP) += 2;
 
             cyclesExecuted(8 + 4);
             break;
@@ -1912,8 +1928,7 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xC2: // RET near, add to SP
         {
             // pop from stack
-            auto newIP = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newIP = pop(operandSize32);
 
             // add imm to SP
             auto imm = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
@@ -1927,8 +1942,7 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xC3: // RET near
         {
             // pop from stack
-            auto newIP = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newIP = pop(operandSize32);
 
             setIP(newIP);
             cyclesExecuted(16 + 4);
@@ -2010,12 +2024,10 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xCA: // RET far, add to SP
         {
             // pop IP
-            auto newIP = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newIP = pop(operandSize32);
 
             // pop CS
-            auto newCS = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newCS = pop(operandSize32);
 
             // add imm to SP
             auto imm = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
@@ -2029,12 +2041,10 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xCB: // RET far
         {
             // pop IP
-            auto newIP = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newIP = pop(operandSize32);
 
             // pop CS
-            auto newCS = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newCS = pop(operandSize32);
 
             setSegmentReg(Reg16::CS, newCS);
             setIP(newIP);
@@ -2059,17 +2069,14 @@ void RAM_FUNC(CPU::executeInstruction)()
             delayInterrupt = true;
 
             // pop IP
-            auto newIP = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newIP = pop(operandSize32);
 
             // pop CS
-            auto newCS = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
-            reg(Reg16::SP) += 2;
+            auto newCS = pop(operandSize32);
 
             // pop flags
-            flags = readMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS));
+            flags = pop(operandSize32);
             flags = (flags & 0xFD5) | 0xF002;
-            reg(Reg16::SP) += 2;
 
             setSegmentReg(Reg16::CS, newCS);
             setIP(newIP);
@@ -2322,9 +2329,8 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
 
             // push
-            reg(Reg16::SP) -= 2;
             auto retAddr = reg(Reg32::EIP) + 2;
-            writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), retAddr);
+            push(retAddr, operandSize32);
 
             setIP(reg(Reg32::EIP) + 2 + off);
             cyclesExecuted(19 + 4);
@@ -2784,13 +2790,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                     auto newCS = readMem16(offset + 2, segment);
 
                     // push CS
-                    reg(Reg16::SP) -= 2;
-                    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), reg(Reg16::CS));
+                    push(reg(Reg16::CS), operandSize32);
 
                     // push IP
-                    reg(Reg16::SP) -= 2;
                     auto retAddr = reg(Reg32::EIP) + 1;
-                    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), retAddr);
+                    push(retAddr, operandSize32);
 
                     setSegmentReg(Reg16::CS, newCS);
                     setIP(v);
@@ -2819,12 +2823,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                 }
                 case 6: // PUSH
                 {
-                    reg(Reg16::SP) -= 2;
-
                     if(modRM == 0xF4) // r/m is SP
                         v -= 2;
 
-                    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), v);
+                    push(v, operandSize32);
 
                     reg(Reg32::EIP)++;
                     cyclesExecuted(isReg ? 11 : (16 + 2 * 4) + cycles);
