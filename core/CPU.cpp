@@ -620,6 +620,49 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto opcode2 = sys.readMem(addr + 1);
             switch(opcode2)
             {
+                case 0x01:
+                {
+                    auto modRM = sys.readMem(addr + 2);
+                    auto exOp = (modRM >> 3) & 0x7;
+
+                    switch(exOp)
+                    {
+                        case 0x02: // LGDT
+                        {
+                            int cycles;
+                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, cycles, false, addr + 1);
+                            gdtLimit = readMem16(offset, segment);
+                            gdtBase = readMem32(offset + 2, segment);
+
+                            if(!operandSize32)
+                                gdtBase &= 0xFFFFFF;
+                            reg(Reg32::EIP) += 2;
+                            break;
+                        }
+
+                        case 0x03: // LIDT
+                        {
+                            int cycles;
+                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, cycles, false, addr + 1);
+                            idtLimit = readMem16(offset, segment);
+                            idtBase = readMem32(offset + 2, segment);
+
+                            if(!operandSize32)
+                                idtBase &= 0xFFFFFF;
+
+                            reg(Reg32::EIP) += 2;
+                            break;
+                        }
+
+                        default:
+                            printf("op 0f 01 %02x @%05x\n", (int)exOp, addr);
+                            exit(1);
+                            break;
+                    }
+
+                    break;
+                }
+
                 case 0x20: // MOV from control reg
                 {
                     auto modRM = sys.readMem(addr + 2);
