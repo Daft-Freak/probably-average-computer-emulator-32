@@ -749,7 +749,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                 case 0x8E: // JLE/JNG
                 case 0x8F: // JNLE/JG
                 {
-                    int cond = opcode & 0xF;
+                    int cond = opcode2 & 0xF;
 
                     int off;
 
