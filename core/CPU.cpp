@@ -34,7 +34,7 @@ static constexpr bool parity(uint8_t v)
 };
 
 template<class T>
-static constexpr int signBit()
+static constexpr T signBit()
 {
     return 1 << ((sizeof(T) * 8) - 1);
 }
