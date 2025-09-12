@@ -523,7 +523,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     return ret + 4;
 
                 // disp instead of base
-                if(rm == 4 && (sys.readMem(nextAddr) & 7) == 6)
+                if(rm == 4 && (sys.readMem(nextAddr) & 7) == 5)
                     ret += 4;
             
                 return ret;
@@ -3321,6 +3321,7 @@ std::tuple<uint32_t, uint32_t> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int r
 
     if(addressSize32) // r/m meaning is entirely different in 32bit mode
     {
+        // are there more cases we need to use SS?
         switch(rm)
         {
             case 0: // EAX
@@ -3335,6 +3336,8 @@ std::tuple<uint32_t, uint32_t> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int r
             case 4: // SIB
             {
                 auto sib = sys.readMem(addr + 2);
+                addr++; // everything is now offset by a byte
+
                 if(!rw)
                     reg(Reg32::EIP)++;
 
@@ -3342,7 +3345,7 @@ std::tuple<uint32_t, uint32_t> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int r
                 int index = (sib >> 3) & 7;
                 int base = sib & 7;
 
-                if(mod == 0 && base == 6)
+                if(mod == 0 && base == 5)
                 {
                     // disp32 instead of base
                     memAddr = sys.readMem(addr + 2) | sys.readMem(addr + 3) << 8 | sys.readMem(addr + 4) << 16 | sys.readMem(addr + 5) << 24;
