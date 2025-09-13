@@ -1456,6 +1456,20 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
         }
 
+        case 0x6A: // PUSH imm8
+        {
+            uint32_t imm = sys.readMem(addr + 1);
+
+            // sign extend
+            if(imm & 0x80)
+                imm |= 0xFFFFFF00;
+
+            reg(Reg32::EIP)++;
+    
+            push(imm, operandSize32);
+            break;
+        }
+
         case 0x6B: // IMUL sign extended byte
         {
             auto modRM = sys.readMem(addr + 1);
