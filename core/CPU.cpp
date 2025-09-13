@@ -3192,22 +3192,36 @@ void RAM_FUNC(CPU::executeInstruction)()
 
         case 0xE8: // CALL
         {
-            auto off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
+            uint32_t off;
+
+            int immSize = operandSize32 ? 4 : 2;
+            
+            if(operandSize32)
+                off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8 | sys.readMem(addr + 3) << 16 | sys.readMem(addr + 4) << 24;
+            else
+                off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
 
             // push
-            auto retAddr = reg(Reg32::EIP) + 2;
+            auto retAddr = reg(Reg32::EIP) + immSize;
             push(retAddr, operandSize32);
 
-            setIP(reg(Reg32::EIP) + 2 + off);
+            setIP(reg(Reg32::EIP) + immSize + off);
             cyclesExecuted(19 + 4);
             break;
         }
 
         case 0xE9: // JMP near
         {
-            auto off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
+            uint32_t off;
 
-            setIP(reg(Reg32::EIP) + 2 + off);
+            int immSize = operandSize32 ? 4 : 2;
+            
+            if(operandSize32)
+                off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8 | sys.readMem(addr + 3) << 16 | sys.readMem(addr + 4) << 24;
+            else
+                off = sys.readMem(addr + 1) | sys.readMem(addr + 2) << 8;
+
+            setIP(reg(Reg32::EIP) + immSize + off);
 
             cyclesExecuted(15);
             break;
