@@ -48,11 +48,6 @@ public:
 
     void removeMemory(unsigned int block);
 
-    uint32_t *getMemoryDirtyMask();
-    bool getMemoryBlockDirty(unsigned int block) const;
-    void setMemoryBlockDirty(unsigned int block);
-    void clearMemoryBlockDirty(unsigned int block);
-
     void setMemoryRequestCallback(MemRequestCallback cb);
     MemRequestCallback getMemoryRequestCallback() const;
 
@@ -111,8 +106,6 @@ private:
     static const int blockSize = 16 * 1024;
 
     uint8_t *memMap[maxAddress / blockSize];
-    uint32_t memDirty[maxAddress / blockSize / 32];
-    uint32_t memReadOnly[maxAddress / blockSize / 32];
 
     MemRequestCallback memReqCb = nullptr;
 

@@ -15,12 +15,10 @@
 
 System::System() : cpu(*this)
 {
-    memset(memReadOnly, 0, sizeof(memReadOnly));
 }
 
 void System::reset()
 {
-    memset(memDirty, 0, sizeof(memDirty));
     cpu.reset();
 }
 
@@ -49,8 +47,6 @@ void System::addReadOnlyMemory(uint32_t base, uint32_t size, const uint8_t *ptr)
     for(int i = 0; i < numBlocks; i++)
     {
         memMap[block + i] = const_cast<uint8_t *>(ptr) - base;
-    
-        memReadOnly[(block + i) / 32] |= 1 << ((block + i) % 32);
     }
 }
 
@@ -58,26 +54,6 @@ void System::removeMemory(unsigned int block)
 {
     assert(block < maxAddress / blockSize);
     memMap[block] = nullptr;
-}
-
-uint32_t *System::getMemoryDirtyMask()
-{
-    return memDirty;
-}
-
-bool System::getMemoryBlockDirty(unsigned int block) const
-{
-    return memDirty[block / 32] & (1 << (block % 32));
-}
-
-void System::setMemoryBlockDirty(unsigned int block)
-{
-    memDirty[block / 32] |= 1 << (block % 32);
-}
-
-void System::clearMemoryBlockDirty(unsigned int block)
-{
-    memDirty[block / 32] &= ~(1 << (block % 32));
 }
 
 void System::setMemoryRequestCallback(MemRequestCallback cb)
@@ -144,15 +120,8 @@ void RAM_FUNC(System::writeMem)(uint32_t addr, uint8_t data)
             ptr = memMap[block] = ptr - block * blockSize;
     }
 
-    // no writing the ROM
-    if(memReadOnly[block / 32] & (1 << (block % 32)))
-        return;
-
     if(ptr)
     {
-        if(ptr[addr] != data)
-            memDirty[block / 32] |= (1 << (block % 32));
-
         ptr[addr] = data;
     }
 }
