@@ -2454,6 +2454,47 @@ void RAM_FUNC(CPU::executeInstruction)()
             cyclesExecuted(4);
             break;
         }
+
+        case 0xC0: // shift r/m8 by imm
+        {
+            auto modRM = sys.readMem(addr + 1);
+            auto exOp = (modRM >> 3) & 0x7;
+    
+            auto count = sys.readMem(addr + 2 + getDispLen(modRM, addr + 2));
+    
+            int cycles = (modRM >> 6) == 3 ? 2 : 15;
+            auto v = readRM8(modRM, cycles, addr);
+
+            writeRM8(modRM, doShift(exOp, v, count, flags), cycles, addr, true);
+
+            reg(Reg32::EIP) += 2;
+            cyclesExecuted(cycles);
+            break;
+        }
+        case 0xC1: // shift r/m16 by imm
+        {
+            auto modRM = sys.readMem(addr + 1);
+            auto exOp = (modRM >> 3) & 0x7;
+    
+            auto count = sys.readMem(addr + 2 + getDispLen(modRM, addr + 2));
+    
+            int cycles = ((modRM >> 6) == 3 ? 8 : 20 + 2 * 4) + count * 4;
+
+            if(operandSize32)
+            {
+                auto v = readRM32(modRM, cycles, addr);
+                writeRM32(modRM, doShift(exOp, v, count, flags), cycles, addr, true);
+            }
+            else
+            {
+                auto v = readRM16(modRM, cycles, addr);
+                writeRM16(modRM, doShift(exOp, v, count, flags), cycles, addr, true);
+            }
+
+            reg(Reg32::EIP) += 2;
+            cyclesExecuted(cycles);
+            break;
+        }
     
         case 0xC2: // RET near, add to SP
         {
