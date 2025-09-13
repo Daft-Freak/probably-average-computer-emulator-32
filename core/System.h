@@ -127,6 +127,9 @@ private:
 
     PIT pit;
 
+    uint8_t cmosIndex = 0; // 70
+    uint8_t cmosRam[64];
+
     uint32_t lastSpeakerUpdateCycle = 0;
     uint32_t speakerSampleTimer = 0;
     SpeakerAudioCallback speakerCb = nullptr;

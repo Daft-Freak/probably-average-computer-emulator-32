@@ -101,6 +101,12 @@ uint8_t Chipset::read(uint16_t addr)
             break;
         }
 
+        case 0x71: // CMOS data
+        {
+            printf("CMOS R %x\n", cmosIndex);
+            return cmosRam[cmosIndex];
+        }
+
         default:
             printf("IO R %04X\n", addr);
     }
@@ -379,6 +385,19 @@ void Chipset::write(uint16_t addr, uint8_t data)
                 // sys.calculateNextInterruptCycle(sys.getCycleCount()); //FIXME
             }
 
+            break;
+        }
+
+        case 0x70: // CMOS index
+        {
+            //nmiEnabled = !(data & 0x80);
+            cmosIndex = data & 0x7F;
+            break;
+        }
+        case 0x71: // CMOS data
+        {
+            printf("CMOS W %x = %02X\n", cmosIndex, data);
+            cmosRam[cmosIndex] = data;
             break;
         }
 
