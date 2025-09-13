@@ -1158,7 +1158,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 doSub(reg(Reg32::EAX), imm, flags);
 
-                reg(Reg32::EIP) += 2;
+                reg(Reg32::EIP) += 4;
             }
             else
             {
