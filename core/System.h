@@ -168,6 +168,8 @@ public:
     void setMemoryRequestCallback(MemRequestCallback cb);
     MemRequestCallback getMemoryRequestCallback() const;
 
+    Chipset &getChipset() {return chipset;}
+
     void addIODevice(uint16_t mask, uint16_t value, uint8_t picMask, IODevice *dev);
     void removeIODevice(IODevice *dev);
 

@@ -478,8 +478,8 @@ void RAM_FUNC(CPU::run)(int ms)
 
         if(flags & Flag_I)
         {
-            //if(!delayInterrupt && sys.hasInterrupt())
-            //    serviceInterrupt(sys.acknowledgeInterrupt());
+            if(!delayInterrupt && chipset.hasInterrupt())
+                serviceInterrupt(chipset.acknowledgeInterrupt());
         }
 
         delayInterrupt = false;
