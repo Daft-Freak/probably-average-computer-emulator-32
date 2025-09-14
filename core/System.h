@@ -129,6 +129,9 @@ private:
 
     bool nmiEnabled = false;
 
+    FIFO<uint8_t, 16> i8042Queue; // buffer inputs a bit
+    uint8_t i8042ControllerCommand = 0, i8042DeviceCommand = 0;
+
     uint8_t cmosIndex = 0; // 70
     uint8_t cmosRam[64];
 

@@ -101,6 +101,19 @@ uint8_t Chipset::read(uint16_t addr)
             break;
         }
 
+        case 0x60: // 8042 "keyboard controller" data
+        {
+            if(i8042Queue.empty())
+                return 0xFF;
+
+            return i8042Queue.pop();
+        }
+
+        case 0x64: // 8042 "keyboard controller" status
+        {
+            return i8042Queue.empty() ? 0 : 1 << 0;
+        } 
+
         case 0x70: // CMOS index
             return cmosIndex | (nmiEnabled ? 0 : 0x80);
 
@@ -406,6 +419,86 @@ void Chipset::write(uint16_t addr, uint8_t data)
                 // sys.calculateNextInterruptCycle(sys.getCycleCount()); //FIXME
             }
 
+            break;
+        }
+
+        case 0x60: // 8042 data
+        {
+            if(i8042ControllerCommand)
+            {
+                if(i8042ControllerCommand == 0x60) // write config byte
+                {
+                    printf("8042 cfg %02X\n", data);
+                }
+                i8042ControllerCommand = 0;
+                break;
+            }
+            else if(i8042DeviceCommand)
+            {
+                if(i8042DeviceCommand == 0xF0) // get/set scancode set
+                {
+                    switch(data)
+                    {
+                        case 0:
+                            i8042Queue.push(0xFA); // ACK
+                            i8042Queue.push(0x41); // set 2 (TODO)
+                            break;
+
+                        case 1:
+                        case 2:
+                        case 3:
+                            printf("8042 scancode set %i\n", data);
+                            i8042Queue.push(0xFA); // ACK
+                            break;
+                    }
+                }
+                i8042DeviceCommand = 0;
+                break;
+            }
+
+            switch(data)
+            {
+                case 0xF0: // get/set code set
+                    i8042DeviceCommand = data;
+                    i8042Queue.push(0xFA); // ACK
+                    break;
+                case 0xF4: // enable sending
+                    printf("8042 disable send\n");
+                    i8042Queue.push(0xFA); // ACK
+                    break;
+                case 0xF5: // disable sending
+                    printf("8042 disable send\n");
+                    i8042Queue.push(0xFA); // ACK
+                    break;
+
+                case 0xFF: // reset and test
+                    i8042Queue.push(0xFA); // ACK
+                    i8042Queue.push(0xAA); // passed
+                    break;
+
+                default:
+                    printf("8042 dat %02X\n", data);
+            }
+            break;
+        }
+
+        case 0x64: // 8042 command
+        {
+            switch(data)
+            {
+                case 0x60: // write config byte
+                    i8042ControllerCommand = data;
+                    break;
+                case 0xAA: // controller test
+                    i8042Queue.push(0x55); // pass
+                    break;
+                case 0xAB: // first port test
+                    i8042Queue.push(0); // pass
+                    break;
+
+                default:
+                    printf("8042 cmd %02X\n", data);
+            }
             break;
         }
 
