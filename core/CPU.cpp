@@ -1965,7 +1965,10 @@ void RAM_FUNC(CPU::executeInstruction)()
             int cycles = ((modRM >> 6) == 3 ? 8 : 17 + 4) + 4;
 
             auto v = pop(operandSize32);
-            writeRM16(modRM, v, cycles, addr);
+            if(operandSize32)
+                writeRM32(modRM, v, cycles, addr);
+            else
+                writeRM16(modRM, v, cycles, addr);
 
             reg(Reg32::EIP)++;
             cyclesExecuted(cycles);
