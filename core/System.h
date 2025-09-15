@@ -5,6 +5,7 @@
 
 #include "CPU.h"
 #include "FIFO.h"
+#include "Scancode.h"
 
 class System;
 
@@ -53,6 +54,9 @@ public:
 
     void flagPICInterrupt(int index);
     uint8_t acknowledgeInterrupt();
+
+    // 8042
+    void sendKey(ATScancode scancode, bool down);
 
     // PIT/speaker
     void setSpeakerAudioCallback(SpeakerAudioCallback cb);
@@ -131,6 +135,9 @@ private:
 
     FIFO<uint8_t, 16> i8042Queue; // buffer inputs a bit
     uint8_t i8042ControllerCommand = 0, i8042DeviceCommand = 0;
+    uint8_t i8042PortEnabled = 0;
+    uint8_t i8042Configuration = 0;
+    uint8_t i8042DeviceSendEnabled = 0;
 
     uint8_t cmosIndex = 0; // 70
     uint8_t cmosRam[64];

@@ -106,7 +106,13 @@ uint8_t Chipset::read(uint16_t addr)
             if(i8042Queue.empty())
                 return 0xFF;
 
-            return i8042Queue.pop();
+            uint8_t ret = i8042Queue.pop();
+
+            // re-flag interrupt if enabled and more data
+            if((i8042Configuration & (1 << 0)) && !i8042Queue.empty())
+                flagPICInterrupt(1);
+
+            return ret;
         }
 
         case 0x64: // 8042 "keyboard controller" status
@@ -429,6 +435,7 @@ void Chipset::write(uint16_t addr, uint8_t data)
                 if(i8042ControllerCommand == 0x60) // write config byte
                 {
                     printf("8042 cfg %02X\n", data);
+                    i8042Configuration = data;
                 }
                 i8042ControllerCommand = 0;
                 break;
@@ -441,7 +448,7 @@ void Chipset::write(uint16_t addr, uint8_t data)
                     {
                         case 0:
                             i8042Queue.push(0xFA); // ACK
-                            i8042Queue.push(0x41); // set 2 (TODO)
+                            i8042Queue.push(0x41); // set 2 (TODO) (also this is translated)
                             break;
 
                         case 1:
@@ -463,11 +470,13 @@ void Chipset::write(uint16_t addr, uint8_t data)
                     i8042Queue.push(0xFA); // ACK
                     break;
                 case 0xF4: // enable sending
-                    printf("8042 disable send\n");
+                    // TODO: 2nd port
+                    i8042DeviceSendEnabled |= (1 << 0);
                     i8042Queue.push(0xFA); // ACK
                     break;
                 case 0xF5: // disable sending
-                    printf("8042 disable send\n");
+                     // TODO: 2nd port
+                    i8042DeviceSendEnabled &= ~(1 << 0);
                     i8042Queue.push(0xFA); // ACK
                     break;
 
@@ -489,13 +498,25 @@ void Chipset::write(uint16_t addr, uint8_t data)
                 case 0x60: // write config byte
                     i8042ControllerCommand = data;
                     break;
+                case 0xA7: // disable second port
+                    i8042PortEnabled &= ~(1 << 1);
+                    break;
+                case 0xA8: // enable second port
+                    i8042PortEnabled |= (1 << 1);
+                    break;
                 case 0xAA: // controller test
                     i8042Queue.push(0x55); // pass
                     break;
                 case 0xAB: // first port test
+                    i8042PortEnabled |= (1 << 0); //?
                     i8042Queue.push(0); // pass
                     break;
-
+                case 0xAD: // disable first port
+                    i8042PortEnabled &= ~(1 << 0);
+                    break;
+                case 0xAE: // enable first port
+                    i8042PortEnabled |= (1 << 0);
+                    break;
                 default:
                     printf("8042 cmd %02X\n", data);
             }
@@ -684,6 +705,68 @@ uint8_t Chipset::acknowledgeInterrupt()
     pic.request &= ~(1 << serviceIndex);
 
     return serviceIndex | (pic.initCommand[1] & 0xF8);
+}
+
+void Chipset::sendKey(ATScancode scancode, bool down)
+{
+    // check if enabled (assume keyboard is first port)
+    if(!(i8042PortEnabled & (1 << 0)))
+        return;
+
+    if(!(i8042DeviceSendEnabled & (1 << 0)))
+        return;
+
+    bool translate = i8042Configuration & (1 << 6);
+
+    auto rawCode = static_cast<uint16_t>(scancode);
+
+    // assuming keyboard is set to scancode set 2
+
+    // send extended code (E0)
+    if(rawCode & 0xFF00)
+        i8042Queue.push(rawCode >> 8);
+
+    if(translate)
+    {
+        // translate set
+        static const uint8_t translationTable[]
+        {
+            0xFF, 0x43, 0x41, 0x3F, 0x3D, 0x3B, 0x3C, 0x58, 0x64, 0x44, 0x42, 0x40, 0x3E, 0x0F, 0x29, 0x59,
+            0x65, 0x38, 0x2A, 0x70, 0x1D, 0x10, 0x02, 0x5A, 0x66, 0x71, 0x2C, 0x1F, 0x1E, 0x11, 0x03, 0x5B,
+            0x67, 0x2E, 0x2D, 0x20, 0x12, 0x05, 0x04, 0x5C, 0x68, 0x39, 0x2F, 0x21, 0x14, 0x13, 0x06, 0x5D,
+            0x69, 0x31, 0x30, 0x23, 0x22, 0x15, 0x07, 0x5E, 0x6A, 0x72, 0x32, 0x24, 0x16, 0x08, 0x09, 0x5F,
+            0x6B, 0x33, 0x25, 0x17, 0x18, 0x0B, 0x0A, 0x60, 0x6C, 0x34, 0x35, 0x26, 0x27, 0x19, 0x0C, 0x61,
+            0x6D, 0x73, 0x28, 0x74, 0x1A, 0x0D, 0x62, 0x6E, 0x3A, 0x36, 0x1C, 0x1B, 0x75, 0x2B, 0x63, 0x76,
+            0x55, 0x56, 0x77, 0x78, 0x79, 0x7A, 0x0E, 0x7B, 0x7C, 0x4F, 0x7D, 0x4B, 0x47, 0x7E, 0x7F, 0x6F,
+            0x52, 0x53, 0x50, 0x4C, 0x4D, 0x48, 0x01, 0x45, 0x57, 0x4E, 0x51, 0x4A, 0x37, 0x49, 0x46, 0x54,
+            0x80, 0x81, 0x82, 0x41, 0x54
+        };
+
+        uint8_t translated;
+
+        if((rawCode & 0xFF) >= 0x85)
+            translated = rawCode & 0xFF;
+        else
+            translated = translationTable[rawCode & 0xFF];
+
+        // break bit
+        if(!down)
+            translated |= 0x80;
+
+        i8042Queue.push(translated);
+    }
+    else
+    {
+        // break prefix
+        if(!down)
+            i8042Queue.push(0xF0);
+
+        i8042Queue.push(rawCode & 0xFF);
+    }
+
+    // flag interrupt if enabled
+    if(i8042Configuration & (1 << 0))
+        flagPICInterrupt(1);
 }
 
 void Chipset::setSpeakerAudioCallback(SpeakerAudioCallback cb)
