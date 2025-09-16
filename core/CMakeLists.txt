@@ -2,6 +2,7 @@ add_library(PACECore INTERFACE)
 
 target_sources(PACECore INTERFACE
     CPU.cpp
+    QEMUConfig.cpp
     System.cpp
 )
 
