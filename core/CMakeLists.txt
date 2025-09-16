@@ -4,6 +4,7 @@ target_sources(PACECore INTERFACE
     CPU.cpp
     QEMUConfig.cpp
     System.cpp
+    VGACard.cpp
 )
 
 target_include_directories(PACECore INTERFACE ${CMAKE_CURRENT_LIST_DIR})
