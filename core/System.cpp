@@ -124,10 +124,7 @@ uint8_t Chipset::read(uint16_t addr)
             return cmosIndex | (nmiEnabled ? 0 : 0x80);
 
         case 0x71: // CMOS data
-        {
-            printf("CMOS R %x\n", cmosIndex);
             return cmosRam[cmosIndex];
-        }
 
         case 0x92: // system control port A
             return systemControlA;
