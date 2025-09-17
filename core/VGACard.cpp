@@ -178,6 +178,8 @@ uint8_t VGACard::readMem(uint32_t addr)
     // remap low bit for chaining
     if(chain && map == 0)
         mappedAddr = (mappedAddr & ~1) | ((addr >> 16) & 1);
+    else if(chain)
+        mappedAddr = (mappedAddr & ~1);
 
     //printf("VGA R %05X (%04X, sel %i)\n", addr, mappedAddr, gfxReadSel);
 
@@ -201,6 +203,8 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
     // remap low bit for chaining
     if(chain && map == 0)
         mappedAddr = (mappedAddr & ~1) | ((addr >> 16) & 1);
+    else if(chain)
+        mappedAddr = (mappedAddr & ~1);
 
     //if(data)
     //    printf("VGA W %05X(%04X) = %02X\n", addr, mappedAddr, data);
