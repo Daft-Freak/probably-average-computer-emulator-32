@@ -50,7 +50,12 @@ void VGACard::write(uint16_t addr, uint8_t data)
 
         case 0x3C0: // attribute address/data
             if(attributeIsData)
-                printf("VGA W attrib %02X = %02X\n", attributeIndex, data);
+            {
+                if(attributeIndex < 0x10)
+                    attribPalette[attributeIndex] = data;
+                else
+                    printf("VGA W attrib %02X = %02X\n", attributeIndex, data);
+            }
             else
                 attributeIndex = data;
 
@@ -100,8 +105,7 @@ void VGACard::write(uint16_t addr, uint8_t data)
             dacIndexWrite = data * 3;
             break;
         case 0x3C9: // DAC data
-            printf("VGA W dac %02X(%c) = %02X\n", dacIndexWrite / 3, "RGB"[dacIndexWrite % 3], data);
-            dacIndexWrite++;
+            dacPalette[dacIndexWrite++] = data;
             break;
 
         case 0x3CE: // graphics controller address

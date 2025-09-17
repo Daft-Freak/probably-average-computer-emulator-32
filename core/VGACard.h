@@ -44,10 +44,16 @@ private:
     // crtc
     uint8_t crtcRegs[25];
 
+    // attribute controller
+    uint8_t attribPalette[16]; // 0-F
+
     // sequencer
     uint8_t seqClockMode = 0; // 1
     uint8_t seqMapMask = 0;   // 2
     uint8_t seqMemMode = 0;   // 4
+
+    // dac
+    uint8_t dacPalette[3 * 256];
 
     // graphics controller
     uint8_t gfxReadSel = 0; // 4
