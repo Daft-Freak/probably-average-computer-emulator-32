@@ -5,10 +5,13 @@
 
 #include <SDL.h>
 
+#include "FloppyController.h"
 #include "QEMUConfig.h"
 #include "Scancode.h"
 #include "System.h"
 #include "VGACard.h"
+
+#include "DiskIO.h"
 
 static bool quit = false;
 static bool turbo = false;
@@ -17,6 +20,7 @@ static SDL_AudioDeviceID audioDevice;
 
 static System sys;
 
+static FloppyController fdc(sys);
 static QEMUConfig qemuCfg(sys);
 static VGACard vgaCard(sys);
 
@@ -24,6 +28,10 @@ static uint8_t ram[8 * 1024 * 1024];
 
 static uint8_t biosROM[0x20000];
 static uint8_t vgaBIOS[0x10000];
+
+static FileFloppyIO floppyIO;
+
+static std::list<std::string> nextFloppyImage;
 
 static ATScancode scancodeMap[SDL_NUM_SCANCODES]
 {
@@ -328,6 +336,22 @@ static void pollEvents()
                 if((event.key.keysym.mod & escMod) == escMod)
                 {
                     // emulator shortcuts
+                    switch(event.key.keysym.sym)
+                    {
+                        case SDLK_f:
+                        {
+                            // load next floppy
+                            if(!nextFloppyImage.empty())
+                            {
+                                auto newPath = nextFloppyImage.front();
+                                nextFloppyImage.splice(nextFloppyImage.end(), nextFloppyImage, nextFloppyImage.begin());
+
+                                std::cout << "Swapping floppy 0 to " << newPath << "\n";
+                                floppyIO.openDisk(0, newPath);
+                            }
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -366,6 +390,8 @@ int main(int argc, char *argv[])
     bool timeLimit = false;
 
     std::string biosPath = "bios.bin";
+    std::string floppyPaths[FileFloppyIO::maxDrives];
+
     int i = 1;
 
     for(; i < argc; i++)
@@ -383,6 +409,17 @@ int main(int argc, char *argv[])
         }
         else if(arg == "--bios" && i + 1 < argc)
             biosPath = argv[++i];
+        else if(arg.compare(0, 8, "--floppy") == 0 && arg.length() == 9 && i + 1 < argc)
+        {
+            int n = arg[8] - '0';
+            if(n >= 0 && n < FileFloppyIO::maxDrives)
+                floppyPaths[n] = argv[++i];
+        }
+        else if(arg == "--floppy-next" && i + 1 < argc)
+        {
+            // floppy image to load later
+            nextFloppyImage.push_back(argv[++i]);
+        }
         else
             break;
     }
@@ -431,6 +468,24 @@ int main(int argc, char *argv[])
         biosFile.read(reinterpret_cast<char *>(vgaBIOS), sizeof(vgaBIOS));
         qemuCfg.setVGABIOS(vgaBIOS);
     }
+
+    // try to open floppy disk image(s)
+    for(int i = 0; i < FileFloppyIO::maxDrives; i++)
+    {
+        if(!floppyPaths[i].empty())
+        {
+            floppyIO.openDisk(i, basePath + floppyPaths[i]);
+        
+            // add current image to end of floppy list so we can cycle
+            if(i == 0 && !nextFloppyImage.empty())
+                nextFloppyImage.push_back(floppyPaths[i]);
+        }
+    }
+
+    for(auto &path : nextFloppyImage)
+        path = basePath + path;
+    
+    fdc.setIOInterface(&floppyIO);
 
     sys.reset();
 

@@ -1,6 +1,7 @@
 # minimal SDL shell
 
 add_executable(PACE_SDL
+    DiskIO.cpp
     Main.cpp
 )
 
