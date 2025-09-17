@@ -191,7 +191,6 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
     auto mappedAddr = planeAddr;
 
     // remap low bit for chaining
-    // TODO: only correct for 64k/no expansion ram
     if(chain)
         mappedAddr = (mappedAddr & ~1) | ((addr >> 16) & 1);
 
