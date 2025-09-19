@@ -3,7 +3,7 @@
 #include <string>
 #include <thread>
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include "FloppyController.h"
 #include "QEMUConfig.h"
@@ -16,7 +16,7 @@
 static bool quit = false;
 static bool turbo = false;
 
-static SDL_AudioDeviceID audioDevice;
+static SDL_AudioStream *audioStream;
 
 static System sys;
 
@@ -33,7 +33,7 @@ static FileFloppyIO floppyIO;
 
 static std::list<std::string> nextFloppyImage;
 
-static ATScancode scancodeMap[SDL_NUM_SCANCODES]
+static ATScancode scancodeMap[SDL_SCANCODE_COUNT]
 {
     ATScancode::Invalid,
     ATScancode::Invalid,
@@ -313,32 +313,32 @@ static ATScancode scancodeMap[SDL_NUM_SCANCODES]
 
 static void pollEvents()
 {
-    const int escMod = KMOD_RCTRL | KMOD_RSHIFT;
+    const int escMod = SDL_KMOD_RCTRL | SDL_KMOD_RSHIFT;
 
     SDL_Event event;
     while(SDL_PollEvent(&event))
     {
         switch(event.type)
         {
-            case SDL_KEYDOWN:
+            case SDL_EVENT_KEY_DOWN:
             {
-                if((event.key.keysym.mod & escMod) != escMod)
+                if((event.key.mod & escMod) != escMod)
                 {
-                    auto code = scancodeMap[event.key.keysym.scancode];
+                    auto code = scancodeMap[event.key.scancode];
 
                     if(code != ATScancode::Invalid)
                         sys.getChipset().sendKey(code, true);
                 }
                 break;
             }
-            case SDL_KEYUP:
+            case SDL_EVENT_KEY_UP:
             {
-                if((event.key.keysym.mod & escMod) == escMod)
+                if((event.key.mod & escMod) == escMod)
                 {
                     // emulator shortcuts
-                    switch(event.key.keysym.sym)
+                    switch(event.key.key)
                     {
-                        case SDLK_f:
+                        case SDLK_F:
                         {
                             // load next floppy
                             if(!nextFloppyImage.empty())
@@ -355,7 +355,7 @@ static void pollEvents()
                 }
                 else
                 {
-                    auto code = scancodeMap[event.key.keysym.scancode];
+                    auto code = scancodeMap[event.key.scancode];
 
                     if(code != ATScancode::Invalid)
                         sys.getChipset().sendKey(code, true);
@@ -363,14 +363,14 @@ static void pollEvents()
                 break;
             }
 
-            case SDL_MOUSEMOTION:
+            case SDL_EVENT_MOUSE_MOTION:
                 break;
 
-            case SDL_MOUSEBUTTONDOWN:
-            case SDL_MOUSEBUTTONUP:
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            case SDL_EVENT_MOUSE_BUTTON_UP:
                 break;
 
-            case SDL_QUIT:
+            case SDL_EVENT_QUIT:
                 quit = true;
                 break;
         }
@@ -428,11 +428,7 @@ int main(int argc, char *argv[])
     std::string basePath;
     auto tmp = SDL_GetBasePath();
     if(tmp)
-    {
         basePath = tmp;
-        SDL_free(tmp);
-    }
-
   
     // emu init
     auto &cpu = sys.getCPU();
@@ -490,40 +486,40 @@ int main(int argc, char *argv[])
     sys.reset();
 
     // SDL init
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
+    if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         std::cerr << "Failed to init SDL!\n";
         return 1;
     }
 
-    auto window = SDL_CreateWindow("DaftBoySDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                   screenWidth * screenScale, screenHeight * screenScale,
-                                   SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    auto window = SDL_CreateWindow("DaftBoySDL", screenWidth * screenScale, screenHeight * screenScale,
+                                   SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
-    auto renderer = SDL_CreateRenderer(window, -1, turbo ? 0 : SDL_RENDERER_PRESENTVSYNC);
-    SDL_RenderSetLogicalSize(renderer, screenWidth, screenHeight);
-    SDL_RenderSetIntegerScale(renderer, SDL_TRUE);
+    auto renderer = SDL_CreateRenderer(window, nullptr);
+    if(!turbo)
+        SDL_SetRenderVSync(renderer, 1);
+    SDL_SetRenderLogicalPresentation(renderer, screenWidth, screenHeight, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
 
-    auto texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight);
+    auto texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_XBGR8888, SDL_TEXTUREACCESS_STREAMING, textureWidth, textureHeight);
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
     // audio
     SDL_AudioSpec spec{};
 
     spec.freq = 44100;
-    spec.format = AUDIO_S16;
+    spec.format = SDL_AUDIO_S16;
     spec.channels = 1;
-    spec.samples = 512;
 
-    audioDevice = SDL_OpenAudioDevice(nullptr, false, &spec, nullptr, 0);
+    audioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
 
-    if(!audioDevice)
+    if(!audioStream)
     {
         std::cerr << "Failed to open audio: " << SDL_GetError() << "\n";
         quit = true;
     }
 
     if(!turbo)
-        SDL_PauseAudioDevice(audioDevice, 0);
+        SDL_ResumeAudioStreamDevice(audioStream);
 
     auto lastTick = SDL_GetTicks();
     auto startTime = SDL_GetTicks();
@@ -582,8 +578,8 @@ int main(int argc, char *argv[])
         SDL_UnlockTexture(texture);
 
         SDL_RenderClear(renderer);
-        SDL_Rect srcRect{0, 0, outputW, outputH};
-        SDL_RenderCopy(renderer, texture, &srcRect, nullptr);
+        SDL_FRect srcRect{0, 0, float(outputW), float(outputH)};
+        SDL_RenderTexture(renderer, texture, &srcRect, nullptr);
         SDL_RenderPresent(renderer);
     }
 
@@ -593,7 +589,7 @@ int main(int argc, char *argv[])
         printf("Ran for %ums\n", runTime);
     }
 
-    SDL_CloseAudioDevice(audioDevice);
+    SDL_DestroyAudioStream(audioStream);
 
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
