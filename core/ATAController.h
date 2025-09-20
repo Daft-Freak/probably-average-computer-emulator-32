@@ -6,10 +6,10 @@ public:
     ATAController(System &sys);
 
     uint8_t read(uint16_t addr) override;
-    uint16_t read16(uint16_t addr) override {return read(addr) | read(addr + 1) << 8;}
+    uint16_t read16(uint16_t addr) override;
 
     void write(uint16_t addr, uint8_t data) override;
-    void write16(uint16_t addr, uint16_t data) override {write(addr, data); write(addr + 1, data >> 8);}
+    void write16(uint16_t addr, uint16_t data) override;
 
     void updateForInterrupts(uint8_t mask) override {}
     int getCyclesToNextInterrupt(uint32_t cycleCount) override {return 0;}
@@ -19,6 +19,8 @@ public:
     void dmaComplete(int ch) override {}
 
 private:
+    void fillIdentity(int device);
+
     uint8_t features;
     uint8_t sectorCount;
     uint8_t lbaLowSector; // LBA low or sector
@@ -27,4 +29,8 @@ private:
     uint8_t deviceHead; // device/head
 
     uint8_t status = 0;
+
+    uint8_t sectorBuf[512];
+    int pioReadLen = 0;
+    int bufOffset = 0;
 };
