@@ -29,6 +29,11 @@ ATAController::ATAController(System &sys)
     sys.addIODevice(0x3FE, 0x3F6, 0, this);
 }
 
+void ATAController::setIOInterface(ATADiskIO *io)
+{
+    this->io = io;
+}
+
 uint8_t ATAController::read(uint16_t addr)
 {
     switch(addr & ~(1 << 7))
@@ -138,7 +143,7 @@ void ATAController::write(uint16_t addr, uint8_t data)
                     break;
 
                 case ATACommand::IDENTIFY_DEVICE:
-                    //if(dev == 0) // FIXME: device present
+                    if(io && io->getNumSectors(dev))
                     {
                         fillIdentity(dev);
 
@@ -168,8 +173,7 @@ void ATAController::write16(uint16_t addr, uint16_t data)
 
 void ATAController::fillIdentity(int device)
 {
-    //TODO
-    uint32_t sectors = 100 * 1024 * 2;
+    uint32_t sectors = io->getNumSectors(device);
 
     // fake some CHS sizes
     // this may try too hard

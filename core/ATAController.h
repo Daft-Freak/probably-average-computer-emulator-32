@@ -1,9 +1,26 @@
+#pragma once
+
 #include "System.h"
+
+class ATADiskIO
+{
+public:
+    // returns 0 if no drive present
+    virtual uint32_t getNumSectors(int device) = 0;
+
+    // reads a 512 byte sector
+    virtual bool read(int device, uint8_t *buf, uint32_t lba) = 0;
+
+    // writes a 512 byte sector
+    virtual bool write(int device, const uint8_t *buf, uint32_t lba) = 0;
+};
 
 class ATAController : public IODevice
 {
 public:
     ATAController(System &sys);
+
+    void setIOInterface(ATADiskIO *io);
 
     uint8_t read(uint16_t addr) override;
     uint16_t read16(uint16_t addr) override;
@@ -33,4 +50,6 @@ private:
     uint8_t sectorBuf[512];
     int pioReadLen = 0;
     int bufOffset = 0;
+
+    ATADiskIO *io = nullptr;
 };
