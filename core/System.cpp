@@ -1051,8 +1051,15 @@ uint8_t RAM_FUNC(System::readIOPort)(uint16_t addr)
 
 uint16_t RAM_FUNC(System::readIOPort16)(uint16_t addr)
 {
-    // TODO: 16-bit cards may not want this
-    return readIOPort(addr) | readIOPort(addr + 1) << 8;
+    for(auto & dev : ioDevices)
+    {
+        if((addr & dev.ioMask) == dev.ioValue)
+            return dev.dev->read16(addr);
+    }
+
+    printf("IO R %04X\n", addr);
+
+    return 0xFFFF;
 }
 
 void RAM_FUNC(System::writeIOPort)(uint16_t addr, uint8_t data)
@@ -1067,8 +1074,12 @@ void RAM_FUNC(System::writeIOPort)(uint16_t addr, uint8_t data)
 
 void RAM_FUNC(System::writeIOPort16)(uint16_t addr, uint16_t data)
 {
-    writeIOPort(addr, data & 0xFF);
-    writeIOPort(addr + 1, data >> 8);
+    for(auto & dev : ioDevices)
+    {
+        if((addr & dev.ioMask) == dev.ioValue)
+            return dev.dev->write16(addr, data);
+    }
+    printf("IO W %04X = %04X\n", addr, data);
 }
 
 void System::updateForInterrupts(uint8_t updateMask, uint8_t picMask)
