@@ -444,7 +444,12 @@ void Chipset::write(uint16_t addr, uint8_t data)
             }
             else if(i8042DeviceCommand)
             {
-                if(i8042DeviceCommand == 0xF0) // get/set scancode set
+                if(i8042DeviceCommand == 0xED) // set LEDs
+                {
+                    printf("8042 set keyboard leds %x\n", data);
+                    i8042Queue.push(0xFA); // ACK
+                }
+                else if(i8042DeviceCommand == 0xF0) // get/set scancode set
                 {
                     switch(data)
                     {
@@ -467,6 +472,11 @@ void Chipset::write(uint16_t addr, uint8_t data)
 
             switch(data)
             {
+                case 0xED: // set LEDs
+                    i8042DeviceCommand = data;
+                    i8042Queue.push(0xFA); // ACK
+                    break;
+
                 case 0xF0: // get/set code set
                     i8042DeviceCommand = data;
                     i8042Queue.push(0xFA); // ACK
