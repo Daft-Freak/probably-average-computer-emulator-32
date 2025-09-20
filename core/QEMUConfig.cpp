@@ -56,11 +56,11 @@ uint8_t QEMUConfig::read(uint16_t addr)
 
 void QEMUConfig::write(uint16_t addr, uint8_t data)
 {
-    if(addr & 1)
-        index |= data << 8;
-    else
-    {
-        index = data;
-        dataOffset = 0;
-    }
+    // 510 is a 16-bit port (and the only write port)
+}
+
+void QEMUConfig::write16(uint16_t addr, uint16_t data)
+{
+    index = data;
+    dataOffset = 0;
 }
