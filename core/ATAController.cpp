@@ -81,11 +81,28 @@ uint16_t ATAController::read16(uint16_t addr)
                 // check for end of transfer
                 if(bufOffset == pioReadLen)
                 {
-                    pioReadLen = 0;
+                    if(pioReadSectors > 1)
+                    {
+                        // next sector for multi-sector read
+                        pioReadSectors--;
+                        curLBA++;
 
-                    // clear data request, set ready
-                    status |= Status_DRDY;
-                    status &= ~Status_DRQ;
+                        int dev = (deviceHead >> 4) & 1;
+
+                        if(!io || !io->read(dev, sectorBuf, curLBA))
+                            status |= Status_ERR;
+
+                        bufOffset = 0;
+                    }
+                    else
+                    {
+                        pioReadLen = 0;
+                        pioReadSectors = 0;
+
+                        // clear data request, set ready
+                        status |= Status_DRDY;
+                        status &= ~Status_DRQ;
+                    }
                 }
 
                 return ret;
@@ -136,6 +153,40 @@ void ATAController::write(uint16_t addr, uint8_t data)
 
             switch(static_cast<ATACommand>(data))
             {
+                case ATACommand::READ_SECTOR:
+                {
+                    bool isLBA = (deviceHead >> 6) & 1;
+                    uint32_t lba;
+                    if(isLBA)
+                    {
+                        lba = lbaLowSector | lbaMidCylinderLow << 8 | lbaHighCylinderHigh << 16 | (deviceHead & 0xF) << 24;
+                        printf("ATA dev %i read %i sectors LBA %u\n", dev, sectorCount, lba);
+                    }
+                    else
+                    {
+                        auto cylinder = lbaMidCylinderLow | lbaHighCylinderHigh << 8;
+                        int head = deviceHead & 0xF;
+                        lba = (cylinder * numHeads[dev] + head) *sectorsPerTrack[dev] + (lbaLowSector - 1);
+                        printf("ATA dev %i read %i sectors C %u H %u S %u LBA %u\n", dev, sectorCount, cylinder, head, lbaLowSector, lba);
+                    }
+
+                    // try to read
+                    if(!io || !io->read(dev, sectorBuf, lba))
+                        status |= Status_ERR;
+                    else
+                    {
+                        curLBA = lba;
+
+                        pioReadLen = 512;
+                        pioReadSectors = sectorCount;
+                        bufOffset = 0;
+
+
+                        status &= ~Status_DRDY;
+                        status |= Status_DRQ;
+                    }
+                    break;
+                }
                 // ATAPI
                 case ATACommand::PACKET:
                 case ATACommand::IDENTIFY_PACKET_DEVICE:
@@ -216,6 +267,11 @@ void ATAController::fillIdentity(int device)
     // less sectors per track than heads looks a bit silly
     if(sectorsPerTrack < heads)
         std::swap(sectorsPerTrack, heads);
+
+    // store for later translation
+    numCylinders[device] = cylinders;
+    numHeads[device] = heads;
+    this->sectorsPerTrack[device] = sectorsPerTrack;
 
     printf("%u LBA sectors -> %i cylinders, %i heads, %i sectors (%u total)\n", sectors, cylinders, heads, sectorsPerTrack, cylinders * heads * sectorsPerTrack);
 

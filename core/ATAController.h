@@ -48,8 +48,17 @@ private:
     uint8_t status = 0;
 
     uint8_t sectorBuf[512];
-    int pioReadLen = 0;
     int bufOffset = 0;
 
+    int pioReadLen = 0;
+    int pioReadSectors = 0;
+
+    uint32_t curLBA;
+
     ATADiskIO *io = nullptr;
+
+    // faked values
+    uint8_t sectorsPerTrack[2];
+    uint8_t numHeads[2];
+    uint16_t numCylinders[2];
 };
