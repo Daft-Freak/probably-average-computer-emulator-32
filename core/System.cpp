@@ -532,10 +532,10 @@ void Chipset::write(uint16_t addr, uint8_t data)
                     i8042PortEnabled |= (1 << 1);
                     break;
                 case 0xAA: // controller test
+                    i8042PortEnabled |= (3 << 0); //?
                     i8042Queue.push(0x55); // pass
                     break;
                 case 0xAB: // first port test
-                    i8042PortEnabled |= (1 << 0); //?
                     i8042Queue.push(0); // pass
                     break;
                 case 0xAD: // disable first port
