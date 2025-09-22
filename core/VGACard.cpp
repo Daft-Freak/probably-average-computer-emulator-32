@@ -226,21 +226,39 @@ void VGACard::write(uint16_t addr, uint8_t data)
             break;
 
         case 0x3CF: // graphics controller data
-            printf("VGA W gfx %02X = %02X\n", gfxControllerIndex, data);
-
             switch(gfxControllerIndex)
             {
+                case 0: // set/reset
+                    gfxSetReset = data;
+                    break;
+                case 1: // enable set/reset
+                    gfxEnableSetRes = data;
+                    break;
+                case 3: // data rotate (also logic op)
+                    gfxDataRotate = data;
+                    break;
                 case 4: // read sel
                     gfxReadSel = data;
                     break;
                 case 5: // mode
                     gfxMode = data;
                     setupMemory();
+                    if(gfxMode & (1 << 3))
+                        printf("VGA read mode 1\n");
+
+                    if((gfxMode & 3) == 3)
+                        printf("VGA write mode 3\n");
                     break;
                 case 6: // misc
                     gfxMisc = data;
                     setupMemory();
                     break;
+                case 8: // bit mask
+                    gfxBitMask = data;
+                    break;
+                default:
+                    printf("VGA W gfx %02X = %02X\n", gfxControllerIndex, data);
+
             }
             break;
 
@@ -323,7 +341,11 @@ uint8_t VGACard::readMem(uint32_t addr)
 
     //printf("VGA R %05X (%04X, sel %i)\n", addr, mappedAddr, gfxReadSel);
 
-    return ram[mappedAddr + plane * 0x10000];
+    // load latches
+    for(int i = 0; i < 4; i++)
+        latch[i] = ram[mappedAddr + i * 0x10000];
+
+    return latch[plane];
 }
 
 void VGACard::writeMem(uint32_t addr, uint8_t data)
@@ -331,6 +353,7 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
     bool chain = gfxMisc & (1 << 1);
     int map = (gfxMisc >> 2) & 3;
     bool oddEven = gfxMode & (1 << 4);
+    int writeMode = gfxMode & 3;
 
     int planeAddr = addr & 0xFFFF;
 
@@ -346,8 +369,17 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
     else if(chain)
         mappedAddr = (mappedAddr & ~1);
 
+    // apply rotation
+    if(writeMode == 0 || writeMode == 3)
+    {
+        int rotate = gfxDataRotate & 7;
+        data = data >> rotate | data << (8 - rotate);
+    }
+
     //if(data)
     //    printf("VGA W %05X(%04X) = %02X\n", addr, mappedAddr, data);
+
+    int logicOp = (gfxDataRotate >> 3) & 3;
 
     for(int i = 0; i < 4; i++)
     {
@@ -359,7 +391,32 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
         if(oddEven && (i & 1) != (planeAddr & 1))
             continue;
 
-        // TODO: graphics controller stuff (set/reset, rotate, latches, and/or/xor, ...)
-        ram[mappedAddr + i * 0x10000] = data;
+        uint8_t planeData = data;
+
+        // set/reset for mode 0
+        if(writeMode == 0)
+        {
+            if(gfxEnableSetRes & (1 << i))
+                planeData = (gfxSetReset & (1 << i)) ? 0xFF : 0;
+        }
+        // expand bit for mode 2
+        else if(writeMode == 2)
+            planeData = ((data >> i) & 1) * 0xFF;
+
+        // TODO: mode 3
+        if(writeMode == 0 || writeMode == 2)
+        {
+            // apply logic op
+            if(logicOp == 1)
+                planeData &= latch[i];
+            else if(logicOp == 2)
+                planeData |= latch[i];
+            else if(logicOp == 3)
+                planeData ^= latch[i];
+
+            ram[mappedAddr + i * 0x10000] = (planeData & gfxBitMask) | (latch[i] & ~gfxBitMask);
+        }
+        else if(writeMode == 1)
+            ram[mappedAddr + i * 0x10000] = latch[i];
     }
 }

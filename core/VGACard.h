@@ -64,11 +64,17 @@ private:
     uint8_t dacPalette[3 * 256];
 
     // graphics controller
-    uint8_t gfxReadSel = 0; // 4
-    uint8_t gfxMode = 0;    // 5
-    uint8_t gfxMisc = 0;    // 6
+    uint8_t gfxSetReset   = 0;   // 0
+    uint8_t gfxEnableSetRes = 0; // 1
+    uint8_t gfxDataRotate = 0;   // 3
+    uint8_t gfxReadSel = 0;      // 4
+    uint8_t gfxMode = 0;         // 5
+    uint8_t gfxMisc = 0;         // 6
+    uint8_t gfxBitMask = 0;      // 8
 
     uint8_t miscOutput = 0;
+
+    uint8_t latch[4];
 
     int outputW = 0, outputH = 0;
 
