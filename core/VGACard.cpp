@@ -242,14 +242,20 @@ void VGACard::write(uint16_t addr, uint8_t data)
                     gfxReadSel = data;
                     break;
                 case 5: // mode
+                {
+                    auto changed = gfxMode ^ data;
                     gfxMode = data;
-                    setupMemory();
+
+                    if(changed & (1 << 4)) // host odd/even
+                        setupMemory();
+
                     if(gfxMode & (1 << 3))
                         printf("VGA read mode 1\n");
 
                     if((gfxMode & 3) == 3)
                         printf("VGA write mode 3\n");
                     break;
+                }
                 case 6: // misc
                     gfxMisc = data;
                     setupMemory();
