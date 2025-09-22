@@ -191,8 +191,6 @@ void VGACard::write(uint16_t addr, uint8_t data)
             sequencerIndex = data;
             break;
         case 0x3C5: // sequencer data
-            printf("VGA W seq %02X = %02X\n", sequencerIndex, data);
-
             switch(sequencerIndex)
             {
                 case 1: // clock mode
@@ -206,6 +204,9 @@ void VGACard::write(uint16_t addr, uint8_t data)
                 case 4: // memory mode
                     seqMemMode = data;
                     break;
+
+                default:
+                    printf("VGA W seq %02X = %02X\n", sequencerIndex, data);
             }
             break;
         case 0x3C6:
