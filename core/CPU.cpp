@@ -2364,6 +2364,10 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
         }
 
+        case 0x9B: // WAIT/FWAIT
+            // we don't have a floating point unit
+            break;
+
         case 0x9C: // PUSHF
         {
             push(flags, operandSize32);
