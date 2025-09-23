@@ -26,6 +26,20 @@ enum Flags
     Flag_O = (1 << 11),
 };
 
+enum SegmentDescriptorFlags
+{
+    SD_Present        =   1 << 23,
+    SD_PrivilegeLevel =   3 << 21,
+    SD_Type           =   1 << 20, // 0 = system, 1 = code/data
+    SD_Executable     =   1 << 19,
+    SD_DirConform     =   1 << 18, // direction/conforming
+    SD_ReadWrite      =   1 << 17, // readable for code, writable for data
+    SD_Accessed       =   1 << 16,
+    SD_SysType        = 0xF << 16, // system segment type
+    SD_Granularity    =   1 << 15,
+    SD_Size           =   1 << 14,
+};
+
 // opcode helpers
 
 static constexpr bool parity(uint8_t v)
@@ -451,10 +465,10 @@ void CPU::reset()
     for(auto & desc : segmentDescriptorCache)
     {
         desc.limit = 0xFFFF;
-        desc.flags = 1 << 16 /*accessed*/
-                   | 1 << 17 /*RW*/
-                   | 1 << 20 /*not system*/
-                   | 1 << 23 /*present*/;
+        desc.flags = SD_Accessed
+                   | SD_ReadWrite
+                   | SD_Type /*not system*/
+                   | SD_Present;
     }
 
     setSegmentReg(Reg16::CS, 0xF000);
@@ -4543,49 +4557,53 @@ std::tuple<uint32_t, uint32_t> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int r
     return {memAddr, getSegmentOffset(segBase)};
 }
 
+CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
+{
+    SegmentDescriptor desc;
+    //int privLevel = selector & 3;
+    bool local = selector & 4;
+
+    assert(!local); // FIXME: local table
+
+    // FIXME: limit
+    // FIXME: privilege
+    
+    auto addr = gdtBase + (selector >> 3) * 8;
+
+    desc.base = sys.readMem(addr + 2)
+                | sys.readMem(addr + 3) <<  8
+                | sys.readMem(addr + 4) << 16
+                | sys.readMem(addr + 7) << 24;
+
+    desc.limit = sys.readMem(addr + 0)
+                | sys.readMem(addr + 1) << 8
+                | (sys.readMem(addr + 6) & 0xF) << 16;
+
+    desc.flags = sys.readMem(addr + 5) << 16 | (sys.readMem(addr + 6) & 0xF0) << 8;
+
+    // 4k granularity
+    if(desc.flags & SD_Granularity)
+    {
+        desc.limit <<= 12;
+        desc.limit |= 0xFFF;
+    }
+
+    return desc;
+}
+
 void CPU::setSegmentReg(Reg16 r, uint16_t value)
 {
     reg(r) = value;
 
     if(isProtectedMode())
-    {
-        //int privLevel = value & 3;
-        //bool local = value & 4;
-
-        // FIXME: limit
-        // FIXME: privilege
-        // FIXME: local table
-        auto addr = gdtBase + (value >> 3) * 8;
-
-        auto &desc = getCachedSegmentDescriptor(r);
-        desc.base = sys.readMem(addr + 2)
-                  | sys.readMem(addr + 3) <<  8
-                  | sys.readMem(addr + 4) << 16
-                  | sys.readMem(addr + 7) << 24;
-
-        desc.limit = sys.readMem(addr + 0)
-                   | sys.readMem(addr + 1) << 8
-                   | (sys.readMem(addr + 6) & 0xF) << 16;
-
-        desc.flags = sys.readMem(addr + 5) << 16 | (sys.readMem(addr + 6) & 0xF0) << 8;
-
-        // 4k granularity
-        if(desc.flags & (1 << 15))
-        {
-            desc.limit <<= 12;
-            desc.limit |= 0xFFF;
-        }
-
-        char segLetter[]{'E', 'C', 'S', 'D', 'F', 'G'};
-        printf("load %cS base %08X limit %08X flags %08X\n", segLetter[int(r) - int(Reg16::ES)], desc.base, desc.limit, desc.flags);
-    }
+        getCachedSegmentDescriptor(r) = loadSegmentDescriptor(value);
     else
     {
         auto &desc = getCachedSegmentDescriptor(r);
         desc.base = value * 16;
         if(r == Reg16::CS)
         {
-            desc.flags &= ~(3 << 21); // clear privilege level
+            desc.flags &= ~SD_PrivilegeLevel; // clear privilege level
             desc.limit = 0xFFFF;
         }
     }
@@ -4597,7 +4615,7 @@ bool CPU::isOperandSize32(bool override)
     if(isProtectedMode())
     {
         // D bit in CS descriptor
-        bool ret = getCachedSegmentDescriptor(Reg16::CS).flags & (1 << 14);
+        bool ret = getCachedSegmentDescriptor(Reg16::CS).flags & SD_Size;
 
         // override inverts
         if(override)
@@ -4615,7 +4633,7 @@ bool CPU::isStackAddressSize32()
     {
         // B bit in SS descriptor
         // (same bit as D)
-        return getCachedSegmentDescriptor(Reg16::SS).flags & (1 << 14);
+        return getCachedSegmentDescriptor(Reg16::SS).flags & SD_Size;
     }
 
     return false;
