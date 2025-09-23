@@ -904,6 +904,15 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
 
+                case 0xA0: // PUSH FS
+                    push(reg(Reg16::FS), operandSize32);
+                    reg(Reg32::EIP)++;
+                    break;
+                case 0xA1: // POP FS
+                    setSegmentReg(Reg16::FS, pop(operandSize32));
+                    reg(Reg32::EIP)++;
+                    break;
+
                 case 0xA3: // BT
                 {
                     auto modRM = sys.readMem(addr + 2);
@@ -937,6 +946,15 @@ void RAM_FUNC(CPU::executeInstruction)()
                     reg(Reg32::EIP) += 2;
                     break;
                 }
+
+                case 0xA8: // PUSH GS
+                    push(reg(Reg16::GS), operandSize32);
+                    reg(Reg32::EIP)++;
+                    break;
+                case 0xA9: // POP GS
+                    setSegmentReg(Reg16::GS, pop(operandSize32));
+                    reg(Reg32::EIP)++;
+                    break;
 
                 case 0xAC: // SHRD by imm
                 {
