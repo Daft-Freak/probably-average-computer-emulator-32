@@ -4621,7 +4621,7 @@ bool CPU::isStackAddressSize32()
     return false;
 }
 
-uint8_t RAM_FUNC(CPU::readRM8)(uint8_t modRM, int &cycles, uint32_t addr)
+uint8_t RAM_FUNC(CPU::readRM8)(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4629,13 +4629,13 @@ uint8_t RAM_FUNC(CPU::readRM8)(uint8_t modRM, int &cycles, uint32_t addr)
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, false, addr);
-        return sys.readMem(offset + segment);
+        return sys.readMem(offset + additionalOffset + segment);
     }
     else
         return reg(static_cast<Reg8>(rm));
 }
 
-uint16_t RAM_FUNC(CPU::readRM16)(uint8_t modRM, int &cycles, uint32_t addr)
+uint16_t RAM_FUNC(CPU::readRM16)(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4643,13 +4643,13 @@ uint16_t RAM_FUNC(CPU::readRM16)(uint8_t modRM, int &cycles, uint32_t addr)
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, false, addr);
-        return readMem16(offset, segment);
+        return readMem16(offset + additionalOffset, segment);
     }
     else
         return reg(static_cast<Reg16>(rm));
 }
 
-uint32_t RAM_FUNC(CPU::readRM32)(uint8_t modRM, int &cycles, uint32_t addr)
+uint32_t RAM_FUNC(CPU::readRM32)(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4657,13 +4657,13 @@ uint32_t RAM_FUNC(CPU::readRM32)(uint8_t modRM, int &cycles, uint32_t addr)
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, false, addr);
-        return readMem32(offset, segment);
+        return readMem32(offset + additionalOffset, segment);
     }
     else
         return reg(static_cast<Reg32>(rm));
 }
 
-void RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, int &cycles, uint32_t addr, bool rw)
+void RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, int &cycles, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4671,13 +4671,13 @@ void RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, int &cycles, uint32_t add
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, rw, addr);
-        sys.writeMem(offset + segment, v);
+        sys.writeMem(offset + additionalOffset + segment, v);
     }
     else
         reg(static_cast<Reg8>(rm)) = v;
 }
 
-void RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, int &cycles, uint32_t addr, bool rw)
+void RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, int &cycles, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4685,13 +4685,13 @@ void RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, int &cycles, uint32_t a
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, rw, addr);
-        writeMem16(offset, segment, v);
+        writeMem16(offset + additionalOffset, segment, v);
     }
     else
         reg(static_cast<Reg16>(rm)) = v;
 }
 
-void RAM_FUNC(CPU::writeRM32)(uint8_t modRM, uint32_t v, int &cycles, uint32_t addr, bool rw)
+void RAM_FUNC(CPU::writeRM32)(uint8_t modRM, uint32_t v, int &cycles, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -4699,7 +4699,7 @@ void RAM_FUNC(CPU::writeRM32)(uint8_t modRM, uint32_t v, int &cycles, uint32_t a
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, cycles, rw, addr);
-        writeMem32(offset, segment, v);
+        writeMem32(offset + additionalOffset, segment, v);
     }
     else
         reg(static_cast<Reg32>(rm)) = v;

@@ -112,13 +112,13 @@ private:
 
     // R/M helpers
 
-    uint8_t readRM8(uint8_t modRM, int &cycles, uint32_t addr);
-    uint16_t readRM16(uint8_t modRM, int &cycles, uint32_t addr);
-    uint32_t readRM32(uint8_t modRM, int &cycles, uint32_t addr);
+    uint8_t readRM8(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset = 0);
+    uint16_t readRM16(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset = 0);
+    uint32_t readRM32(uint8_t modRM, int &cycles, uint32_t addr, int additionalOffset = 0);
 
-    void writeRM8(uint8_t modRM, uint8_t v, int &cycles, uint32_t addr, bool rw = false);
-    void writeRM16(uint8_t modRM, uint16_t v, int &cycles, uint32_t addr, bool rw = false);
-    void writeRM32(uint8_t modRM, uint32_t v, int &cycles, uint32_t addr, bool rw = false);
+    void writeRM8(uint8_t modRM, uint8_t v, int &cycles, uint32_t addr, bool rw = false, int additionalOffset = 0);
+    void writeRM16(uint8_t modRM, uint16_t v, int &cycles, uint32_t addr, bool rw = false, int additionalOffset = 0);
+    void writeRM32(uint8_t modRM, uint32_t v, int &cycles, uint32_t addr, bool rw = false, int additionalOffset = 0);
 
     // ALU helpers
     using ALUOp8 = uint8_t(*)(uint8_t, uint8_t, uint32_t &);
