@@ -24,6 +24,11 @@ enum Flags
     Flag_I = (1 << 9),
     Flag_D = (1 << 10),
     Flag_O = (1 << 11),
+
+    Flag_IOPL = (3 << 12),
+    Flag_NT   = (1 << 14),
+    Flag_R    = (1 << 16),
+    Flag_VM   = (1 << 17),
 };
 
 enum SegmentDescriptorFlags
