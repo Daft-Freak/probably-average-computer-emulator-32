@@ -946,18 +946,14 @@ void RAM_FUNC(CPU::executeInstruction)()
                     if(operandSize32)
                     {
                         bit = reg(static_cast<Reg32>(r));
-                        if((modRM >> 6) == 3)
-                            bit &= 31;
-                        assert(bit < 32); // FIXME: this can offset a memory operand (modulo for register)
-                        value = readRM32(modRM, cycles, addr + 1) & (1 << bit);
+
+                        value = readRM32(modRM, cycles, addr + 1, (bit / 32) * 4) & (1 << (bit & 31));
                     }
                     else
                     {
                         bit = reg(static_cast<Reg16>(r));
-                        if((modRM >> 6) == 3)
-                            bit &= 16;
-                        assert(bit < 16); // FIXME: ^
-                        value = readRM16(modRM, cycles, addr + 1) & (1 << bit);
+
+                        value = readRM16(modRM, cycles, addr + 1, (bit / 16) * 2) & (1 << (bit & 15));
                     }
 
                     if(value)
@@ -1119,19 +1115,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                             int cycles;
 
                             if(operandSize32)
-                            {
-                                if((modRM >> 6) == 3)
-                                    bit &= 31;
-                                assert(bit < 32); // FIXME: this can offset a memory operand (modulo for register)
-                                value = readRM32(modRM, cycles, addr + 1) & (1 << bit);
-                            }
+                                value = readRM32(modRM, cycles, addr + 1, (bit / 32) * 4) & (1 << (bit & 32));
                             else
-                            {
-                                if((modRM >> 6) == 3)
-                                    bit &= 15;
-                                assert(bit < 16); // FIXME: ^
-                                value = readRM16(modRM, cycles, addr + 1) & (1 << bit);
-                            }
+                                value = readRM16(modRM, cycles, addr + 1, (bit / 16) * 2) & (1 << (bit & 15));
 
                             if(value)
                                 flags |= Flag_C;
