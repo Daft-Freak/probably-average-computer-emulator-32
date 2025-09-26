@@ -878,6 +878,13 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
 
+                case 0x06: // CLTS
+                {
+                    reg(Reg32::CR0) &= ~(1 << 3);
+                    reg(Reg32::EIP)++;
+                    break;
+                }
+
                 case 0x20: // MOV from control reg
                 {
                     auto modRM = readMem8(addr + 2);
