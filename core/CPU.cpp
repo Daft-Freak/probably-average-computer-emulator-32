@@ -3551,17 +3551,87 @@ void RAM_FUNC(CPU::executeInstruction)()
         {
             delayInterrupt = true;
 
-            // pop IP
-            auto newIP = pop(operandSize32);
+            if(!isProtectedMode())
+            {
+                // pop IP
+                auto newIP = pop(operandSize32);
 
-            // pop CS
-            auto newCS = pop(operandSize32);
+                // pop CS
+                auto newCS = pop(operandSize32);
 
-            // pop flags
-            flags = (flags & 0x30000) | (pop(operandSize32) & 0x7FD5) | 2;
+                // pop flags
+                auto newFlags = pop(operandSize32);
 
-            setSegmentReg(Reg16::CS, newCS);
-            setIP(newIP);
+                // real mode
+                if(operandSize32)
+                    flags = (flags & 0x20000) | (newFlags & 0x17FD5) | 2;
+                else
+                    flags = (flags & 0x30000) | (newFlags & 0x7FD5) | 2;
+
+                setSegmentReg(Reg16::CS, newCS);
+                setIP(newIP);
+            }
+            else if(flags & Flag_NT)
+            {
+                printf("IRET task switch\n");
+                exit(1);
+            }
+            else
+            {
+                // pop IP
+                auto newIP = pop(operandSize32);
+
+                // pop CS
+                auto newCS = pop(operandSize32);
+
+                // pop flags
+                auto newFlags = pop(operandSize32);
+
+                unsigned cpl = (flags & Flag_VM) ? 3 : (reg(Reg16::CS) & 3);
+
+                if((newFlags & Flag_VM) && cpl == 0)
+                {
+                    // return to virtual 8086 mode
+
+                    flags = newFlags;
+                    setSegmentReg(Reg16::CS, newCS);
+                    setIP(newIP);
+
+                    // prepare new stack
+                    auto newESP = pop(operandSize32);
+                    auto newSS = pop(operandSize32);
+
+                    // pop segments
+                    setSegmentReg(Reg16::ES, pop(operandSize32));
+                    setSegmentReg(Reg16::DS, pop(operandSize32));
+                    setSegmentReg(Reg16::FS, pop(operandSize32));
+                    setSegmentReg(Reg16::GS, pop(operandSize32));
+
+                    setSegmentReg(Reg16::SS, newSS);
+                    reg(Reg32::ESP) = newESP;
+
+                    // back to 16-bit mode?
+                    getCachedSegmentDescriptor(Reg16::CS).flags &= ~SD_Size;
+                }
+                else if((newCS & 3) > cpl)
+                {
+                    printf("IRET return to outer %i > %i\n", (newCS & 3), cpl);
+                    exit(1);
+                }
+                else
+                {
+                    // TODO: I flag IOPL check
+
+                    if(operandSize32)
+                        flags = (flags & 0x20000) | (newFlags & 0x17FD5) | 2;
+                    else
+                        flags = (flags & 0x30000) | (newFlags & 0x7FD5) | 2;
+
+                    setSegmentReg(Reg16::CS, newCS);
+                    setIP(newIP);
+                }
+            }
+
             cyclesExecuted(32 + 3 * 4);
             break;
         }
@@ -4948,28 +5018,154 @@ void CPU::cyclesExecuted(int cycles)
 
 void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector)
 {
-    auto addr = vector * 4;
+    bool stackAddrSize32 = isStackAddressSize32();
 
-    auto newIP = readMem16(addr);
-    auto newCS = readMem16(addr + 2);
+    auto push = [this, stackAddrSize32](uint32_t val, bool is32)
+    {
+        uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
+        sp -= is32 ? 4 : 2;
+
+        if(is32)
+            writeMem32(sp, getSegmentOffset(Reg16::SS), val);
+        else
+            writeMem16(sp, getSegmentOffset(Reg16::SS), val);
+
+        if(stackAddrSize32)
+            reg(Reg32::ESP) = sp;
+        else
+            reg(Reg16::SP) = sp;
+    };
+
+    auto tempFlags = flags;
+
+    uint16_t newCS;
+    uint32_t newIP;
+    bool push32;
+    int clearFlags = Flag_T;
+
+    if(isProtectedMode())
+    {
+        auto addr = idtBase + vector * 8;
+        auto offset = readMem16(addr) | readMem16(addr + 6) << 16;
+        auto selector = readMem16(addr + 2);
+        auto access = readMem8(addr + 5);
+
+        assert(access & (1 << 7)); // present
+
+        auto gateType = access & 0xF;
+        //int dpl = (access >> 5) & 3;
+
+        int cpl = reg(Reg16::CS) & 3;
+
+        if(flags & Flag_VM) // should be true? (CS isn't a selector in this mode)
+            cpl = 3;
+
+        if(gateType == 0x5)
+        {
+            printf("protected mode interrupt task gate selector %04X\n", selector);
+            exit(1);
+        }
+
+        bool gate32 = access & 8;
+        bool trapGate = access & 1;
+
+        auto newCSFlags = loadSegmentDescriptor(selector).flags;
+        int newCSDPL = (newCSFlags & SD_PrivilegeLevel) >> 21;
+
+        if(!(newCSFlags & SD_DirConform) && newCSDPL < cpl)
+        {
+            if(flags & Flag_VM)
+            {
+                // clear VM early
+                flags &= ~Flag_VM;
+
+                auto tmpSS = reg(Reg16::SS);
+                auto tmpSP = reg(Reg32::ESP);
+
+                // restore SS:ESP from TSS
+                auto &tsDesc = getCachedSegmentDescriptor(Reg16::TR);
+                assert((tsDesc.flags & SD_SysType) == 0x9 << 16); // 32bit
+
+                auto newSP = readMem32(tsDesc.base + 4 + newCSDPL * 8 + 0); // ESP[DPL]
+                auto newSS = readMem16(tsDesc.base + 4 + newCSDPL * 8 + 4); // SS[DPL]
+
+                setSegmentReg(Reg16::SS, newSS);
+                reg(Reg32::ESP) = newSP;
+
+                // big pile of extra pushes
+                push(reg(Reg16::GS), true);
+                push(reg(Reg16::FS), true);
+                push(reg(Reg16::DS), true);
+                push(reg(Reg16::ES), true);
+
+                // reset segments
+                setSegmentReg(Reg16::GS, 0);
+                setSegmentReg(Reg16::FS, 0);
+                setSegmentReg(Reg16::DS, 0);
+                setSegmentReg(Reg16::ES, 0);
+
+                push(tmpSS, true);
+                push(tmpSP, true);
+
+                // continue to the usual pushes
+                newCS = selector;
+                newIP = offset;
+                push32 = true;
+
+                if(!trapGate)
+                    clearFlags |= Flag_I;
+            }
+            else
+            {
+                printf("inter-privilege interrupt CPL %i DPL %i\n", cpl, newCSDPL);
+                exit(1);
+            }
+        }
+        else
+        {
+            // same privilege
+            fflush(stdout);//
+            assert(!(flags & Flag_VM));
+            assert((newCSFlags & SD_DirConform) || newCSDPL == cpl);
+
+            newCS = selector;
+            newIP = offset;
+            
+            push32 = gate32;
+            if(!trapGate)
+                clearFlags |= Flag_I;
+    
+            clearFlags |= Flag_NT;
+        }
+    }
+    else
+    {
+        assert(!isOperandSize32(false));
+        assert(idtBase == 0);
+
+        auto addr = vector * 4;
+
+        // FIXME: IDT
+        newIP = readMem16(addr);
+        newCS = readMem16(addr + 2);
+
+        push32 = false; //?
+        clearFlags |= Flag_I;
+    }
 
     // push flags
-    reg(Reg16::SP) -= 2;
-    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), flags);
+    push(tempFlags, push32);
 
     // clear I/T
-    flags &= ~(Flag_T | Flag_I);
+    flags &= ~clearFlags;
 
     // inter-segment indirect call
 
     // push CS
-    reg(Reg16::SP) -= 2;
-    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), reg(Reg16::CS));
+    push(reg(Reg16::CS), push32);
 
     // push IP
-    reg(Reg16::SP) -= 2;
-    auto retAddr = reg(Reg32::EIP);
-    writeMem16(reg(Reg16::SP), getSegmentOffset(Reg16::SS), retAddr);
+    push(reg(Reg32::EIP), push32);
 
     setSegmentReg(Reg16::CS, newCS);
     reg(Reg32::EIP) = newIP;
