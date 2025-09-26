@@ -4731,7 +4731,7 @@ void CPU::setSegmentReg(Reg16 r, uint16_t value)
 {
     reg(r) = value;
 
-    if(isProtectedMode())
+    if(isProtectedMode() && !(flags & Flag_VM))
         getCachedSegmentDescriptor(r) = loadSegmentDescriptor(value);
     else
     {
