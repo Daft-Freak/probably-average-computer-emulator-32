@@ -1021,6 +1021,40 @@ void RAM_FUNC(CPU::executeInstruction)()
                     reg(Reg32::EIP)++;
                     break;
 
+                case 0xAB: // BTS
+                {
+                    auto modRM = readMem8(addr + 2);
+                    auto r = (modRM >> 3) & 0x7;
+                    int bit;
+                    bool value;
+                    int cycles;
+
+                    if(operandSize32)
+                    {
+                        bit = reg(static_cast<Reg32>(r));
+
+                        auto data = readRM32(modRM, cycles, addr + 1, (bit / 32) * 4);
+                        value = data & (1 << (bit & 31));
+                        writeRM32(modRM, data | 1 << bit, cycles, addr + 1, true, (bit / 32) * 4);
+                    }
+                    else
+                    {
+                        bit = reg(static_cast<Reg16>(r));
+
+                        auto data = readRM16(modRM, cycles, addr + 1, (bit / 16) * 2);
+                        value = data & (1 << (bit & 15));
+                        writeRM16(modRM, data | 1 << bit, cycles, addr + 1, true, (bit / 16) * 2);
+                    }
+
+                    if(value)
+                        flags |= Flag_C;
+                    else
+                        flags &= ~Flag_C;
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
                 case 0xAC: // SHRD by imm
                 {
                     auto modRM = readMem8(addr + 2);
