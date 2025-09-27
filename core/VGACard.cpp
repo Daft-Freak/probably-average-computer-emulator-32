@@ -123,6 +123,10 @@ uint8_t VGACard::read(uint16_t addr)
 {
     switch(addr)
     {
+        case 0x3B5: // CRTC data
+        case 0x3D5:
+            return crtcRegs[crtcIndex];
+
         case 0x3BA: // input status 1
         case 0x3DA:
             printf("VGA R status 1\n");
