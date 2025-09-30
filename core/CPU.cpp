@@ -3459,36 +3459,62 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xAD: // LODS word
         {
             auto segment = segmentOverride == Reg16::AX ? Reg16::DS : segmentOverride;
+            int step = (flags & Flag_D) ? -2 : 2;
+
+            if(operandSize32)
+                step *= 2;
+
+            uint32_t si;
+            if(addressSize32)
+                si = reg(Reg32::ESI);
+            else
+                si = reg(Reg16::SI);
+
             if(rep)
             {
                 cyclesExecuted(2 + 9);
 
-                while(reg(Reg16::CX))
+                uint32_t count = addressSize32 ? reg(Reg32::ECX) : reg(Reg16::CX);
+
+                while(count)
                 {
                     // TODO: interrupt
-
-                    reg(Reg16::AX) = readMem16(reg(Reg16::SI), getSegmentOffset(segment));
-
-                    if(flags & Flag_D)
-                        reg(Reg16::SI) -= 2;
+                    if(operandSize32)
+                        reg(Reg32::EAX) = readMem32(si, getSegmentOffset(segment));
                     else
-                        reg(Reg16::SI) += 2;
+                        reg(Reg16::AX) = readMem16(si, getSegmentOffset(segment));
 
-                    reg(Reg16::CX)--;
+                    si += step;
+
+                    if(!addressSize32)
+                        si &= 0xFFFF;
+
+                    count--;
                     cyclesExecuted(13 + 4);
                 }
+
+                if(addressSize32)
+                    reg(Reg32::ECX) = count;
+                else
+                    reg(Reg16::CX) = count;
             }
             else
             {
-                reg(Reg16::AX) = readMem16(reg(Reg16::SI), getSegmentOffset(segment));
-
-                if(flags & Flag_D)
-                    reg(Reg16::SI) -= 2;
+                if(operandSize32)
+                    reg(Reg32::EAX) = readMem32(si, getSegmentOffset(segment));
                 else
-                    reg(Reg16::SI) += 2;
+                    reg(Reg16::AX) = readMem16(si, getSegmentOffset(segment));
+
+                si += step;
 
                 cyclesExecuted(12 + 4);
             }
+
+            if(addressSize32)
+                reg(Reg32::ESI) = si;
+            else
+                reg(Reg16::SI) = si;
+
             break;
         }
         case 0xAE: // SCAS byte
