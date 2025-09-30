@@ -778,6 +778,34 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     switch(exOp)
                     {
+                        case 0x2: // LLDT
+                        {
+                            assert(isProtectedMode());
+
+                            int cycles;
+                            auto selector = readRM16(modRM, cycles, addr + 1);
+
+                            if(selector >> 2)
+                            {
+                                auto newDesc = loadSegmentDescriptor(selector);
+
+                                assert(newDesc.flags & SD_Present); // present
+                                assert(!(newDesc.flags & SD_Type)); // system
+                                assert((newDesc.flags & SD_SysType) == 0x2 << 16); // LDT
+
+                                ldtBase = newDesc.base;
+                                ldtLimit = newDesc.limit;
+                            }
+                            else
+                            {
+                                // empty selector, mark invalid
+                                ldtBase = 0;
+                                ldtLimit = 0;
+                            }
+
+                            reg(Reg32::EIP) += 2;
+                            break;
+                        }
                         case 0x3: // LTR
                         {
                             assert(isProtectedMode());
