@@ -1409,6 +1409,31 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
 
+                case 0xBC: // BSF
+                {
+                    auto modRM = readMem8(addr + 2);
+                    auto r = (modRM >> 3) & 0x7;
+
+                    int cycles;
+                    auto val = operandSize32 ? readRM32(modRM, cycles, addr + 1) : readRM16(modRM, cycles, addr + 1);
+
+                    if(!val)
+                        flags |= Flag_Z;
+                    else
+                    {
+                        flags &= ~Flag_Z;
+
+                        int bit = __builtin_ctz(val);
+                        if(operandSize32)
+                            reg(static_cast<Reg32>(r)) = bit;
+                        else
+                            reg(static_cast<Reg16>(r)) = bit;
+                    }
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
                 case 0xBE: // MOVSX 8 -> 16/32
                 {
                     auto modRM = readMem8(addr + 2);
