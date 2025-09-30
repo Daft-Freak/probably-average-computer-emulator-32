@@ -5015,15 +5015,19 @@ std::tuple<uint32_t, uint32_t> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int r
 CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 {
     SegmentDescriptor desc;
+
     //int privLevel = selector & 3;
     bool local = selector & 4;
-
-    assert(!local); // FIXME: local table
 
     // FIXME: limit
     // FIXME: privilege
     
-    auto addr = gdtBase + (selector >> 3) * 8;
+    auto addr = (selector >> 3) * 8;
+
+    if(local)
+        addr += ldtBase;
+    else
+        addr += gdtBase;
 
     desc.base = readMem8(addr + 2)
               | readMem8(addr + 3) <<  8
