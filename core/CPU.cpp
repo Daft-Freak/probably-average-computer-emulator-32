@@ -4475,9 +4475,6 @@ void RAM_FUNC(CPU::executeInstruction)()
                 }
                 case 6: // PUSH
                 {
-                    if(modRM == 0xF4) // r/m is SP
-                        v -= 2;
-
                     push(v, operandSize32);
 
                     reg(Reg32::EIP)++;
