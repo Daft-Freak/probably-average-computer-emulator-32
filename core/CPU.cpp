@@ -2828,7 +2828,37 @@ void RAM_FUNC(CPU::executeInstruction)()
         }
         case 0x9D: // POPF
         {
-            flags = (flags & 0x30000) | (pop(operandSize32) & 0x7FD5) | 2;
+            uint32_t newFlags = pop(operandSize32);
+            uint32_t flagMask;
+
+            if(flags & Flag_VM) // virtual 8086 mode
+            {
+                unsigned iopl = (flags & Flag_IOPL) >> 12;
+                if(iopl == 3)
+                {
+                    flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_NT;
+                }
+                else
+                {
+                    // GP
+                    printf("V86 POPF trap\n");
+                    exit(1);
+                }
+            }
+            else if(!isProtectedMode() || (reg(Reg16::CS) & 3)/*CPL*/ == 0) // real mode or CPL == 0
+                flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT;
+            else // protected mode, CPL > 0
+            {
+                unsigned cpl = reg(Reg16::CS) & 3;
+                unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+                flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT;
+
+                if(cpl <= iopl)
+                    flagMask |= Flag_I;
+            }
+
+            updateFlags(newFlags, flagMask, operandSize32);
 
             cyclesExecuted(8 + 4);
             break;
