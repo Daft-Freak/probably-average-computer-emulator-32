@@ -3425,35 +3425,53 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xAC: // LODS byte
         {
             auto segment = segmentOverride == Reg16::AX ? Reg16::DS : segmentOverride;
+            int step = (flags & Flag_D) ? -1 : 1;
+
+            uint32_t si;
+            if(addressSize32)
+                si = reg(Reg32::ESI);
+            else
+                si = reg(Reg16::SI);
+
             if(rep)
             {
                 cyclesExecuted(2 + 9);
 
-                while(reg(Reg16::CX))
+                uint32_t count = addressSize32 ? reg(Reg32::ECX) : reg(Reg16::CX);
+
+                while(count)
                 {
                     // TODO: interrupt
-                    reg(Reg8::AL) = readMem8(reg(Reg16::SI), getSegmentOffset(segment));
+                    reg(Reg8::AL) = readMem8(si, getSegmentOffset(segment));
 
-                    if(flags & Flag_D)
-                        reg(Reg16::SI)--;
-                    else
-                        reg(Reg16::SI)++;
+                    si += step;
 
-                    reg(Reg16::CX)--;
+                    if(!addressSize32)
+                        si &= 0xFFFF;
+
+                    count--;
                     cyclesExecuted(13);
                 }
+
+                if(addressSize32)
+                    reg(Reg32::ECX) = count;
+                else
+                    reg(Reg16::CX) = count;
             }
             else
             {
-                reg(Reg8::AL) = readMem8(reg(Reg16::SI), getSegmentOffset(segment));
+                reg(Reg8::AL) = readMem8(si, getSegmentOffset(segment));
 
-                if(flags & Flag_D)
-                    reg(Reg16::SI)--;
-                else
-                    reg(Reg16::SI)++;
+                si += step;
 
                 cyclesExecuted(12);
             }
+
+            if(addressSize32)
+                reg(Reg32::ESI) = si;
+            else
+                reg(Reg16::SI) = si;
+
             break;
         }
         case 0xAD: // LODS word
@@ -3519,42 +3537,60 @@ void RAM_FUNC(CPU::executeInstruction)()
         }
         case 0xAE: // SCAS byte
         {
+            int step = (flags & Flag_D) ? -1 : 1;
+
+            uint32_t di;
+            if(addressSize32)
+                di = reg(Reg32::EDI);
+            else
+                di = reg(Reg16::DI);
+        
             if(rep)
             {
                 cyclesExecuted(2 + 9);
 
-                while(reg(Reg16::CX))
+                uint32_t count = addressSize32 ? reg(Reg32::ECX) : reg(Reg16::CX);
+
+                while(count)
                 {
                     // TODO: interrupt
-                    auto rSrc = readMem8(reg(Reg16::DI), getSegmentOffset(Reg16::ES));
+                    auto rSrc = readMem8(di, getSegmentOffset(Reg16::ES));
 
                     doSub(reg(Reg8::AL), rSrc, flags);
 
-                    if(flags & Flag_D)
-                        reg(Reg16::DI)--;
-                    else
-                        reg(Reg16::DI)++;
+                    di += step;
 
-                    reg(Reg16::CX)--;
+                    if(!addressSize32)
+                        di &= 0xFFFF;
+
+                    count--;
                     cyclesExecuted(15);
 
                     if(!!(flags & Flag_Z) != repZ)
                         break;
                 }
+
+                if(addressSize32)
+                    reg(Reg32::ECX) = count;
+                else
+                    reg(Reg16::CX) = count;
             }
             else
             {
-                auto rSrc = readMem8(reg(Reg16::DI), getSegmentOffset(Reg16::ES));
+                auto rSrc = readMem8(di, getSegmentOffset(Reg16::ES));
 
                 doSub(reg(Reg8::AL), rSrc, flags);
 
-                if(flags & Flag_D)
-                    reg(Reg16::DI)--;
-                else
-                    reg(Reg16::DI)++;
+                di += step;
 
                 cyclesExecuted(15);
             }
+
+            if(addressSize32)
+                reg(Reg32::EDI) = di;
+            else
+                reg(Reg16::DI) = di;
+
             break;
         }
         case 0xAF: // SCAS word
