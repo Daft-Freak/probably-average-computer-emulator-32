@@ -43,6 +43,23 @@ enum SegmentDescriptorFlags
     SD_SysType        = 0xF << 16, // system segment type
     SD_Granularity    =   1 << 15,
     SD_Size           =   1 << 14,
+
+    // system descriptor types
+    SD_SysTypeTSS16      =   1 << 16,
+    SD_SysTypeLDT        =   2 << 16,
+    SD_SysTypeBusyTSS16  =   3 << 16,
+    SD_SysTypeCallGate16 =   4 << 16,
+    SD_SysTypeTaskGate   =   5 << 16,
+    SD_SysTypeIntGate16  =   6 << 16,
+    SD_SysTypeTrapGate16 =   7 << 16,
+
+    SD_SysTypeTSS32      =   9 << 16,
+
+    SD_SysTypeBusyTSS32  = 0xB << 16,
+    SD_SysTypeCallGate32 = 0xC << 16,
+
+    SD_SysTypeIntGate32  = 0xE << 16,
+    SD_SysTypeTrapGate32 = 0xF << 16,
 };
 
 // opcode helpers
