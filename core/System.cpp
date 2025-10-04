@@ -126,11 +126,11 @@ uint8_t Chipset::read(uint16_t addr)
             return ret & 0xFF;
         }
 
-        case 0x61: // system control A
+        case 0x61: // system control B
         {
             updatePIT();
             // pit ch2 state in bit 5
-            return (systemControlA & 0xF) | ((pit.outState >> 2) & 1) << 5;
+            return (systemControlB & 0xF) | ((pit.outState >> 2) & 1) << 5;
         }
 
         case 0x64: // 8042 "keyboard controller" status
@@ -518,8 +518,8 @@ void Chipset::write(uint16_t addr, uint8_t data)
             break;
         }
 
-        case 0x61: // system control A
-            systemControlA = data;
+        case 0x61: // system control B
+            systemControlB = data;
             break;
 
         case 0x64: // 8042 command
