@@ -983,12 +983,18 @@ void Chipset::PIC::write(int index, uint8_t data)
             else
                 nextInit = 3; // ICW4 (assuming needed)
         }
+        else if(nextInit == 2) // ICW3
+        {
+            // which input has slave for master
+            // slave id for slave
+            nextInit = 3;
+        }
         else if(nextInit == 3) // ICW4
         {
             assert(data & (1 << 0)); // 8086/88 mode
             assert(!(data & (1 << 1))); // not auto EOI
             assert(!(data & (1 << 2))); // slave
-            assert(data & (1 << 3)); // buffered mode
+            //assert(data & (1 << 3)); // buffered mode
             assert(!(data & (1 << 4))); // not special fully nested mode
 
             initCommand[3] = data;
