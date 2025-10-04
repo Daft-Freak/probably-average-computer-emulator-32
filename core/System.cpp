@@ -1241,6 +1241,10 @@ void RAM_FUNC(System::writeMem)(uint32_t addr, uint8_t data)
 
     auto ptr = memMap[block];
 
+    // HACK: prevent setting coprocessor bit in equipment flags
+    if(addr == 0x410)
+        data &= ~2;
+
     if(ptr)
     {
         ptr[addr] = data;
