@@ -3023,10 +3023,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto srcReg = static_cast<Reg16>(r + static_cast<int>(Reg16::ES));
 
-            if(operandSize32)
-                writeRM32(modRM, reg(srcReg), cycles, addr);
-            else
-                writeRM16(modRM, reg(srcReg), cycles, addr);
+            // with 32bit operand size writing to mem still only writes 16 bits
+            // writing to reg leaves high 16 bits undefined
+            writeRM16(modRM, reg(srcReg), cycles, addr);
 
             reg(Reg32::EIP)++;
             cyclesExecuted(cycles);
