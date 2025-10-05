@@ -5210,12 +5210,40 @@ void RAM_FUNC(CPU::executeInstruction)()
         }
         case 0xFA: // CLI
         {
+            if(isProtectedMode())
+            {
+                int iopl = (flags & Flag_IOPL) >> 12;
+                if(iopl < cpl)
+                {
+                    // GP
+                    // TODO: we need much more general fault handling
+                    reg(Reg32::EIP)--;
+                    serviceInterrupt(0xD);
+                    push(0, true); // error code
+                    break;
+                }
+            }
+
             flags &= ~Flag_I;
             cyclesExecuted(2);
             break;
         }
         case 0xFB: // STI
         {
+            if(isProtectedMode())
+            {
+                int iopl = (flags & Flag_IOPL) >> 12;
+                if(iopl < cpl)
+                {
+                    // GP
+                    // TODO: we need much more general fault handling
+                    reg(Reg32::EIP)--;
+                    serviceInterrupt(0xD);
+                    push(0, true); // error code
+                    break;
+                }
+            }
+
             flags |= Flag_I;
             delayInterrupt = true;
             cyclesExecuted(2);
