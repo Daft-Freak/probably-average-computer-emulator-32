@@ -1212,7 +1212,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     auto modRM = readMem8(addr + 2);
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto count = readMem8(addr + 3 + getDispLen(modRM, addr + 3));
+                    auto count = readMem8(addr + 3 + getDispLen(modRM, addr + 3)) & 0x1F;
 
                     int cycles;
  
@@ -1237,7 +1237,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     auto modRM = readMem8(addr + 2);
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto count = reg(Reg8::CL);
+                    auto count = reg(Reg8::CL) & 0x1F;
 
                     int cycles;
 
