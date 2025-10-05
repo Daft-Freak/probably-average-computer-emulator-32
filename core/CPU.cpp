@@ -1345,7 +1345,8 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        int64_t res = static_cast<int32_t>(readRM32(modRM, cycles, addr + 1)) * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
+                        int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, cycles, addr + 1)))
+                                    * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
                         reg(static_cast<Reg32>(r)) = res;
 
                         // check if upper half matches lower half's sign
@@ -2230,7 +2231,7 @@ void RAM_FUNC(CPU::executeInstruction)()
             {
                 auto imm = static_cast<int32_t>(readMem32(immAddr));
 
-                int64_t res = static_cast<int32_t>(readRM32(modRM, cycles, addr)) * imm;
+                int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, cycles, addr))) * imm;
                 reg(static_cast<Reg32>(r)) = res;
 
                 // check if upper half matches lower half's sign
@@ -2284,7 +2285,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                int64_t res = static_cast<int32_t>(readRM32(modRM, cycles, addr)) * imm;
+                int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, cycles, addr))) * imm;
                 reg(static_cast<Reg32>(r)) = res;
 
                 // check if upper half matches lower half's sign
