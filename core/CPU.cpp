@@ -2267,6 +2267,28 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
         }
 
+        case 0x63: // ARPL
+        {
+            auto modRM = readMem8(addr + 1);
+            auto r = static_cast<Reg16>((modRM >> 3) & 0x7);
+
+            int cycles;
+            auto dest = readRM16(modRM, cycles, addr);
+            auto destRPL = dest & 3;
+            auto srcRPL = reg(r) & 3;
+
+            if(destRPL < srcRPL)
+            {
+                flags |= Flag_Z;
+                writeRM16(modRM, (dest & ~3) | srcRPL, cycles, addr, true);
+            }
+            else
+                flags &= ~Flag_Z;
+
+            reg(Reg32::EIP)++;
+            break;
+        }
+
         case 0x68: // PUSH imm16/32
         {
             uint32_t imm;
