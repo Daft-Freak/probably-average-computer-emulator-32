@@ -4367,13 +4367,39 @@ void RAM_FUNC(CPU::executeInstruction)()
                 auto newFlags = pop(operandSize32);
 
                 // real mode
-                if(operandSize32)
-                    flags = (flags & 0x20000) | (newFlags & 0x17FD5) | 2;
-                else
-                    flags = (flags & 0x30000) | (newFlags & 0x7FD5) | 2;
+                uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R;
+                updateFlags(newFlags, flagMask, operandSize32);
 
                 setSegmentReg(Reg16::CS, newCS);
                 setIP(newIP);
+            }
+            else if(flags & Flag_VM)
+            {
+                // virtual 8086 mode
+                unsigned iopl = (flags & Flag_IOPL) >> 12;
+                if(iopl == 3)
+                {
+                    // pop IP
+                    auto newIP = pop(operandSize32);
+
+                    // pop CS
+                    auto newCS = pop(operandSize32);
+
+                    // pop flags
+                    auto newFlags = pop(operandSize32);
+
+                    setSegmentReg(Reg16::CS, newCS);
+                    setIP(newIP);
+
+                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_NT | Flag_R;
+                    updateFlags(newFlags, flagMask, operandSize32);
+                }
+                else
+                {
+                    // GP
+                    printf("V86 IRET IOPL %i\n", iopl);
+                    exit(1);
+                }
             }
             else if(flags & Flag_NT)
             {
@@ -4413,19 +4439,54 @@ void RAM_FUNC(CPU::executeInstruction)()
                     setSegmentReg(Reg16::SS, newSS);
                     reg(Reg32::ESP) = newESP;
                 }
-                else if((newCS & 3) > cpl)
+                else if((newCS & 3) > cpl) // return to outer privilege
                 {
-                    printf("IRET return to outer %i > %i\n", (newCS & 3), cpl);
-                    exit(1);
-                }
-                else
-                {
-                    // TODO: I flag IOPL check
+                    uint32_t newESP = pop(operandSize32);
+                    uint16_t newSS = pop(operandSize32);
 
-                    if(operandSize32)
-                        flags = (flags & 0x20000) | (newFlags & 0x17FD5) | 2;
-                    else
-                        flags = (flags & 0x30000) | (newFlags & 0x7FD5) | 2;
+                    // flags
+                    unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
+                    if(cpl <= iopl)
+                        flagMask |= Flag_I;
+                    if(cpl == 0)
+                        flagMask |= Flag_IOPL;
+                    updateFlags(newFlags, flagMask, operandSize32);
+
+                    // new CS:IP
+                    setSegmentReg(Reg16::CS, newCS);
+                    setIP(newIP);
+
+                    // setup new stack
+                    setSegmentReg(Reg16::SS, newSS);
+                    reg(Reg32::ESP) = newESP;
+
+                    // check ES/DS/FS/GS descriptors against new CPL
+                    auto checkSeg = [this](Reg16 r)
+                    {
+                        auto desc = getCachedSegmentDescriptor(r);
+                        int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
+                        // dpl < cpl, data or non-conforming code
+                        if(dpl < cpl && (!(desc.flags & SD_Executable) || !(desc.flags & SD_DirConform)))
+                            setSegmentReg(r, 0); // reset to NULL
+                    };
+
+                    checkSeg(Reg16::ES);
+                    checkSeg(Reg16::DS);
+                    checkSeg(Reg16::FS);
+                    checkSeg(Reg16::GS);
+                }
+                else // return to same privilege
+                {
+                    unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
+                    if(cpl <= iopl)
+                        flagMask |= Flag_I;
+                    if(cpl == 0)
+                        flagMask |= Flag_IOPL;
+                    updateFlags(newFlags, flagMask, operandSize32);
 
                     setSegmentReg(Reg16::CS, newCS);
                     setIP(newIP);
@@ -6152,18 +6213,38 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector)
             }
             else
             {
-                printf("inter-privilege interrupt CPL %i DPL %i\n", cpl, newCSDPL);
-                exit(1);
+                auto tmpSS = reg(Reg16::SS);
+                auto tmpSP = reg(Reg32::ESP);
+
+                // restore SS:ESP from TSS
+                auto [newSP, newSS] = getTSSStackPointer(newCSDPL);
+
+                setSegmentReg(Reg16::SS, newSS);
+                reg(Reg32::ESP) = newSP;
+
+                push(tmpSS, gate32);
+                push(tmpSP, gate32);
+
+                // continue to the usual pushes
+                newCS = selector;
+                newIP = offset;
+                push32 = gate32;
+
+                newCS = (newCS & ~3) | newCSDPL;
+
+                if(!trapGate)
+                    clearFlags |= Flag_I;
+
+                clearFlags |= Flag_NT;
             }
         }
         else
         {
             // same privilege
-            fflush(stdout);//
             assert(!(flags & Flag_VM));
             assert((newCSFlags & SD_DirConform) || newCSDPL == cpl);
 
-            newCS = selector;
+            newCS = (selector & ~3) | cpl; // preserve cpl
             newIP = offset;
             
             push32 = gate32;
@@ -6176,11 +6257,9 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector)
     else
     {
         assert(!isOperandSize32(false));
-        assert(idtBase == 0);
 
-        auto addr = vector * 4;
+        auto addr = idtBase + vector * 4;
 
-        // FIXME: IDT
         newIP = readMem16(addr);
         newCS = readMem16(addr + 2);
 
