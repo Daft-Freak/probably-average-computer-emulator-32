@@ -36,6 +36,8 @@ public:
     void dmaComplete(int ch) override {}
 
 private:
+    void calculateCHS(int device);
+
     void fillIdentity(int device);
 
     uint8_t features;

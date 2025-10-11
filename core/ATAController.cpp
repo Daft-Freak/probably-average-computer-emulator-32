@@ -296,7 +296,7 @@ void ATAController::write16(uint16_t addr, uint16_t data)
     }
 }
 
-void ATAController::fillIdentity(int device)
+void ATAController::calculateCHS(int device)
 {
     uint32_t sectors = io->getNumSectors(device);
 
@@ -348,15 +348,20 @@ void ATAController::fillIdentity(int device)
     this->sectorsPerTrack[device] = sectorsPerTrack;
 
     printf("%u LBA sectors -> %i cylinders, %i heads, %i sectors (%u total)\n", sectors, cylinders, heads, sectorsPerTrack, cylinders * heads * sectorsPerTrack);
+}
+
+void ATAController::fillIdentity(int device)
+{
+    calculateCHS(device);
 
     // clear the buffer
     memset(sectorBuf, 0, sizeof(sectorBuf));
 
     auto wordBuf = reinterpret_cast<uint16_t *>(sectorBuf);
 
-    wordBuf[1] = cylinders;
-    wordBuf[3] = heads;
-    wordBuf[6] = sectorsPerTrack;
+    wordBuf[1] = numCylinders[device];
+    wordBuf[3] = numHeads[device];
+    wordBuf[6] = sectorsPerTrack[device];
 
     // serial number
     for(int i = 0; i < 20; i++)
@@ -377,6 +382,8 @@ void ATAController::fillIdentity(int device)
     wordBuf[49] = 1 << 9/*LBA*/; // TODO: bit 8 for DMA
 
     // LBA mode sectors
+    uint32_t sectors = io->getNumSectors(device);
+
     wordBuf[60] = sectors & 0xFFFF;
     wordBuf[61] = sectors >> 16;
 
