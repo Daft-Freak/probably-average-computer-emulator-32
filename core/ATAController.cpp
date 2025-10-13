@@ -487,6 +487,17 @@ void ATAController::doATAPICommand(int device)
 {
     switch(static_cast<SCSICommand>(sectorBuf[0]))
     {
+        case SCSICommand::TEST_UNIT_READY:
+        {
+            // always ready (for now?)
+
+            sectorCount = 1 << 0  // command
+                        | 1 << 1; // to host
+            
+            flagIRQ();
+            break;
+        }
+
         case SCSICommand::INQUIRY:
         {
             pioReadLen = lbaMidCylinderLow | lbaHighCylinderHigh << 8; // requested len
