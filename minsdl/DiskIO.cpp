@@ -21,6 +21,19 @@ bool FileFloppyIO::read(int unit, uint8_t *buf, uint8_t cylinder, uint8_t head, 
     return file[unit].seekg(lba * 512).read(reinterpret_cast<char *>(buf), 512).gcount() == 512;
 }
 
+bool FileFloppyIO::write(int unit, const uint8_t *buf, uint8_t cylinder, uint8_t head, uint8_t sector)
+{
+    if(unit >= maxDrives)
+        return false;
+
+    int heads = doubleSided[unit] ? 2 : 1;
+    auto lba = ((cylinder * heads + head) * sectorsPerTrack[unit]) + sector - 1;
+
+    file[unit].clear();
+
+    return file[unit].seekp(lba * 512).write(reinterpret_cast<const char *>(buf), 512).good();
+}
+
 void FileFloppyIO::openDisk(int unit, std::string path)
 {
     if(unit >= maxDrives)
@@ -28,7 +41,7 @@ void FileFloppyIO::openDisk(int unit, std::string path)
 
     file[unit].close();
 
-    file[unit].open(path, std::ios::binary);
+    file[unit].open(path, std::ios::in | std::ios::out | std::ios::binary);
     if(file[unit])
     {
         file[unit].seekg(0, std::ios::end);

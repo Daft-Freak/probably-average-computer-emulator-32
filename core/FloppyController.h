@@ -9,6 +9,9 @@ public:
 
     // reads a 512 byte sector
     virtual bool read(int unit, uint8_t *buf, uint8_t cylinder, uint8_t head, uint8_t sector) = 0;
+
+    // writes a 512 byte sector
+    virtual bool write(int device, const uint8_t *buf, uint8_t cylinder, uint8_t head, uint8_t sector) = 0;
 };
 
 class FloppyController final : public IODevice
@@ -28,7 +31,7 @@ public:
     int getCyclesToNextInterrupt(uint32_t cycleCount) override {return 0;}
 
     uint8_t dmaRead(int ch) override;
-    void dmaWrite(int ch, uint8_t data) override {}
+    void dmaWrite(int ch, uint8_t data) override;
     void dmaComplete(int ch) override;
 
 private:

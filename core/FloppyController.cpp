@@ -81,6 +81,8 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     commandLen = 3;
                 else if(data == 0x04) // sense drive status
                     commandLen = 2;
+                else if((data & 0x1F) == 0x05) // write
+                    commandLen = 9;
                 else if((data & 0x1F) == 0x06) // read
                     commandLen = 9;
                 else if(data == 0x07) // recalibrate
@@ -119,6 +121,59 @@ void FloppyController::write(uint16_t addr, uint8_t data)
 
                     resultLen = 1;
                     result[0] = (track0 ? 1 << 4 : 0) | 1 << 5 /*ready*/;
+                }
+                else if((command[0] & 0x1F) == 0x05) // write
+                {
+                    [[maybe_unused]] bool multiTrack = command[0] & (1 << 7);
+                    [[maybe_unused]] bool mfm = command[0] & (1 << 6);
+                    // bool skipDeleted = command[0] & (1 << 5);
+
+                    int unit = command[1] & 3;
+                    int head = (command[1] >> 2) & 1;
+
+                    auto cylinder = command[2];
+                    [[maybe_unused]] auto headAgain = command[3];
+                    auto record = command[4];
+                    [[maybe_unused]] auto number = command[5];
+                    //auto endOfTrack = command[6];
+                    //auto gapLength = command[7];
+                    //auto dataLength = command[8];
+
+                    assert(head == headAgain);
+                    assert(number == 2);
+                    assert(multiTrack);
+                    assert(mfm);
+
+                    // prepare for write
+                    bool failed = false;
+                    if(!io)
+                        failed = true;
+
+                    status[0] = unit | head << 2;
+
+                    if(failed)
+                        status[0] |= 1 << 6;
+
+                    resultLen = 7;
+                    result[0] = status[0];
+                    result[1] = status[1];
+                    result[2] = status[2];
+                    result[3] = cylinder;
+                    result[4] = head;
+                    result[5] = record;
+                    result[6] = number;
+
+                    if(!failed)
+                    {
+                        // start DMA if we didn't immediately fail
+                        sectorBufOffset = 0;
+                        sys.getChipset().dmaRequest(2, true, this);
+                    }
+                    else
+                    {
+                        if(digitalOutput & (1 << 3))
+                            sys.getChipset().flagPICInterrupt(6);
+                    }
                 }
                 else if((command[0] & 0x1F) == 0x06) // read
                 {
@@ -299,6 +354,40 @@ uint8_t FloppyController::dmaRead(int ch)
     }
 
     return sectorBuf[sectorBufOffset++];
+}
+
+void FloppyController::dmaWrite(int ch, uint8_t data)
+{
+    sectorBuf[sectorBufOffset++] = data;
+
+    // check if we need to write the next sector
+    if(sectorBufOffset == 512)
+    {
+        int unit = command[1] & 3;
+        auto &cylinder = command[2];
+        auto &head = command[3];
+        auto &record = command[4];
+        auto endOfTrack = command[6];
+
+        if(!io || !io->write(unit, sectorBuf, cylinder, head, record))
+            status[0] |= 1 << 6; // error (TODO: should we stop the DMA now?)
+
+        // update offset
+        record++;
+        if(record > endOfTrack)
+        {
+            record = 1;
+            if(head == 0)
+                head = 1;
+            else
+            {
+                head = 0;
+                cylinder++;
+            }
+        }
+
+        sectorBufOffset = 0;
+    }
 }
 
 void FloppyController::dmaComplete(int ch)
