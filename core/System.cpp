@@ -1247,7 +1247,8 @@ uint8_t RAM_FUNC(System::readMem)(uint32_t addr)
 
 void RAM_FUNC(System::writeMem)(uint32_t addr, uint8_t data)
 {
-    addr &= (maxAddress - 1);
+    if(addr >= maxAddress)
+        return;
 
     auto block = addr / blockSize;
 
