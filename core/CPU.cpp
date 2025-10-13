@@ -4751,22 +4751,30 @@ void RAM_FUNC(CPU::executeInstruction)()
         case 0xE4: // IN AL from imm8
         {
             auto port = readMem8(addr + 1);
-            reg(Reg8::AL) = sys.readIOPort(port);
+    
+            if(checkIOPermission(port))
+            {
+                reg(Reg8::AL) = sys.readIOPort(port);
 
-            reg(Reg32::EIP)++;
-            cyclesExecuted(10);
+                reg(Reg32::EIP)++;
+                cyclesExecuted(10);
+            }
             break;
         }
 
         case 0xE6: // OUT AL to imm8
         {
             auto port = readMem8(addr + 1);
-            auto data = reg(Reg8::AL);
 
-            sys.writeIOPort(port, data);
+            if(checkIOPermission(port))
+            {
+                auto data = reg(Reg8::AL);
 
-            reg(Reg32::EIP)++;
-            cyclesExecuted(10);
+                sys.writeIOPort(port, data);
+
+                reg(Reg32::EIP)++;
+                cyclesExecuted(10);
+            }
             break;
         }
 
@@ -4840,46 +4848,60 @@ void RAM_FUNC(CPU::executeInstruction)()
         {
             auto port = reg(Reg16::DX);
 
-            reg(Reg8::AL) = sys.readIOPort(port);
+            if(checkIOPermission(port))
+            {
+                reg(Reg8::AL) = sys.readIOPort(port);
 
-            cyclesExecuted(8);
+                cyclesExecuted(8);
+            }
             break;
         }
         case 0xED: // IN AX from DX
         {
             auto port = reg(Reg16::DX);
 
-            if(operandSize32)
-                reg(Reg32::EAX) = sys.readIOPort16(port) | sys.readIOPort16(port + 2) << 16;
-            else
-                reg(Reg16::AX) = sys.readIOPort16(port);
+            if(checkIOPermission(port))
+            {
+                if(operandSize32)
+                    reg(Reg32::EAX) = sys.readIOPort16(port) | sys.readIOPort16(port + 2) << 16;
+                else
+                    reg(Reg16::AX) = sys.readIOPort16(port);
 
-            cyclesExecuted(8 + 4);
+                cyclesExecuted(8 + 4);
+            }
             break;
         }
 
         case 0xEE: // OUT AL to DX
         {
             auto port = reg(Reg16::DX);
-            auto data = reg(Reg8::AL);
 
-            sys.writeIOPort(port, data);
+            if(checkIOPermission(port))
+            {
+                auto data = reg(Reg8::AL);
 
-            cyclesExecuted(8);
+                sys.writeIOPort(port, data);
+
+                cyclesExecuted(8);
+            }
             break;
         }
 
         case 0xEF: // OUT AX to DX
         {
             auto port = reg(Reg16::DX);
-            auto data = operandSize32 ? reg(Reg32::EAX) : reg(Reg16::AX);
 
-            sys.writeIOPort16(port, data);
+            if(checkIOPermission(port))
+            {
+                auto data = operandSize32 ? reg(Reg32::EAX) : reg(Reg16::AX);
 
-            if(operandSize32)
-                sys.writeIOPort16(port + 2, data >> 16);
+                sys.writeIOPort16(port, data);
 
-            cyclesExecuted(8 + 4);
+                if(operandSize32)
+                    sys.writeIOPort16(port + 2, data >> 16);
+
+                cyclesExecuted(8 + 4);
+            }
             break;
         }
 
@@ -5857,6 +5879,52 @@ std::tuple<uint32_t, uint16_t> CPU::getTSSStackPointer(int dpl)
     }
 
     return {newSP, newSS};
+}
+
+bool CPU::checkIOPermission(uint16_t addr)
+{
+    // no IO permissions in real mode
+    if(!isProtectedMode())
+        return true;
+
+    unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+    // check IOPL unless virtual-8086 mode
+    if(!(flags & Flag_VM) && cpl <= iopl)
+        return true;
+
+    // get TSS
+    auto &tsDesc = getCachedSegmentDescriptor(Reg16::TR);
+    int descType = (tsDesc.flags & SD_SysType);
+
+    assert(!(tsDesc.flags & SD_Type));
+
+    if(descType == SD_SysTypeTSS32 || descType == SD_SysTypeBusyTSS32) // 32 bit
+    {
+        auto ioMapBase = readMem16(tsDesc.base + 0x66);
+        uint32_t byteAddr = ioMapBase + addr / 8;
+
+        // out of bounds
+        if(byteAddr > tsDesc.limit)
+        {
+            fault(Fault::GP, 0);
+            return false;
+        }
+
+        auto mapByte = readMem8(tsDesc.base + byteAddr);
+
+        // allowed if bit cleared
+        // TODO: need to check multiple bits for 16/32bit port access
+        bool allowed = !(mapByte & (1 << (addr & 7)));
+
+
+        if(!allowed)
+            fault(Fault::GP, 0);
+
+        return allowed;
+    }
+
+    return false;
 }
 
 // also address size, but with a different override prefix

@@ -133,6 +133,8 @@ private:
 
     std::tuple<uint32_t, uint16_t> getTSSStackPointer(int dpl);
 
+    bool checkIOPermission(uint16_t addr);
+
     bool isProtectedMode() {return reg(Reg32::CR0) & 1;}
     bool isOperandSize32(bool override);
     bool isStackAddressSize32();
