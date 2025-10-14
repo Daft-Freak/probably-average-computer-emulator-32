@@ -522,8 +522,17 @@ void CPU::reset()
                    | SD_Present;
     }
 
+    idtBase = 0;
+    idtLimit = 0x3FF;
+
+    reg(Reg16::DX) = 3 << 8; // 386
+
+    reg(Reg32::CR0) = 0;
+
     setSegmentReg(Reg16::CS, 0xF000);
     reg(Reg16::DS) = reg(Reg16::ES) = reg(Reg16::SS) = reg(Reg16::FS) = reg(Reg16::GS) = 0;
+
+    flags = 2; // reserved bit
 
     reg(Reg32::EIP) = 0xFFF0;
 
