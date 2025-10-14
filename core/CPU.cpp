@@ -4408,6 +4408,13 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
         }
 
+        case 0xCE: // INTO
+        {
+            if(flags & Flag_O)
+                serviceInterrupt(0x4); // OF
+            break;
+        }
+
         case 0xCF: // IRET
         {
             delayInterrupt = true;
