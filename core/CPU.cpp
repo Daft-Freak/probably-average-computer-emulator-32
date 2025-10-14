@@ -4469,7 +4469,17 @@ void RAM_FUNC(CPU::executeInstruction)()
         {
             delayInterrupt = true;
 
-            if(!isProtectedMode())
+            // need to validate CS BEFORE popping anything...
+            if(isProtectedMode() && !(flags & Flag_VM))
+            {
+                auto newCS = peek(operandSize32, 1);
+                auto newFlags = peek(operandSize32, 2);
+                // not a segment selector if we're switching to virtual-8086 mode
+                if(!(newFlags & Flag_VM) && !checkSegmentSelector(Reg16::CS, newCS))
+                    break;
+            }
+
+            if(!isProtectedMode()) // real mode
             {
                 // pop IP
                 auto newIP = pop(operandSize32);
@@ -4510,9 +4520,8 @@ void RAM_FUNC(CPU::executeInstruction)()
                 }
                 else
                 {
-                    // GP
                     printf("V86 IRET IOPL %i\n", iopl);
-                    exit(1);
+                    fault(Fault::GP, 0);
                 }
             }
             else if(flags & Flag_NT)
@@ -4530,6 +4539,8 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 // pop flags
                 auto newFlags = pop(operandSize32);
+
+                unsigned newCSRPL = newCS & 3;
 
                 if((newFlags & Flag_VM) && cpl == 0)
                 {
@@ -4553,7 +4564,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     setSegmentReg(Reg16::SS, newSS);
                     reg(Reg32::ESP) = newESP;
                 }
-                else if((newCS & 3) > cpl) // return to outer privilege
+                else if(newCSRPL > cpl) // return to outer privilege
                 {
                     uint32_t newESP = pop(operandSize32);
                     uint16_t newSS = pop(operandSize32);
