@@ -876,12 +876,14 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 assert(!(newDesc.flags & SD_Type)); // system
                                 assert((newDesc.flags & SD_SysType) == 0x2 << 16); // LDT
 
+                                ldtSelector = selector;
                                 ldtBase = newDesc.base;
                                 ldtLimit = newDesc.limit;
                             }
                             else
                             {
                                 // empty selector, mark invalid
+                                ldtSelector = 0;
                                 ldtBase = 0;
                                 ldtLimit = 0;
                             }

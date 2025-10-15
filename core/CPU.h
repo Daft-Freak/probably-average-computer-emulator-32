@@ -191,6 +191,7 @@ private:
 
     uint32_t gdtBase, ldtBase, idtBase;
     uint16_t gdtLimit, ldtLimit, idtLimit;
+    uint16_t ldtSelector;
 
     uint8_t cpl;
 
