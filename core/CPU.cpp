@@ -868,27 +868,8 @@ void RAM_FUNC(CPU::executeInstruction)()
                             int cycles;
                             auto selector = readRM16(modRM, cycles, addr + 1);
 
-                            if(selector >> 2)
-                            {
-                                auto newDesc = loadSegmentDescriptor(selector);
-
-                                assert(newDesc.flags & SD_Present); // present
-                                assert(!(newDesc.flags & SD_Type)); // system
-                                assert((newDesc.flags & SD_SysType) == 0x2 << 16); // LDT
-
-                                ldtSelector = selector;
-                                ldtBase = newDesc.base;
-                                ldtLimit = newDesc.limit;
-                            }
-                            else
-                            {
-                                // empty selector, mark invalid
-                                ldtSelector = 0;
-                                ldtBase = 0;
-                                ldtLimit = 0;
-                            }
-
-                            reg(Reg32::EIP) += 2;
+                            if(setLDT(selector))
+                                reg(Reg32::EIP) += 2;
                             break;
                         }
                         case 0x3: // LTR
@@ -6023,6 +6004,31 @@ bool CPU::setSegmentReg(Reg16 r, uint16_t value)
         }
     }
 
+    return true;
+}
+
+bool CPU::setLDT(uint16_t selector)
+{
+    if(selector >> 2)
+    {
+        auto newDesc = loadSegmentDescriptor(selector);
+
+        assert(!(selector & 4)); // can't have an LDT in the LDT
+        assert(newDesc.flags & SD_Present); // present
+        assert(!(newDesc.flags & SD_Type)); // system
+        assert((newDesc.flags & SD_SysType) == 0x2 << 16); // LDT
+
+        ldtSelector = selector;
+        ldtBase = newDesc.base;
+        ldtLimit = newDesc.limit;
+    }
+    else
+    {
+        // empty selector, mark invalid
+        ldtSelector = 0;
+        ldtBase = 0;
+        ldtLimit = 0;
+    }
     return true;
 }
 

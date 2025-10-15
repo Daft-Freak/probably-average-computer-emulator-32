@@ -132,6 +132,8 @@ private:
     bool checkSegmentSelector(Reg16 r, uint16_t value);
     bool setSegmentReg(Reg16 r, uint16_t value);
 
+    bool setLDT(uint16_t selector);
+
     std::tuple<uint32_t, uint16_t> getTSSStackPointer(int dpl);
 
     bool checkIOPermission(uint16_t addr);
