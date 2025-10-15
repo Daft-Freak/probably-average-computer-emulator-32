@@ -5896,7 +5896,7 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 }
 
 // if this returns false we faulted
-bool CPU::checkSegmentSelector(Reg16 r, uint16_t value)
+bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, bool allowSys)
 {
     // check limit
     auto limit = (value & 4)/*local*/ ? ldtLimit : gdtLimit;
@@ -5935,8 +5935,8 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value)
     }
 
     // check data/code
-    // (CS could be a gate but we'll handle that in the call op)
-    if(!(desc.flags & SD_Type))
+    // (unless this is a call/jump)
+    if(!(desc.flags & SD_Type) && !allowSys)
     {
         fault(Fault::GP, value & ~3);
         return false;
@@ -5947,7 +5947,31 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value)
 
     if(r == Reg16::CS)
     {
-        // TODO
+        if(desc.flags & SD_Type)
+        {
+            // code segment
+            if(!(desc.flags & SD_Executable))
+            {
+                fault(Fault::GP, value & ~3);
+                return false;
+            }
+        }
+        else
+        {
+            // for calls and jumps a call gate, task gate or TSS is allowed
+            switch(desc.flags & SD_SysType)
+            {
+                case SD_SysTypeTSS16:
+                case SD_SysTypeCallGate16:
+                case SD_SysTypeTaskGate:
+                case SD_SysTypeTSS32:
+                case SD_SysTypeCallGate32:
+                    break;
+                default:
+                    fault(Fault::GP, value & ~3);
+                    return false;
+            }
+        }
     }
     else if(r == Reg16::SS)
     {
