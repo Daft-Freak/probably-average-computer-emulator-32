@@ -4605,10 +4605,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                     fault(Fault::GP, 0);
                 }
             }
-            else if(flags & Flag_NT)
+            else if(flags & Flag_NT) // task return
             {
-                printf("IRET task switch\n");
-                exit(1);
+                auto &curTSSDesc = getCachedSegmentDescriptor(Reg16::TR);
+                taskSwitch(readMem16(curTSSDesc.base), reg(Reg32::EIP), TaskSwitchSource::IntRet);
             }
             else
             {
