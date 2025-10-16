@@ -678,7 +678,7 @@ void RAM_FUNC(CPU::executeInstruction)()
     //push/pop
     auto push = [this, stackAddrSize32](uint32_t val, bool is32)
     {
-        doPush(val, is32, stackAddrSize32);
+        return doPush(val, is32, stackAddrSize32);
     };
 
     auto pop = [this, stackAddrSize32](bool is32)
@@ -6207,7 +6207,7 @@ void CPU::doALU32AImm(uint32_t addr)
     reg(Reg32::EIP) += 4;
 }
 
-void CPU::doPush(uint32_t val, bool op32, bool addr32)
+bool CPU::doPush(uint32_t val, bool op32, bool addr32)
 {
     uint32_t sp = addr32 ? reg(Reg32::ESP) : reg(Reg16::SP);
     if(sp == 0 && !addr32)
@@ -6216,14 +6216,19 @@ void CPU::doPush(uint32_t val, bool op32, bool addr32)
         sp -= op32 ? 4 : 2;
 
     if(op32)
-        writeMem32(sp, Reg16::SS, val);
-    else
-        writeMem16(sp, Reg16::SS, val);
+    {
+        if(!writeMem32(sp, Reg16::SS, val))
+            return false;
+    }
+    else if(!writeMem16(sp, Reg16::SS, val))
+        return false;
 
     if(addr32)
         reg(Reg32::ESP) = sp;
     else
         reg(Reg16::SP) = sp;
+
+    return true;
 }
 
 void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32)

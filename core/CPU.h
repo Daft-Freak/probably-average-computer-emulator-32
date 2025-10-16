@@ -188,7 +188,7 @@ private:
     void doALU32AImm(uint32_t addr);
 
     // misc op helpers
-    void doPush(uint32_t val, bool op32, bool addr32);
+    bool doPush(uint32_t val, bool op32, bool addr32);
     void farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32);
     void loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32);
 
