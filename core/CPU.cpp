@@ -6640,8 +6640,27 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                 }
                 case SD_SysTypeTaskGate:
                 {
-                    printf("call task gate\n");
-                    exit(1);
+                    unsigned dpl = (newDesc.flags & SD_PrivilegeLevel) >> 21;
+
+                    // check gate selector
+                    if(dpl < cpl || dpl < rpl)
+                    {
+                        fault(Fault::GP, newCS & ~3);
+                        return;
+                    }
+
+                    // (already checked if present)
+
+                    auto tssSelector = newDesc.base & 0xFFFF;
+
+                    // must be in GDT
+                    if((tssSelector & 4)/*local*/ || (tssSelector | 7) > gdtLimit)
+                    {
+                        fault(Fault::GP, tssSelector & ~3);
+                        return;
+                    }
+
+                    taskSwitch(tssSelector, retAddr, TaskSwitchSource::Call);
                     break;
                 }
                 default:
