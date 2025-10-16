@@ -861,6 +861,28 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     switch(exOp)
                     {
+                        case 0x1: // STR
+                        {
+                            // not recognised in real/virtual-8086 mode
+                            if(!isProtectedMode() || (flags & Flag_VM))
+                            {
+                                fault(Fault::UD);
+                                break;
+                            }
+
+                            int cycles;
+
+                            // with 32bit operand size writing to mem only writes 16 bits
+                            // writing to reg zeroes the high 16 bits
+                            if(operandSize32 && (modRM >> 6) == 3)
+                                reg(static_cast<Reg32>(modRM & 7)) = reg(Reg16::TR);
+                            else
+                                writeRM16(modRM, reg(Reg16::TR), cycles, addr);
+
+                            reg(Reg32::EIP) += 2;
+
+                            break;
+                        }
                         case 0x2: // LLDT
                         {
                             assert(isProtectedMode());
