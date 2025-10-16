@@ -123,16 +123,24 @@ private:
         uint32_t limit;
     };
 
-    uint8_t readMem8(uint32_t offset, uint32_t segment = 0);
-    uint16_t readMem16(uint32_t offset, uint32_t segment = 0);
-    uint32_t readMem32(uint32_t offset, uint32_t segment = 0);
-    void writeMem8(uint32_t offset, uint32_t segment, uint8_t data);
-    void writeMem16(uint32_t offset, uint32_t segment, uint16_t data);
-    void writeMem32(uint32_t offset, uint32_t segment, uint32_t data);
+    uint8_t readMem8(uint32_t offset, Reg16 segment);
+    uint16_t readMem16(uint32_t offset, Reg16 segment);
+    uint32_t readMem32(uint32_t offset, Reg16 segment);
+    void writeMem8(uint32_t offset, Reg16 segment, uint8_t data);
+    void writeMem16(uint32_t offset, Reg16 segment, uint16_t data);
+    void writeMem32(uint32_t offset, Reg16 segment, uint32_t data);
+
+    // some internal stuff that already has a linear address
+    uint8_t readMem8(uint32_t offset);
+    uint16_t readMem16(uint32_t offset);
+    uint32_t readMem32(uint32_t offset);
+    void writeMem8(uint32_t offset, uint8_t data);
+    void writeMem16(uint32_t offset, uint16_t data);
+    void writeMem32(uint32_t offset, uint32_t data);
 
     uint32_t getPhysicalAddress(uint32_t virtAddr);
 
-    std::tuple<uint32_t, uint32_t> getEffectiveAddress(int mod, int rm, bool rw, uint32_t addr);
+    std::tuple<uint32_t, Reg16> getEffectiveAddress(int mod, int rm, bool rw, uint32_t addr);
 
     SegmentDescriptor &getCachedSegmentDescriptor(Reg16 r) {return segmentDescriptorCache[static_cast<int>(r) - static_cast<int>(Reg16::ES)];}
     uint32_t getSegmentOffset(Reg16 r) {return getCachedSegmentDescriptor(r).base;}
