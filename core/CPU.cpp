@@ -6197,7 +6197,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
     if(isProtectedMode() && !(flags & Flag_VM))
     {
-        int rpl = newCS & 3;
+        unsigned rpl = newCS & 3;
 
         auto newDesc = loadSegmentDescriptor(newCS); // wrong format for a gate descriptor
 
@@ -6249,7 +6249,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                 {
                     bool is32 = (newDesc.flags & SD_SysType) == SD_SysTypeCallGate32;
 
-                    int dpl = (newDesc.flags & SD_PrivilegeLevel) >> 21;
+                    unsigned dpl = (newDesc.flags & SD_PrivilegeLevel) >> 21;
                     assert(dpl >= cpl); // GP
                     assert(rpl <= dpl); // GP
 
