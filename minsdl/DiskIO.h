@@ -41,4 +41,5 @@ private:
     std::fstream file[maxDrives];
 
     uint32_t numSectors[maxDrives]{};
+    bool isCD[maxDrives]{};
 };

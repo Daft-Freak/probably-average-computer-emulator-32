@@ -97,7 +97,10 @@ uint32_t FileATAIO::getNumSectors(int drive)
 
 bool FileATAIO::isATAPI(int drive)
 {
-    return false; // TODO
+    if(drive >= maxDrives)
+        return false;
+
+    return isCD[drive];
 }
 
 bool FileATAIO::read(int drive, uint8_t *buf, uint32_t lba)
@@ -107,12 +110,13 @@ bool FileATAIO::read(int drive, uint8_t *buf, uint32_t lba)
 
     file[drive].clear();
 
-    return file[drive].seekg(lba * 512).read(reinterpret_cast<char *>(buf), 512).gcount() == 512;
+    int sectorSize = isCD[drive] ? 2048 : 512;
+    return file[drive].seekg(lba * sectorSize).read(reinterpret_cast<char *>(buf), sectorSize).gcount() == sectorSize;
 }
 
 bool FileATAIO::write(int drive, const uint8_t *buf, uint32_t lba)
 {
-    if(drive >= maxDrives)
+    if(drive >= maxDrives || isCD[drive])
         return false;
 
     file[drive].clear();
@@ -126,6 +130,17 @@ void FileATAIO::openDisk(int drive, std::string path)
         return;
 
     file[drive].open(path, std::ios::in | std::ios::out | std::ios::binary);
+
+    // assume .iso files are CDs
+    isCD[drive] = false;
+
+    auto dot = path.find_last_of('.');
+
+    if(dot != std::string::npos)
+    {
+        auto ext = path.substr(dot + 1);
+        isCD[drive] = ext == "iso";
+    }
 
     // get size
     file[drive].seekg(0, std::ios::end);
