@@ -168,9 +168,9 @@ private:
 
     // R/M helpers
 
-    uint8_t readRM8(uint8_t modRM, uint32_t addr, int additionalOffset = 0);
-    uint16_t readRM16(uint8_t modRM, uint32_t addr, int additionalOffset = 0);
-    uint32_t readRM32(uint8_t modRM, uint32_t addr, int additionalOffset = 0);
+    bool readRM8(uint8_t modRM, uint8_t &v, uint32_t addr, int additionalOffset = 0);
+    bool readRM16(uint8_t modRM, uint16_t &v, uint32_t addr, int additionalOffset = 0);
+    bool readRM32(uint8_t modRM, uint32_t &v, uint32_t addr, int additionalOffset = 0);
 
     bool writeRM8(uint8_t modRM, uint8_t v, uint32_t addr, bool rw = false, int additionalOffset = 0);
     bool writeRM16(uint8_t modRM, uint16_t v, uint32_t addr, bool rw = false, int additionalOffset = 0);

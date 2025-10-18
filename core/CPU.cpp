@@ -943,9 +943,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 break;
                             }
 
-                            auto selector = readRM16(modRM, addr + 1);
+                            uint16_t selector;
 
-                            if(setLDT(selector))
+                            if(readRM16(modRM, selector, addr + 1) && setLDT(selector))
                                 reg(Reg32::EIP) += 2;
                             break;
                         }
@@ -958,7 +958,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 break;
                             }
 
-                            auto selector = readRM16(modRM, addr + 1);
+                            uint16_t selector;
+                            if(!readRM16(modRM, selector, addr + 1))
+                                break;
 
                             // must be global
                             if((selector & 4) || (selector | 7) > gdtLimit)
@@ -1009,7 +1011,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 break;
                             }
 
-                            auto selector = readRM16(modRM, addr + 1);
+                            uint16_t selector;
+                            if(!readRM16(modRM, selector, addr + 1))
+                                break;
 
                             auto desc = loadSegmentDescriptor(selector);
 
@@ -1112,7 +1116,11 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                         case 0x6: // LMSW
                         {
-                            reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0xF) | (readRM16(modRM, addr + 1) & 0xF);
+                            uint16_t tmp;
+                            if(!readRM16(modRM, tmp, addr + 1))
+                                return;
+
+                            reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0xF) | (tmp & 0xF);
                             reg(Reg32::EIP) += 2;
                             break;
                         }
@@ -1136,7 +1144,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto selector = readRM16(modRM, addr + 1);
+                    uint16_t selector;
+                    if(!readRM16(modRM, selector, addr + 1))
+                        break;
 
                     auto desc = loadSegmentDescriptor(selector);
 
@@ -1188,7 +1198,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto selector = readRM16(modRM, addr + 1);
+                    uint16_t selector;
+                    if(!readRM16(modRM, selector, addr + 1))
+                        break;
 
                     auto desc = loadSegmentDescriptor(selector);
 
@@ -1355,13 +1367,21 @@ void RAM_FUNC(CPU::executeInstruction)()
                     {
                         bit = reg(static_cast<Reg32>(r));
 
-                        value = readRM32(modRM, addr + 1, (bit / 32) * 4) & (1 << (bit & 31));
+                        uint32_t data;
+                        if(!readRM32(modRM, data, addr + 1, (bit / 32) * 4))
+                            break;
+
+                        value = data & (1 << (bit & 31));
                     }
                     else
                     {
                         bit = reg(static_cast<Reg16>(r));
 
-                        value = readRM16(modRM, addr + 1, (bit / 16) * 2) & (1 << (bit & 15));
+                        uint16_t data;
+                        if(!readRM16(modRM, data, addr + 1, (bit / 16) * 2))
+                            break;
+
+                        value = data & (1 << (bit & 15));
                     }
 
                     if(value)
@@ -1390,13 +1410,20 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        auto v = readRM32(modRM, addr + 1);
+                        uint32_t v;
+                        if(!readRM32(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg32>(r));
                         writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
                     }
                     else
                     {
-                        auto v = readRM16(modRM, addr + 1);
+                        uint16_t v;
+
+                        if(!readRM16(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg16>(r));
                         writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
                     }
@@ -1416,13 +1443,19 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        auto v = readRM32(modRM, addr + 1);
+                        uint32_t v;
+                        if(!readRM32(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg32>(r));
                         writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
                     }
                     else
                     {
-                        auto v = readRM16(modRM, addr + 1);
+                        uint16_t v;
+                        if(!readRM16(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg16>(r));
                         writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
                     }
@@ -1463,7 +1496,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 32) * 4;
                         bit &= 31;
 
-                        auto data = readRM32(modRM, addr + 1, off);
+                        uint32_t data;
+                        if(!readRM32(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM32(modRM, data | 1 << bit, addr + 1, true, off))
                             break;
@@ -1475,7 +1511,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 16) * 2;
                         bit &= 15;
 
-                        auto data = readRM16(modRM, addr + 1, off);
+                        uint16_t data;
+                        if(!readRM16(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM16(modRM, data | 1 << bit, addr + 1, true, off))
                             break;
@@ -1507,13 +1546,19 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        auto v = readRM32(modRM, addr + 1);
+                        uint32_t v;
+                        if(!readRM32(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg32>(r));
                         writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
                     }
                     else
                     {
-                        auto v = readRM16(modRM, addr + 1);
+                        uint16_t v;
+                        if(!readRM16(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg16>(r));
                         writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
                     }
@@ -1533,13 +1578,19 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        auto v = readRM32(modRM, addr + 1);
+                        uint32_t v;
+                        if(!readRM32(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg32>(r));
                         writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
                     }
                     else
                     {
-                        auto v = readRM16(modRM, addr + 1);
+                        uint16_t v;
+                        if(!readRM16(modRM, v, addr + 1))
+                            break;
+
                         auto src = reg(static_cast<Reg16>(r));
                         writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
                     }
@@ -1557,7 +1608,11 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     if(operandSize32)
                     {
-                        int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, addr + 1)))
+                        uint32_t tmp;
+                        if(!readRM32(modRM, tmp, addr + 1))
+                            break;
+
+                        int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp))
                                     * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
                         reg(static_cast<Reg32>(r)) = res;
 
@@ -1569,7 +1624,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                     }
                     else
                     {
-                        int32_t res = static_cast<int16_t>(readRM16(modRM, addr + 1)) * static_cast<int16_t>(reg(static_cast<Reg16>(r)));
+                        uint16_t tmp;
+                        if(!readRM16(modRM, tmp, addr + 1))
+                            break;
+
+                        int32_t res = static_cast<int16_t>(tmp) * static_cast<int16_t>(reg(static_cast<Reg16>(r)));
                         reg(static_cast<Reg16>(r)) = res;
 
                         // check if upper half matches lower half's sign
@@ -1605,7 +1664,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 32) * 4;
                         bit &= 31;
 
-                        auto data = readRM32(modRM, addr + 1, off);
+                        uint32_t data;
+                        if(!readRM32(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off))
                             break;
@@ -1617,7 +1679,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 16) * 2;
                         bit &= 15;
 
-                        auto data = readRM16(modRM, addr + 1, off);
+                        uint16_t data;
+                        if(!readRM16(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off))
                             break;
@@ -1649,7 +1714,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    uint32_t v = readRM8(modRM, addr + 1);
+                    uint8_t v;
+                    if(!readRM8(modRM, v, addr + 1))
+                        break;
 
                     if(operandSize32)
                         reg(static_cast<Reg32>(r)) = v;
@@ -1667,7 +1734,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    uint32_t v = readRM16(modRM, addr + 1);
+                    uint16_t v;
+                    if(!readRM16(modRM, v, addr + 1))
+                        break;
 
                     if(operandSize32)
                         reg(static_cast<Reg32>(r)) = v;
@@ -1697,9 +1766,21 @@ void RAM_FUNC(CPU::executeInstruction)()
                             bool value;
 
                             if(operandSize32)
-                                value = readRM32(modRM, addr + 1, (bit / 32) * 4) & (1 << (bit & 31));
+                            {
+                                uint32_t data;
+                                if(!readRM32(modRM, data, addr + 1, (bit / 32) * 4))
+                                    break;
+
+                                value = data & (1 << (bit & 31));
+                            }
                             else
-                                value = readRM16(modRM, addr + 1, (bit / 16) * 2) & (1 << (bit & 15));
+                            {
+                                uint16_t data;
+                                if(!readRM16(modRM, data, addr + 1, (bit / 16) * 2))
+                                    break;
+
+                                value = data & (1 << (bit & 15));
+                            }
 
                             if(value)
                                 flags |= Flag_C;
@@ -1718,7 +1799,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 32) * 4;
                                 bit &= 31;
 
-                                auto data = readRM32(modRM, addr + 1, off);
+                                uint32_t data;
+                                if(!readRM32(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM32(modRM, data | 1 << bit, addr + 1, true, off))
                                     break;
@@ -1728,7 +1812,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 16) * 2;
                                 bit &= 15;
 
-                                auto data = readRM16(modRM, addr + 1, off);
+                                uint16_t data;
+                                if(!readRM16(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM16(modRM, data | 1 << bit, addr + 1, true, off))
                                     break;
@@ -1751,7 +1838,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 32) * 4;
                                 bit &= 31;
 
-                                auto data = readRM32(modRM, addr + 1, off);
+                                uint32_t data;
+                                if(!readRM32(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off))
                                     break;
@@ -1761,7 +1851,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 16) * 2;
                                 bit &= 15;
 
-                                auto data = readRM16(modRM, addr + 1, off);
+                                uint16_t data;
+                                if(!readRM16(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off))
                                     break;
@@ -1784,7 +1877,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 32) * 4;
                                 bit &= 31;
 
-                                auto data = readRM32(modRM, addr + 1, off);
+                                uint32_t data;
+                                if(!readRM32(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM32(modRM, data ^ ~(1 << bit), addr + 1, true, off))
                                     break;
@@ -1794,7 +1890,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                                 int off = (bit / 16) * 2;
                                 bit &= 15;
 
-                                auto data = readRM16(modRM, addr + 1, off);
+                                uint16_t data;
+                                if(!readRM16(modRM, data, addr + 1, off))
+                                    break;
+
                                 value = data & (1 << bit);
                                 if(!writeRM16(modRM, data ^ ~(1 << bit), addr + 1, true, off))
                                     break;
@@ -1832,7 +1931,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 32) * 4;
                         bit &= 31;
 
-                        auto data = readRM32(modRM, addr + 1, off);
+                        uint32_t data;
+                        if(!readRM32(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM32(modRM, data ^ 1 << bit, addr + 1, true, off))
                             break;
@@ -1844,7 +1946,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                         int off = (bit / 16) * 2;
                         bit &= 15;
 
-                        auto data = readRM16(modRM, addr + 1, off);
+                        uint16_t data;
+                        if(!readRM16(modRM, data, addr + 1, off))
+                            break;
+
                         value = data & (1 << bit);
                         if(!writeRM16(modRM, data ^ 1 << bit, addr + 1, true, off))
                             break;
@@ -1867,7 +1972,21 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto val = operandSize32 ? readRM32(modRM, addr + 1) : readRM16(modRM, addr + 1);
+                    uint32_t val;
+
+                    if(operandSize32)
+                    {
+                        if(!readRM32(modRM, val, addr + 1))
+                            break;
+                    }
+                    else
+                    {
+                        uint16_t tmp;
+                        if(!readRM16(modRM, tmp, addr + 1))
+                            break;
+
+                        val = tmp;
+                    }
 
                     if(!val)
                         flags |= Flag_Z;
@@ -1893,8 +2012,21 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    auto val = operandSize32 ? readRM32(modRM, addr + 1) : readRM16(modRM, addr + 1);
+                    uint32_t val;
 
+                    if(operandSize32)
+                    {
+                        if(!readRM32(modRM, val, addr + 1))
+                            break;
+                    }
+                    else
+                    {
+                        uint16_t tmp;
+                        if(!readRM16(modRM, tmp, addr + 1))
+                            break;
+
+                        val = tmp;
+                    }
                     if(!val)
                         flags |= Flag_Z;
                     else
@@ -1920,11 +2052,16 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    uint32_t v = readRM8(modRM, addr + 1);
+                    uint32_t v;
+                    uint8_t v8;
+                    if(!readRM8(modRM, v8, addr + 1))
+                        break;
 
                     // sign extend
-                    if(v & 0x80)
-                        v |= 0xFFFFFF00;
+                    if(v8 & 0x80)
+                        v = v8 | 0xFFFFFF00;
+                    else
+                        v = v8;
 
                     if(operandSize32)
                         reg(static_cast<Reg32>(r)) = v;
@@ -1942,11 +2079,16 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     auto r = (modRM >> 3) & 0x7;
 
-                    uint32_t v = readRM16(modRM, addr + 1);
+                    uint32_t v;
+                    uint16_t v16;
+                    if(!readRM16(modRM, v16, addr + 1))
+                        break;
 
                     // sign extend
-                    if(v & 0x8000)
-                        v |= 0xFFFF0000;
+                    if(v16 & 0x8000)
+                        v = v16 | 0xFFFF0000;
+                    else
+                        v = v16;
 
                     if(operandSize32)
                         reg(static_cast<Reg32>(r)) = v;
@@ -2210,7 +2352,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto r = (modRM >> 3) & 0x7;
 
-            uint8_t dest = readRM8(modRM, addr);
+            uint8_t dest;
+            if(!readRM8(modRM, dest, addr))
+                break;
 
             auto srcReg = static_cast<Reg8>(r);
 
@@ -2230,14 +2374,20 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(operandSize32)
             {
                 auto src = reg(static_cast<Reg32>(r));
-                auto dest = readRM32(modRM, addr);
+
+                uint32_t dest;
+                if(!readRM32(modRM, dest, addr))
+                    break;
 
                 doSub(dest, src, flags);
             }
             else
-            {    
+            {
                 auto src = reg(static_cast<Reg16>(r));
-                auto dest = readRM16(modRM, addr);
+
+                uint16_t dest;
+                if(!readRM16(modRM, dest, addr))
+                    break;
 
                 doSub(dest, src, flags);
             }
@@ -2253,7 +2403,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto r = (modRM >> 3) & 0x7;
 
-            uint8_t src = readRM8(modRM, addr);
+            uint8_t src;
+            if(!readRM8(modRM, src, addr))
+                break;
 
             auto dstReg = static_cast<Reg8>(r);
 
@@ -2272,14 +2424,20 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                auto src = readRM32(modRM, addr);
+                uint32_t src;
+                if(!readRM32(modRM, src, addr))
+                    break;
+
                 auto dstReg = static_cast<Reg32>(r);
 
                 doSub(reg(dstReg), src, flags);
             }
             else
             {
-                uint16_t src = readRM16(modRM, addr);
+                uint16_t src;
+                if(!readRM16(modRM, src, addr))
+                    break;
+
                 auto dstReg = static_cast<Reg16>(r);
 
                 doSub(reg(dstReg), src, flags);
@@ -2522,7 +2680,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                 auto r = static_cast<Reg16>((modRM >> 3) & 0x7);
                 reg(Reg32::EIP)++;
 
-                auto dest = readRM16(modRM, addr);
+                uint16_t dest;
+                if(!readRM16(modRM, dest, addr))
+                    break;
+
                 auto destRPL = dest & 3;
                 auto srcRPL = reg(r) & 3;
 
@@ -2577,7 +2738,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                 if(!readMem32(immAddr, imm))
                     return;
 
-                int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, addr))) * imm;
+                uint32_t tmp;
+                if(!readRM32(modRM, tmp, addr))
+                    break;
+
+                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp)) * imm;
                 reg(static_cast<Reg32>(r)) = res;
 
                 // check if upper half matches lower half's sign
@@ -2595,7 +2760,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                 if(!readMem16(immAddr, imm))
                     return;
 
-                int32_t res = static_cast<int16_t>(readRM16(modRM, addr)) * imm;
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr))
+                    break;
+
+                int32_t res = static_cast<int16_t>(tmp) * imm;
                 reg(static_cast<Reg16>(r)) = res;
 
                 // check if upper half matches lower half's sign
@@ -2640,7 +2809,11 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                int64_t res = static_cast<int64_t>(static_cast<int32_t>(readRM32(modRM, addr))) * imm;
+                uint32_t tmp;
+                if(!readRM32(modRM, tmp, addr))
+                    break;
+
+                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp)) * imm;
                 reg(static_cast<Reg32>(r)) = res;
 
                 // check if upper half matches lower half's sign
@@ -2651,7 +2824,11 @@ void RAM_FUNC(CPU::executeInstruction)()
             }
             else
             {
-                int32_t res = static_cast<int16_t>(readRM16(modRM, addr)) * imm;
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr))
+                    break;
+
+                int32_t res = static_cast<int16_t>(tmp) * imm;
                 reg(static_cast<Reg16>(r)) = res;
 
                 // check if upper half matches lower half's sign
@@ -2907,7 +3084,10 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto exOp = (modRM >> 3) & 0x7;
 
-            auto dest = readRM8(modRM, addr);
+            uint8_t dest;
+            if(!readRM8(modRM, dest, addr))
+                break;
+
             int immOff = 2 + getDispLen(modRM, addr + 2);
 
             uint8_t imm;
@@ -2958,11 +3138,13 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                auto dest = readRM32(modRM, addr);
-                
                 uint32_t imm;
                 if(!readMem32(addr + immOff, imm))
                     return;
+
+                uint32_t dest;
+                if(!readRM32(modRM, dest, addr))
+                    break;
 
                 reg(Reg32::EIP) += 5;
 
@@ -2996,11 +3178,13 @@ void RAM_FUNC(CPU::executeInstruction)()
             }
             else
             {
-                auto dest = readRM16(modRM, addr);
-                
                 uint16_t imm;
                 if(!readMem16(addr + immOff, imm))
                     return;
+
+                uint16_t dest;
+                if(!readRM16(modRM, dest, addr))
+                    break;
 
                 reg(Reg32::EIP) += 3;
 
@@ -3049,8 +3233,10 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                auto dest = readRM32(modRM, addr);
-                
+                uint32_t dest;
+                if(!readRM32(modRM, dest, addr))
+                    break;
+
                 uint32_t imm;
 
                 if(!readMem8(addr + immOff, imm))
@@ -3090,7 +3276,9 @@ void RAM_FUNC(CPU::executeInstruction)()
             }
             else
             {
-                auto dest = readRM16(modRM, addr);
+                uint16_t dest;
+                if(!readRM16(modRM, dest, addr))
+                    break;
 
                 uint16_t imm;
                 uint8_t imm8;
@@ -3145,7 +3333,10 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto r = (modRM >> 3) & 0x7;
 
             auto src = reg(static_cast<Reg8>(r));
-            auto dest = readRM8(modRM, addr);
+
+            uint8_t dest;
+            if(!readRM8(modRM, dest, addr))
+                break;
 
             doAnd(dest, src, flags);
 
@@ -3163,14 +3354,19 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(operandSize32)
             {
                 auto src = reg(static_cast<Reg32>(r));
-                auto dest = readRM32(modRM, addr);
 
+                uint32_t dest;
+                if(!readRM32(modRM, dest, addr))
+                    break;
                 doAnd(dest, src, flags);
             }
             else
             {
                 auto src = reg(static_cast<Reg16>(r));
-                auto dest = readRM16(modRM, addr);
+
+                uint16_t dest;
+                if(!readRM16(modRM, dest, addr))
+                    break;
 
                 doAnd(dest, src, flags);
             }
@@ -3189,9 +3385,10 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto srcReg = static_cast<Reg8>(r);
 
-            auto tmp = readRM8(modRM, addr);
-            if(!writeRM8(modRM, reg(srcReg), addr, true))
+            uint8_t tmp;
+            if(!readRM8(modRM, tmp, addr) || !writeRM8(modRM, reg(srcReg), addr, true))
                 break;
+
             reg(srcReg) = tmp;
 
             reg(Reg32::EIP) += 1;
@@ -3208,17 +3405,21 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(operandSize32)
             {
                 auto srcReg = static_cast<Reg32>(r);
-                auto tmp = readRM32(modRM, addr);
-                if(!writeRM32(modRM, reg(srcReg), addr, true))
+    
+                uint32_t tmp;
+                if(!readRM32(modRM, tmp, addr) || !writeRM32(modRM, reg(srcReg), addr, true))
                     break;
+
                 reg(srcReg) = tmp;
             }
             else
             {
                 auto srcReg = static_cast<Reg16>(r);
-                auto tmp = readRM16(modRM, addr);
-                if(!writeRM16(modRM, reg(srcReg), addr, true))
+
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr) || !writeRM16(modRM, reg(srcReg), addr, true))
                     break;
+
                 reg(srcReg) = tmp;
             }
 
@@ -3269,13 +3470,13 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(!readMem8(addr + 1, modRM))
                 return;
 
+            reg(Reg32::EIP)++;
+
             auto r = (modRM >> 3) & 0x7;
 
             auto destReg = static_cast<Reg8>(r);
 
-            reg(destReg) = readRM8(modRM, addr);
-
-            reg(Reg32::EIP)++;
+            readRM8(modRM, reg(destReg), addr);
 
             break;
         }
@@ -3285,14 +3486,14 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(!readMem8(addr + 1, modRM))
                 return;
 
+            reg(Reg32::EIP)++;
+
             auto r = (modRM >> 3) & 0x7;
 
             if(operandSize32)
-                reg(static_cast<Reg32>(r)) = readRM32(modRM, addr);
+                readRM32(modRM, reg(static_cast<Reg32>(r)), addr);
             else
-                reg(static_cast<Reg16>(r)) = readRM16(modRM, addr);
-
-            reg(Reg32::EIP)++;
+                readRM16(modRM, reg(static_cast<Reg16>(r)), addr);
 
             break;
         }
@@ -3344,6 +3545,8 @@ void RAM_FUNC(CPU::executeInstruction)()
             if(!readMem8(addr + 1, modRM))
                 return;
 
+            reg(Reg32::EIP)++;
+
             auto r = (modRM >> 3) & 0x7;
 
             auto destReg = static_cast<Reg16>(r + static_cast<int>(Reg16::ES));
@@ -3355,8 +3558,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                 break;
             }
 
-            if(setSegmentReg(destReg, readRM16(modRM, addr)))
-                reg(Reg32::EIP)++;
+            uint16_t v;
+            if(readRM16(modRM, v, addr))
+                setSegmentReg(destReg, v);
+
             break;
         }
 
@@ -4428,7 +4633,9 @@ void RAM_FUNC(CPU::executeInstruction)()
     
             reg(Reg32::EIP) += 2;
 
-            auto v = readRM8(modRM, addr);
+            uint8_t v;
+            if(!readRM8(modRM, v, addr))
+                break;
 
             writeRM8(modRM, doShift(exOp, v, count, flags), addr, true);
             break;
@@ -4449,12 +4656,18 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(operandSize32)
             {
-                auto v = readRM32(modRM, addr);
+                uint32_t v;
+                if(!readRM32(modRM, v, addr))
+                    break;
+
                 writeRM32(modRM, doShift(exOp, v, count, flags), addr, true);
             }
             else
             {
-                auto v = readRM16(modRM, addr);
+                uint16_t v;
+                if(!readRM16(modRM, v, addr))
+                    break;
+
                 writeRM16(modRM, doShift(exOp, v, count, flags), addr, true);
             }
 
@@ -4918,7 +5131,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto count = 1;
 
-            auto v = readRM8(modRM, addr);
+            uint8_t v;
+            if(!readRM8(modRM, v, addr))
+                break;
 
             writeRM8(modRM, doShift(exOp, v, count, flags), addr, true);
             break;
@@ -4936,12 +5151,16 @@ void RAM_FUNC(CPU::executeInstruction)()
     
             if(operandSize32)
             {
-                auto v = readRM32(modRM, addr);
+                uint32_t v;
+                if(!readRM32(modRM, v, addr))
+                    break;
                 writeRM32(modRM, doShift(exOp, v, count, flags), addr, true);
             }
             else
             {
-                auto v = readRM16(modRM, addr);
+                uint16_t v;
+                if(!readRM16(modRM, v, addr))
+                    break;
                 writeRM16(modRM, doShift(exOp, v, count, flags), addr, true);
             }
 
@@ -4958,7 +5177,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto count = reg(Reg8::CL);
 
-            auto v = readRM8(modRM, addr);
+            uint8_t v;
+            if(!readRM8(modRM, v, addr))
+                break;
 
             writeRM8(modRM, doShift(exOp, v, count, flags), addr, true);
             break;
@@ -4976,12 +5197,16 @@ void RAM_FUNC(CPU::executeInstruction)()
     
             if(operandSize32)
             {
-                auto v = readRM32(modRM, addr);
+                uint32_t v;
+                if(!readRM32(modRM, v, addr))
+                    break;
                 writeRM32(modRM, doShift(exOp, v, count, flags), addr, true);
             }
             else
             {
-                auto v = readRM16(modRM, addr);
+                uint16_t v;
+                if(!readRM16(modRM, v, addr))
+                    break;
                 writeRM16(modRM, doShift(exOp, v, count, flags), addr, true);
             }
 
@@ -5064,7 +5289,10 @@ void RAM_FUNC(CPU::executeInstruction)()
                 if(!readMem8(addr + 1, modRM))
                     return;
 
-                readRM8(modRM, addr); // we need to at least decode it
+                // we need to at least decode it
+                uint8_t v;
+                if(!readRM8(modRM, v, addr))
+                    break;
 
                 reg(Reg32::EIP)++;
             }
@@ -5420,7 +5648,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto exOp = (modRM >> 3) & 0x7;
 
-            auto v = readRM8(modRM, addr); // NOT/NEG write back...
+            uint8_t v;
+            if(!readRM8(modRM, v, addr)) // NOT/NEG write back...
+                break;
 
             switch(exOp)
             {
@@ -5527,9 +5757,18 @@ void RAM_FUNC(CPU::executeInstruction)()
             uint32_t v;
 
             if(operandSize32)
-                v = readRM32(modRM, addr);
+            {
+                if(!readRM32(modRM, v, addr))
+                    break;
+            }
             else
-                v = readRM16(modRM, addr);
+            {
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr))
+                    break;
+
+                v = tmp;
+            }
 
             switch(exOp)
             {
@@ -5781,7 +6020,9 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto exOp = (modRM >> 3) & 0x7;
 
-            auto v = readRM8(modRM, addr);
+            uint8_t v;
+            if(!readRM8(modRM, v, addr))
+                break;
 
             switch(exOp)
             {
@@ -5819,7 +6060,21 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             bool isReg = (modRM >> 6) == 3;
 
-            uint32_t v = operandSize32 ? readRM32(modRM, addr) : readRM16(modRM, addr);
+            uint32_t v;
+
+            if(operandSize32)
+            {
+                if(!readRM32(modRM, v, addr))
+                    break;
+            }
+            else
+            {
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr))
+                    break;
+
+                v = tmp;
+            }
 
             switch(exOp)
             {
@@ -6558,7 +6813,7 @@ bool CPU::isStackAddressSize32()
     return false;
 }
 
-uint8_t RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint32_t addr, int additionalOffset)
+bool RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint8_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -6566,15 +6821,16 @@ uint8_t RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint32_t addr, int additionalOffse
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
-        uint8_t v;
-        readMem8(offset + additionalOffset, segment, v);
-        return v;
+        return readMem8(offset + additionalOffset, segment, v);
     }
     else
-        return reg(static_cast<Reg8>(rm));
+    {
+        v = reg(static_cast<Reg8>(rm));
+        return true;
+    }
 }
 
-uint16_t RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint32_t addr, int additionalOffset)
+bool RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint16_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -6582,15 +6838,16 @@ uint16_t RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint32_t addr, int additionalOff
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
-        uint16_t v;
-        readMem16(offset + additionalOffset, segment, v);
-        return v;
+        return readMem16(offset + additionalOffset, segment, v);
     }
     else
-        return reg(static_cast<Reg16>(rm));
+    {
+        v = reg(static_cast<Reg16>(rm));
+        return true;
+    }
 }
 
-uint32_t RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t addr, int additionalOffset)
+bool RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -6598,12 +6855,13 @@ uint32_t RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t addr, int additionalOff
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
-        uint32_t v;
-        readMem32(offset + additionalOffset, segment, v);
-        return v;
+        return readMem32(offset + additionalOffset, segment, v);
     }
     else
-        return reg(static_cast<Reg32>(rm));
+    {
+        v = reg(static_cast<Reg32>(rm));
+        return true;
+    }
 }
 
 bool RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, uint32_t addr, bool rw, int additionalOffset)
@@ -6668,7 +6926,9 @@ void CPU::doALU8(uint32_t addr)
 
     if(d)
     {
-        src = readRM8(modRM, addr);
+        if(!readRM8(modRM, src, addr))
+            return;
+
         dest = reg(r);
 
         reg(r) = op(dest, src, flags);
@@ -6676,7 +6936,9 @@ void CPU::doALU8(uint32_t addr)
     else
     {
         src = reg(r);
-        dest = readRM8(modRM, addr);
+
+        if(!readRM8(modRM, dest, addr))
+            return;
 
         writeRM8(modRM, op(dest, src, flags), addr, true);
     }
@@ -6696,7 +6958,9 @@ void CPU::doALU16(uint32_t addr)
 
     if(d)
     {
-        src = readRM16(modRM, addr);
+        if(!readRM16(modRM, src, addr))
+            return;
+
         dest = reg(r);
 
         reg(r) = op(dest, src, flags);
@@ -6704,7 +6968,9 @@ void CPU::doALU16(uint32_t addr)
     else
     {
         src = reg(r);
-        dest = readRM16(modRM, addr);
+
+        if(!readRM16(modRM, dest, addr))
+            return;
 
         writeRM16(modRM, op(dest, src, flags), addr, true);
     }
@@ -6724,7 +6990,9 @@ void CPU::doALU32(uint32_t addr)
 
     if(d)
     {
-        src = readRM32(modRM, addr);
+        if(!readRM32(modRM, src, addr))
+            return;
+
         dest = reg(r);
 
         reg(r) = op(dest, src, flags);
@@ -6732,7 +7000,9 @@ void CPU::doALU32(uint32_t addr)
     else
     {
         src = reg(r);
-        dest = readRM32(modRM, addr);
+
+        if(!readRM32(modRM, dest, addr))
+            return;
 
         writeRM32(modRM, op(dest, src, flags), addr, true);
     }
