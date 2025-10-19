@@ -6431,7 +6431,8 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 }
 
 // if this returns false we faulted
-bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allowSys)
+// gpFault is usually GP, but overridden sometimes when doing TSS-related things
+bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allowSys, Fault gpFault)
 {
     // check limit
     auto limit = (value & 4)/*local*/ ? ldtLimit : gdtLimit;
@@ -6449,7 +6450,7 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allow
         // not valid for CS/SS
         if(r == Reg16::CS || r == Reg16::SS)
         {
-            fault(Fault::GP, value & ~3);
+            fault(gpFault, value & ~3);
             return false;
         }
 
@@ -6473,7 +6474,7 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allow
     // (unless this is a call/jump)
     if(!(desc.flags & SD_Type) && !allowSys)
     {
-        fault(Fault::GP, value & ~3);
+        fault(gpFault, value & ~3);
         return false;
     }
 
@@ -6513,14 +6514,14 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allow
         // check privileges
         if(rpl != cpl || dpl != cpl)
         {
-            fault(Fault::GP, value & ~3);
+            fault(gpFault, value & ~3);
             return false;
         }
 
         // needs to be writable data segment
         if((desc.flags & SD_Executable) || !(desc.flags & SD_ReadWrite))
         {
-            fault(Fault::GP, value & ~3);
+            fault(gpFault, value & ~3);
             return false;
         }
     }
@@ -7082,16 +7083,24 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                         auto oldSS = reg(Reg16::SS);
                         auto copyAddr = oldSP + getSegmentOffset(Reg16::SS);
 
-                        // set early so PL checks in setSegmentReg work
-                        // FIXME: wrong fault if there is an actual mismatch
-                        cpl = newDesc.base & 3;
+                        int newCPL = newDesc.base & 3;
 
-                        // setup new stack
-                        if(!setSegmentReg(Reg16::SS, newSS))
+                        // validate new SS
+                        if(!checkSegmentSelector(Reg16::SS, newSS, newCPL, false, Fault::TS))
+                            return;
+
+                        // FIXME: check limit for space for params + SS:SP + CS:IP
+
+                        // check new IP
+                        if(codeSegOffset > codeSegDesc.limit)
                         {
-                            printf("call gate SS bad!\n");
-                            exit(1);
+                            fault(Fault::GP, 0);
+                            return;
                         }
+
+                        // setup new stack (this shouldn't fail, but also the checks are redundant...)
+                        setSegmentReg(Reg16::SS, newSS);
+
                         reg(Reg32::ESP) = newSP;
 
                         // push old stack
