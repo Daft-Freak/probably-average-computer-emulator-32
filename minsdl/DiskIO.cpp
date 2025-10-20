@@ -143,10 +143,12 @@ void FileATAIO::openDisk(int drive, std::string path)
     }
 
     // get size
+    int sectorSize = isCD[drive] ? 2048 : 512;
+
     file[drive].seekg(0, std::ios::end);
-    numSectors[drive] = file[drive].tellg() / 512;
+    numSectors[drive] = file[drive].tellg() / sectorSize;
     file[drive].seekg(0);
 
     if(file[drive])
-        std::cout << "Loaded ATA disk " << drive << ": " << path << " (size " << numSectors[drive] * 512 << ")\n";
+        std::cout << "Loaded ATA disk " << drive << ": " << path << " (size " << numSectors[drive] * sectorSize << ")\n";
 }
