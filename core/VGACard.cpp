@@ -77,7 +77,9 @@ void VGACard::drawScanline(int line, uint8_t *output)
         int offset = crtcRegs[0x13];
         int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
 
-        auto ptr0 = plane0 + startAddr + offset * 8 * (line / charHeight);
+        bool byteAccess = crtcRegs[0x17] & (1 << 6);
+
+        auto ptr0 = plane0 + startAddr + offset * (byteAccess ? 2 : 8) * (line / charHeight);
 
         for(int i = 0; i < outputW / 4; i++)
         {
@@ -85,7 +87,7 @@ void VGACard::drawScanline(int line, uint8_t *output)
             uint8_t byte1 = (attribPlaneEnable & (1 << 1)) ? ptr0[0x10000] : 0;
             uint8_t byte2 = (attribPlaneEnable & (1 << 2)) ? ptr0[0x20000] : 0;
             uint8_t byte3 = (attribPlaneEnable & (1 << 3)) ? ptr0[0x30000] : 0;
-            ptr0 += 4;
+            ptr0 += byteAccess ? 1 : 4;
 
             auto pal256 = dacPalette + byte0 * 3;
             outputPixel(pal256[0], pal256[1], pal256[2]);
