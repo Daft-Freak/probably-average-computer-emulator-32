@@ -23,7 +23,15 @@ Chipset::Chipset(System &sys) : sys(sys)
     cmosRam[0x08] = 1; // month
 
     cmosRam[0x10] = 0x44; // floppy drive type
-    cmosRam[0x31] = 4 * 7; // 8MB (-1)
+
+    uint32_t extMemKB = 7 * 1024;
+    cmosRam[0x15] = 128; //  128
+    cmosRam[0x16] = 2;   // +512 = 640K
+    cmosRam[0x17] = extMemKB & 0xFF;
+    cmosRam[0x18] = extMemKB >> 8;
+
+    cmosRam[0x30] = extMemKB & 0xFF;
+    cmosRam[0x31] = extMemKB >> 8;
 }
 
 uint8_t Chipset::read(uint16_t addr)
