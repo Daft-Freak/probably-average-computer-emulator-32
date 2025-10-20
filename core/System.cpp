@@ -156,6 +156,15 @@ uint8_t Chipset::read(uint16_t addr)
         case 0x71: // CMOS data
             return cmosRam[cmosIndex];
 
+        case 0x80: // not actually channel 0 high addr
+            return dma.highAddr[0];
+        case 0x81: // DMA channel 2 high addr
+            return dma.highAddr[2];
+        case 0x82: // DMA channel 3 high addr
+            return dma.highAddr[3];
+        case 0x83: // DMA channel 1 high addr
+            return dma.highAddr[1];
+
         case 0x92: // system control port A
             return systemControlA;
     
@@ -597,6 +606,9 @@ void Chipset::write(uint16_t addr, uint8_t data)
             break;
         }
 
+        case 0x80:
+            dma.highAddr[0] = data;
+            break;
         case 0x81: // DMA channel 2 high addr
             dma.highAddr[2] = data;
             break;
