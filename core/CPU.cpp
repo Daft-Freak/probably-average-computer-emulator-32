@@ -6134,13 +6134,20 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, Reg16 segment, uint32_t data)
 
 bool RAM_FUNC(CPU::readMem8)(uint32_t offset, uint8_t &data)
 {
-    data = sys.readMem(getPhysicalAddress(offset));
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
+    data = sys.readMem(physAddr);
     return true;
 }
 
 bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data)
 {
-    auto physAddr = getPhysicalAddress(offset);
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
     // FIXME: broken on page boundary
     data = sys.readMem(physAddr) | sys.readMem(physAddr + 1) << 8;
     return true;
@@ -6148,7 +6155,10 @@ bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data)
 
 bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data)
 {
-    auto physAddr = getPhysicalAddress(offset);
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
     data = sys.readMem(physAddr + 0)       |
            sys.readMem(physAddr + 1) <<  8 |
            sys.readMem(physAddr + 2) << 16 |
@@ -6159,13 +6169,20 @@ bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data)
 
 bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, uint8_t data)
 {
-    sys.writeMem(getPhysicalAddress(offset), data);
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
+    sys.writeMem(physAddr, data);
     return true;
 }
 
 bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data)
 {
-    auto physAddr = getPhysicalAddress(offset);
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
     sys.writeMem(physAddr, data & 0xFF);
     sys.writeMem(physAddr + 1, data >> 8);
     return true;
@@ -6173,7 +6190,10 @@ bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data)
 
 bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data)
 {
-    auto physAddr = getPhysicalAddress(offset);
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr))
+        return false;
+
     sys.writeMem(physAddr + 0, data & 0xFF);
     sys.writeMem(physAddr + 1, data >> 8);
     sys.writeMem(physAddr + 2, data >> 16);
@@ -6181,11 +6201,14 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data)
     return true;
 }
 
-uint32_t CPU::getPhysicalAddress(uint32_t virtAddr)
+bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr)
 {
     // paging not enabled
     if(!(reg(Reg32::CR0) & (1 << 31)))
-        return virtAddr;
+    {
+        physAddr = virtAddr;
+        return true;
+    }
 
     auto dir = virtAddr >> 22;
     auto page = (virtAddr >> 12) & 0x3FF;
@@ -6212,7 +6235,8 @@ uint32_t CPU::getPhysicalAddress(uint32_t virtAddr)
     // FIXME: check user/supervisor
     // FIXME: set dirty/accessed
 
-    return (pageEntry & 0xFFFFF000) | (virtAddr & 0xFFF);
+    physAddr = (pageEntry & 0xFFFFF000) | (virtAddr & 0xFFF);
+    return true;
 }
 
 // rw is true if this is a write that was read in the same op (to avoid counting disp twice)

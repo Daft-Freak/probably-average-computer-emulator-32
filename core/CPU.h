@@ -145,7 +145,7 @@ private:
     bool readMem16(uint32_t offset,  int32_t &data) {uint16_t tmp; if(!readMem16(offset, tmp)) return false; data = int16_t(tmp); return true;}
     bool readMem32(uint32_t offset,  int32_t &data) {uint32_t tmp; if(!readMem32(offset, tmp)) return false; data = int32_t(tmp); return true;}
 
-    uint32_t getPhysicalAddress(uint32_t virtAddr);
+    bool getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr);
 
     std::tuple<uint32_t, Reg16> getEffectiveAddress(int mod, int rm, bool rw, uint32_t addr);
 
