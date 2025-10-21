@@ -653,11 +653,15 @@ void RAM_FUNC(CPU::executeInstruction)()
                     return ret + 4;
 
                 // disp instead of base
-                uint8_t sib;
-                readMem8(nextAddr, sib);
-                // FIXME: fault here would be bad
-                if(rm == 4 && (sib & 7) == 5)
-                    ret += 4;
+                if(rm == 4)
+                {
+                    uint8_t sib;
+                    [[maybe_unused]] bool ok = readMem8(nextAddr, sib);
+                    assert(ok); // FIXME: make sure callers try to access the RM first so this can't happen
+
+                    if((sib & 7) == 5)
+                        ret += 4;
+                }
             
                 return ret;
             }
