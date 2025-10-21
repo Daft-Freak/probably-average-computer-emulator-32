@@ -1069,6 +1069,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                         {
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
 
+                            if(segment == Reg16::AX)
+                                return;
+
                             if(writeMem16(offset, segment, gdtLimit) && writeMem32(offset + 2, segment, gdtBase))
                                 reg(Reg32::EIP) += 2;
                             break;
@@ -1077,6 +1080,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                         {
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
 
+                            if(segment == Reg16::AX)
+                                return;
+
                             if(writeMem16(offset, segment, idtLimit) && writeMem32(offset + 2, segment, idtBase))
                                 reg(Reg32::EIP) += 2;
                             break;
@@ -1084,6 +1090,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                         case 0x2: // LGDT
                         {
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                            if(segment == Reg16::AX)
+                                return;
 
                             if(readMem16(offset, segment, gdtLimit) && readMem32(offset + 2, segment, gdtBase))
                             {
@@ -1096,6 +1105,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                         case 0x3: // LIDT
                         {
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                            if(segment == Reg16::AX)
+                                return;
 
                             if(readMem16(offset, segment, idtLimit) && readMem32(offset + 2, segment, idtBase))
                             {
@@ -2551,6 +2563,8 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto r = (modRM >> 3) & 0x7;
 
             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr);
+            if(segment == Reg16::AX)
+                return;
 
             int32_t index, lower, upper;
 
@@ -3446,7 +3460,10 @@ void RAM_FUNC(CPU::executeInstruction)()
             auto r = (modRM >> 3) & 0x7;
 
             // the only time we don't want the segment added...
-            auto offset = std::get<0>(getEffectiveAddress(modRM >> 6, modRM & 7, false, addr));
+            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr);
+
+            if(segment == Reg16::AX)
+                return;
 
             if(operandSize32)
                 reg(static_cast<Reg32>(r)) = offset;
@@ -6330,7 +6347,7 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
 }
 
 // rw is true if this is a write that was read in the same op (to avoid counting disp twice)
-// TODO: should addr cycles be counted twice?
+// returns {0, AX(0)} if there was a fault fetching a disp (or SIB)
 std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int rm, bool rw, uint32_t addr)
 {
     bool addressSize32 = isOperandSize32(addressSizeOverride); // TODO: cache?
@@ -6355,7 +6372,9 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
             case 4: // SIB
             {
                 uint8_t sib;
-                readMem8(addr + 2, sib);
+                if(!readMem8(addr + 2, sib))
+                    return {0, Reg16::AX};
+
                 // FIXME: faults;
                 addr++; // everything is now offset by a byte
 
@@ -6369,7 +6388,8 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
                 if(mod == 0 && base == Reg32::EBP)
                 {
                     // disp32 instead of base
-                    readMem32(addr + 2, memAddr);
+                    if(!readMem32(addr + 2, memAddr))
+                        return {0, Reg16::AX};
 
                     if(!rw)
                         reg(Reg32::EIP) += 4;
@@ -6389,7 +6409,8 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
             case 5: // ~the same as 6 for 16-bit
                 if(mod == 0) // direct
                 {
-                    readMem32(addr + 2, memAddr);
+                    if(!readMem32(addr + 2, memAddr))
+                        return {0, Reg16::AX};
 
                     if(!rw)
                         reg(Reg32::EIP) += 4;
@@ -6430,7 +6451,8 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
             case 6:
                 if(mod == 0) // direct
                 {
-                    readMem16(addr + 2, memAddr);
+                    if(!readMem16(addr + 2, memAddr))
+                        return {0, Reg16::AX};
 
                     if(!rw)
                         reg(Reg32::EIP) += 2;
@@ -6452,7 +6474,8 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
     if(mod == 1)
     {
         uint32_t disp;
-        readMem8(addr + 2, disp);
+        if(!readMem8(addr + 2, disp))
+            return {0, Reg16::AX};
 
         // sign extend
         if(disp & 0x80)
@@ -6468,7 +6491,9 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
         if(addressSize32) // 32bit
         {
             uint32_t disp;
-            readMem32(addr + 2, disp);
+            if(!readMem32(addr + 2, disp))
+                return {0, Reg16::AX};
+
             if(!rw)
                 reg(Reg32::EIP) += 4;
 
@@ -6477,7 +6502,8 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
         else //16bit
         {
             uint16_t disp;
-            readMem16(addr + 2, disp);
+            if(!readMem16(addr + 2, disp))
+                return {0, Reg16::AX};
 
             if(!rw)
                 reg(Reg32::EIP) += 2;
@@ -6860,6 +6886,8 @@ bool RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint8_t &v, uint32_t addr, int additi
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
+        if(segment == Reg16::AX) // fault while reading disp
+            return false;
         return readMem8(offset + additionalOffset, segment, v);
     }
     else
@@ -6877,6 +6905,8 @@ bool RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint16_t &v, uint32_t addr, int addi
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
+        if(segment == Reg16::AX)
+            return false;
         return readMem16(offset + additionalOffset, segment, v);
     }
     else
@@ -6894,6 +6924,8 @@ bool RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t &v, uint32_t addr, int addi
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, false, addr);
+        if(segment == Reg16::AX)
+            return false;
         return readMem32(offset + additionalOffset, segment, v);
     }
     else
@@ -6911,6 +6943,8 @@ bool RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, uint32_t addr, bool rw, i
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, rw, addr);
+        if(segment == Reg16::AX)
+            return false;
         return writeMem8(offset + additionalOffset, segment, v);
     }
     else
@@ -6927,6 +6961,8 @@ bool RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, uint32_t addr, bool rw,
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, rw, addr);
+        if(segment == Reg16::AX)
+            return false;
         return writeMem16(offset + additionalOffset, segment, v);
     }
     else
@@ -6943,6 +6979,8 @@ bool RAM_FUNC(CPU::writeRM32)(uint8_t modRM, uint32_t v, uint32_t addr, bool rw,
     if(mod != 3)
     {
         auto [offset, segment] = getEffectiveAddress(mod, rm, rw, addr);
+        if(segment == Reg16::AX)
+            return false;
         return writeMem32(offset + additionalOffset, segment, v);
     }
     else
