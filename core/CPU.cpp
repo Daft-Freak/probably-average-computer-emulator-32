@@ -7648,7 +7648,14 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
         assert(access & (1 << 7)); // present
 
         auto gateType = access & 0xF;
-        //int dpl = (access >> 5) & 3;
+        int gateDPL = (access >> 5) & 3;
+
+        // check DPL for INT
+        if(isInt && gateDPL < cpl)
+        {
+            fault(Fault::GP, addr | 2/*IDT*/);
+            return;
+        }
 
         if(gateType == 0x5)
         {
