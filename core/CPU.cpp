@@ -4802,7 +4802,9 @@ void RAM_FUNC(CPU::executeInstruction)()
             
             nestingLevel %= 32;
 
-            push(reg(Reg32::EBP), operandSize32);
+            // we can at least handle this one easily...
+            if(!push(reg(Reg32::EBP), operandSize32))
+                break;
 
             auto frameTemp = operandSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
