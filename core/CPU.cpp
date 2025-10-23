@@ -7247,12 +7247,8 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
         auto newDesc = loadSegmentDescriptor(newCS); // wrong format for a gate descriptor
 
-        if(!(newDesc.flags & SD_Present))
-        {
-            // NP
-            fault(Fault::NP, newCS & ~3);
+        if(!checkSegmentSelector(Reg16::CS, newCS, cpl, true))
             return;
-        }
 
         if(newDesc.flags & SD_Type)
         {
@@ -7299,6 +7295,10 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                     assert(dpl >= cpl); // GP
                     assert(rpl <= dpl); // GP
 
+                    // check code segment
+                    if(!checkSegmentSelector(Reg16::CS, newDesc.base & 0xFFFF, cpl))
+                        return;
+
                     auto codeSegDesc = loadSegmentDescriptor(newDesc.base & 0xFFFF);
 
                     auto codeSegOffset = newDesc.limit;
@@ -7310,9 +7310,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
                     int codeSegDPL = (codeSegDesc.flags & SD_PrivilegeLevel) >> 21;
 
-                    assert((codeSegDesc.flags & SD_Type) && (codeSegDesc.flags & SD_Executable)); // code segment (GP)
                     assert(codeSegDPL <= cpl); // GP
-                    assert(codeSegDesc.flags & SD_Present); // NP
 
                     if(!(codeSegDesc.flags & SD_DirConform) && codeSegDPL < cpl) // more privilege
                     {
