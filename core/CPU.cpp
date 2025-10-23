@@ -5089,7 +5089,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                     pop(operandSize32, newGS);
 
                     // set new flags and CS (we're now in v86 mode at the new privilege level)
-                    flags = newFlags;
+                    // I/IOPL are always allowed here as CPL must be 0
+                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R | Flag_VM;
+                    updateFlags(newFlags, flagMask, operandSize32);
                     setSegmentReg(Reg16::CS, newCS);
                     setIP(newIP);
                     cpl = 3;
