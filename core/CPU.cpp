@@ -1078,11 +1078,9 @@ void RAM_FUNC(CPU::executeInstruction)()
                             getCachedSegmentDescriptor(Reg16::TR) = newDesc;
                             reg(Reg16::TR) = selector;
 
-                            // set busy (sys type | 2)
+                            // write access back
                             auto addr = (selector >> 3) * 8 + gdtBase;
-                            uint8_t access;
-                            readMem8(addr + 5, access);
-                            writeMem8(addr + 5, access | 2);
+                            writeMem8(addr + 5, newDesc.flags >> 16);
 
                             reg(Reg32::EIP) += 2;
                             break;
@@ -7568,9 +7566,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     {
         tssDesc.flags |= 2 << 16; // in the cache too
         auto addr = (selector >> 3) * 8 + gdtBase;
-        uint8_t access;
-        readMem8(addr + 5, access);
-        writeMem8(addr + 5, access | 2);
+        writeMem8(addr + 5, tssDesc.flags >> 16);
     }
 
     // load new TSS
