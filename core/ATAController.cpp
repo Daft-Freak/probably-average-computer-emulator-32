@@ -580,7 +580,8 @@ void ATAController::doATAPICommand(int device)
             [[maybe_unused]] bool desc = sectorBuf[1] & 1;
             assert(!desc);
 
-            pioReadLen = lbaMidCylinderLow | lbaHighCylinderHigh << 8; // requested len
+            // clamp to requested len
+            pioReadLen = std::min(lbaMidCylinderLow | lbaHighCylinderHigh << 8, 18);
             pioReadSectors = 0;
             bufOffset = 0;
 
@@ -606,7 +607,9 @@ void ATAController::doATAPICommand(int device)
 
         case SCSICommand::INQUIRY:
         {
-            pioReadLen = lbaMidCylinderLow | lbaHighCylinderHigh << 8; // requested len
+            // clamp to requested len
+            pioReadLen = std::min(lbaMidCylinderLow | lbaHighCylinderHigh << 8, 36);
+
             pioReadSectors = 0;
             bufOffset = 0;
 
