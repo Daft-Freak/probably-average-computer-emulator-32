@@ -96,6 +96,7 @@ uint8_t ATAController::read(uint16_t addr)
             return deviceHead;
         case 0x177: // status
             // clears irq
+            sys.getChipset().setPICInput(14, false); // 15 for secondary
             return status;
 
         case 0x376: // alt status
@@ -808,5 +809,5 @@ void ATAController::doATAPICommand(int device)
 void ATAController::flagIRQ()
 {
     if(!(deviceControl & (1 << 1)))
-        sys.getChipset().flagPICInterrupt(14); // 15 for secondary
+        sys.getChipset().setPICInput(14, true); // 15 for secondary
 }
