@@ -677,7 +677,10 @@ void ATAController::doATAPICommand(int device)
 
             auto limit = lbaMidCylinderLow | lbaHighCylinderHigh << 8;
 
-            assert(limit == numSectors * 2048 || limit == 2048);
+            // force a single sector
+            assert(limit >= 2048);
+            lbaMidCylinderLow = 0;
+            lbaHighCylinderHigh = 2048 >> 8;
 
             if(io && io->read(device, sectorBuf, lba))
             {
