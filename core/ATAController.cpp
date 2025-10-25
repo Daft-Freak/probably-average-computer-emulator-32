@@ -560,6 +560,9 @@ void ATAController::fillIdentity(int device)
     wordBuf[80] = ((1 << 4) - 1) << 1; // ATA-4 (earliest ver with ATAPI)
 
     // 82-84 for command sets
+
+    if(atapi)
+        wordBuf[82] = 1 << 4/*PACKET*/ | 1 << 9/*DEVICE RESET*/;
 }
 
 void ATAController::doATAPICommand(int device)
