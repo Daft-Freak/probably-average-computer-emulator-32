@@ -14,6 +14,7 @@ enum ATAStatus
     Status_ERR  = 1 << 0, // error
     Status_DRQ  = 1 << 3, // data request
     Status_DF   = 1 << 5, // device fault
+    Status_DSC  = 1 << 4, // seek complete
     Status_DRDY = 1 << 6, // device ready
     Status_BSY  = 1 << 7, // busy
 };
@@ -144,8 +145,7 @@ uint16_t ATAController::read16(uint16_t addr)
                         pioReadLen = 0;
                         pioReadSectors = 0;
 
-                        // clear data request, set ready
-                        status |= Status_DRDY;
+                        // clear data request
                         status &= ~Status_DRQ;
                     }
 
@@ -187,6 +187,9 @@ void ATAController::write(uint16_t addr, uint8_t data)
             deviceHead = data;
             if(!io || !io->isATAPI((deviceHead >> 4) & 1))
                 status |= Status_DRDY; // non-ATAPI is automatically ready
+            else
+                status &= ~Status_DSC;
+
             break;
         case 0x177: // command
         {
@@ -251,8 +254,7 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         pioReadSectors = sectorCount;
                         bufOffset = 0;
 
-                        status &= ~Status_DRDY;
-                        status |= Status_DRQ;
+                        status |= Status_DRQ | Status_DSC;
 
                         flagIRQ();
                     }
@@ -286,8 +288,9 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         pioWriteSectors = sectorCount;
                         bufOffset = 0;
 
-                        status &= ~Status_DRDY;
-                        status |= Status_DRQ;
+                        status |= Status_DRQ | Status_DSC;
+
+                        flagIRQ();
                     }
                     break;
                 }
@@ -315,7 +318,6 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         pioWriteSectors = 0;
                         bufOffset = 0;
 
-                        status &= ~Status_DRDY;
                         status |= Status_DRQ;
 
                         // for packet commands, this is the interrupt reason
@@ -373,7 +375,6 @@ void ATAController::write(uint16_t addr, uint8_t data)
 
                             pioReadLen = 512;
                             bufOffset = 0;
-                            status &= ~Status_DRDY;
                             status |= Status_DRQ;
                         }
                     }
@@ -432,14 +433,15 @@ void ATAController::write16(uint16_t addr, uint16_t data)
                         pioWriteLen = 0;
                         pioWriteSectors = 0;
 
-                        // clear data request, set ready
-                        status |= Status_DRDY;
+                        // clear data request
                         status &= ~Status_DRQ;
                     }
 
                     // handle the command if needed
                     if(isATAPICommand)
                         doATAPICommand(dev);
+                    else
+                        flagIRQ();
                 }
             }
 
@@ -596,7 +598,6 @@ void ATAController::doATAPICommand(int device)
             sectorBuf[14] = 0; // "field replaceable unit code"
             sectorBuf[15] = 0; // no key specific data
     
-            status &= ~Status_DRDY;
             status |= Status_DRQ;
 
             sectorCount = (0 << 0)  // data
@@ -632,7 +633,6 @@ void ATAController::doATAPICommand(int device)
             memcpy(sectorBuf + 16, product, 16);
             memcpy(sectorBuf + 32, revision, 4);
 
-            status &= ~Status_DRDY;
             status |= Status_DRQ;
 
             sectorCount = (0 << 0)  // data
@@ -687,7 +687,6 @@ void ATAController::doATAPICommand(int device)
                 bufOffset = 0;
                 curLBA = lba;
 
-                status &= ~Status_DRDY;
                 status |= Status_DRQ;
 
                 sectorCount = (0 << 0)  // data
@@ -737,7 +736,6 @@ void ATAController::doATAPICommand(int device)
                 sectorBuf[8] = sectorBuf[9] = sectorBuf[10] = sectorBuf[11] = 0; // LBA
             }
 
-            status &= ~Status_DRDY;
             status |= Status_DRQ;
 
             sectorCount = (0 << 0)  // data
