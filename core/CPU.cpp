@@ -6795,11 +6795,11 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allow
     return true;
 }
 
-bool CPU::setSegmentReg(Reg16 r, uint16_t value)
+bool CPU::setSegmentReg(Reg16 r, uint16_t value, bool checkFaults)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
-        if(!checkSegmentSelector(r, value, cpl))
+        if(checkFaults && !checkSegmentSelector(r, value, cpl))
             return false;
         
         getCachedSegmentDescriptor(r) = loadSegmentDescriptor(value);

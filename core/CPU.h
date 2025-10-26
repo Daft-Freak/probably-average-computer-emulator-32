@@ -153,7 +153,7 @@ private:
     uint32_t getSegmentOffset(Reg16 r) {return getCachedSegmentDescriptor(r).base;}
     SegmentDescriptor loadSegmentDescriptor(uint16_t selector);
     bool checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allowSys = false, Fault gpFault = Fault::GP);
-    bool setSegmentReg(Reg16 r, uint16_t value);
+    bool setSegmentReg(Reg16 r, uint16_t value, bool checkFaults = true);
 
     bool setLDT(uint16_t selector);
 
