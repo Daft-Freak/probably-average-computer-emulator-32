@@ -119,6 +119,7 @@ private:
     enum SelectorCheckFlags
     {
         Selector_AllowSys = 1 << 0, // far calls/jumps can have gates
+        Selector_CallGate = 1 << 1, // CS selector for a call gate is always handled as conforming
     };
 
     struct SegmentDescriptor

@@ -4886,7 +4886,7 @@ void RAM_FUNC(CPU::executeInstruction)()
             {
                 // peek might fault first
                 uint32_t newCS;
-                if(!peek(operandSize32, 1, newCS) || !checkSegmentSelector(Reg16::CS, newCS, cpl))
+                if(!peek(operandSize32, 1, newCS) || !checkSegmentSelector(Reg16::CS, newCS, (newCS & 3)))
                     break;
             }
 
@@ -4911,8 +4911,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 if(rpl > cpl) // outer privilege
                 {
-                    // TODO: setSegmentReg is going to check the selector again
-                    setSegmentReg(Reg16::CS, newCS);
+                    setSegmentReg(Reg16::CS, newCS, false);
                     setIP(newIP);
 
                     // additional stack restore
@@ -4957,7 +4956,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                 }
                 else // same privilege
                 {
-                    setSegmentReg(Reg16::CS, newCS);
+                    setSegmentReg(Reg16::CS, newCS, false);
                     setIP(newIP);
                 }
             }
@@ -5003,7 +5002,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break; // whoops stack fault
 
                 // not a segment selector if we're switching to virtual-8086 mode
-                if(!(newFlags & Flag_VM) && !checkSegmentSelector(Reg16::CS, newCS, cpl))
+                if(!(newFlags & Flag_VM) && !checkSegmentSelector(Reg16::CS, newCS, newCS & 3))
                     break;
             }
 
@@ -5138,7 +5137,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     updateFlags(newFlags, flagMask, operandSize32);
 
                     // new CS:IP
-                    setSegmentReg(Reg16::CS, newCS);
+                    setSegmentReg(Reg16::CS, newCS, false);
                     setIP(newIP);
 
                     // setup new stack
@@ -5171,7 +5170,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                         flagMask |= Flag_IOPL;
                     updateFlags(newFlags, flagMask, operandSize32);
 
-                    setSegmentReg(Reg16::CS, newCS);
+                    setSegmentReg(Reg16::CS, newCS, false);
                     setIP(newIP);
                 }
             }
@@ -5592,26 +5591,8 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     break; // nothing to do (JMP IP ignored)
                 }
-                else if(newCSFlags & SD_DirConform) // conforming code
-                {
-                    if(dpl > cpl)
-                    {
-                        fault(Fault::GP, newCS & ~3);
-                        break;
-                    }
-
+                else  //  code segment
                     newCS = (newCS & ~3) | cpl; // RPL = CPL
-                }
-                else // non-conforming code
-                {
-                    if(rpl > cpl || dpl != cpl)
-                    {
-                        fault(Fault::GP, newCS & ~3);
-                        break;
-                    }
-
-                    newCS = (newCS & ~3) | cpl; // RPL = CPL
-                }
             }
 
             setSegmentReg(Reg16::CS, newCS);
@@ -6748,6 +6729,24 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags,
                 fault(Fault::GP, value & ~3);
                 return false;
             }
+
+            // these work as long as we pass the new CPL for returns
+            if((desc.flags & SD_DirConform) || (flags & Selector_CallGate)) // conforming
+            {
+                if(dpl > cpl)
+                {
+                    fault(Fault::GP, value & ~3);
+                    return false;
+                }
+            }
+            else
+            {
+                if(rpl > cpl || dpl != cpl)
+                {
+                    fault(Fault::GP, value & ~3);
+                    return false;
+                }
+            }
         }
         else
         {
@@ -7339,7 +7338,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                     assert(rpl <= dpl); // GP
 
                     // check code segment
-                    if(!checkSegmentSelector(Reg16::CS, newDesc.base & 0xFFFF, cpl))
+                    if(!checkSegmentSelector(Reg16::CS, newDesc.base & 0xFFFF, cpl, Selector_CallGate))
                         return;
 
                     auto codeSegDesc = loadSegmentDescriptor(newDesc.base & 0xFFFF);
