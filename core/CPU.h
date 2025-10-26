@@ -116,6 +116,11 @@ private:
         IntRet,
     };
 
+    enum SelectorCheckFlags
+    {
+        Selector_AllowSys = 1 << 0, // far calls/jumps can have gates
+    };
+
     struct SegmentDescriptor
     {
         uint32_t flags;
@@ -152,7 +157,7 @@ private:
     SegmentDescriptor &getCachedSegmentDescriptor(Reg16 r) {return segmentDescriptorCache[static_cast<int>(r) - static_cast<int>(Reg16::ES)];}
     uint32_t getSegmentOffset(Reg16 r) {return getCachedSegmentDescriptor(r).base;}
     SegmentDescriptor loadSegmentDescriptor(uint16_t selector);
-    bool checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allowSys = false, Fault gpFault = Fault::GP);
+    bool checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags = 0, Fault gpFault = Fault::GP);
     bool setSegmentReg(Reg16 r, uint16_t value, bool checkFaults = true);
 
     bool setLDT(uint16_t selector);

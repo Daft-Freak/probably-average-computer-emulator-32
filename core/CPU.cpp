@@ -5551,7 +5551,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             if(isProtectedMode() && !(flags & Flag_VM))
             {
-                if(!checkSegmentSelector(Reg16::CS, newCS, cpl, true))
+                if(!checkSegmentSelector(Reg16::CS, newCS, cpl, Selector_AllowSys))
                     break;
 
                 auto newDesc = loadSegmentDescriptor(newCS);
@@ -6689,7 +6689,7 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 
 // if this returns false we faulted
 // gpFault is usually GP, but overridden sometimes when doing TSS-related things
-bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allowSys, Fault gpFault)
+bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags, Fault gpFault)
 {
     // check limit
     auto limit = (value & 4)/*local*/ ? ldtLimit : gdtLimit;
@@ -6729,7 +6729,7 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, bool allow
 
     // check data/code
     // (unless this is a call/jump)
-    if(!(desc.flags & SD_Type) && !allowSys)
+    if(!(desc.flags & SD_Type) && !(flags & Selector_AllowSys))
     {
         fault(gpFault, value & ~3);
         return false;
@@ -7290,7 +7290,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
         auto newDesc = loadSegmentDescriptor(newCS); // wrong format for a gate descriptor
 
-        if(!checkSegmentSelector(Reg16::CS, newCS, cpl, true))
+        if(!checkSegmentSelector(Reg16::CS, newCS, cpl, Selector_AllowSys))
             return;
 
         if(newDesc.flags & SD_Type)
@@ -7367,7 +7367,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                         int newCPL = codeSegDPL;
 
                         // validate new SS
-                        if(!checkSegmentSelector(Reg16::SS, newSS, newCPL, false, Fault::TS))
+                        if(!checkSegmentSelector(Reg16::SS, newSS, newCPL, 0, Fault::TS))
                             return;
 
                         // FIXME: check limit for space for params + SS:SP + CS:IP
