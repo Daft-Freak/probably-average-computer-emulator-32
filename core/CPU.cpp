@@ -6775,16 +6775,6 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags,
     // TODO: just get flags?
     auto desc = loadSegmentDescriptor(value);
 
-    // not present
-    if(!(desc.flags & SD_Present))
-    {
-        if(r == Reg16::SS)
-            fault(Fault::SS, value & ~3);
-        else
-            fault(Fault::NP, value & ~3);
-        return false;
-    }
-
     // check data/code
     // (unless this is a call/jump)
     if(!(desc.flags & SD_Type) && !(flags & Selector_AllowSys))
@@ -6866,6 +6856,17 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags,
             fault(Fault::GP, value & ~3);
             return false;
         }
+    }
+
+    // not present
+    // you'd think this would be an easy thing to check first, but it's usually listed last in the opcode descriptions
+    if(!(desc.flags & SD_Present))
+    {
+        if(r == Reg16::SS)
+            fault(Fault::SS, value & ~3);
+        else
+            fault(Fault::NP, value & ~3);
+        return false;
     }
 
     return true;
