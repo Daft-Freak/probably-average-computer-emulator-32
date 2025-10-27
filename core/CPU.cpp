@@ -7459,7 +7459,8 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
                         auto oldSP = reg(Reg32::ESP);
                         auto oldSS = reg(Reg16::SS);
-                        auto copyAddr = oldSP + getSegmentOffset(Reg16::SS);
+                        auto oldSSBase = getSegmentOffset(Reg16::SS);
+                        bool oldStackAddress32 = stackAddress32;
 
                         int newCPL = codeSegDPL;
 
@@ -7493,15 +7494,26 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
                         // push params
                         int temp = (newDesc.base >> 16) & 0x1F;
-                        copyAddr -= (temp - 1) * (is32 ? 4 : 2);
+                        auto copySP = oldSP + (temp - 1) * (is32 ? 4 : 2);
+
+                        if(!oldStackAddress32)
+                            copySP &= 0xFFFF;
 
                         for(int i = 0; i < temp; i++)
                         {
-                            uint32_t v;
+                            // this read really shouldn't fault as we should be reading values that were just written before the call...
+                            // TODO?: if 16bit SP wraps we have a problem
+                            uint32_t v = 0;
                             if(is32)
-                                readMem32(copyAddr + i * 4, v);
+                            {
+                                readMem32(oldSSBase + copySP, v);
+                                copySP -= 4;
+                            }
                             else
-                                readMem16(copyAddr + i * 2, v);
+                            {
+                                readMem16(oldSSBase + copySP, v);
+                                copySP -= 2;
+                            }
 
                             doPush(v, is32, stackAddress32);
                         }
