@@ -4852,6 +4852,24 @@ void RAM_FUNC(CPU::executeInstruction)()
             
             nestingLevel %= 32;
 
+            // calculate the final SP
+            int pushSize = operandSize32 ? 4 : 2;
+            auto finalSP = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
+            finalSP -= pushSize; // push(BP)
+            finalSP -= nestingLevel * pushSize; // nesting
+            finalSP -= allocSize;
+
+            if(!stackAddrSize32)
+                finalSP &= 0xFFFF;
+
+            // we need to fault if the new SP value would fault when used
+            if(!checkSegmentAccess(Reg16::SS, finalSP, pushSize, true))
+                break;
+
+            uint32_t tempAddr;
+            if(!getPhysicalAddress(finalSP + getSegmentOffset(Reg16::SS), tempAddr, true))
+                break;
+
             // we can at least handle this one easily...
             if(!push(reg(Reg32::EBP), operandSize32))
                 break;
