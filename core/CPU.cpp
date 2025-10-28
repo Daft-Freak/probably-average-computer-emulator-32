@@ -1145,7 +1145,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                         default:
                             printf("op 0f 00 %02x @%05x\n", (int)exOp, addr);
-                            exit(1);
+                            fault(Fault::UD);
                             break;
                     }
 
@@ -1235,7 +1235,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                         default:
                             printf("op 0f 01 %02x @%05x\n", (int)exOp, addr);
-                            exit(1);
+                            fault(Fault::UD);
                             break;
                     }
 
@@ -2219,16 +2219,18 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
 
+                case 0x0B: // UD2
+                case 0xB9: // UD1
                 case 0xFF: // UD0
                 {
-                    // would be the default case if we weren't missing ops all over the place...
+                    // these cases are only to avoid the logging in the default case
                     fault(Fault::UD);
                     break;
                 }
 
                 default:
                     printf("op 0f %02x @%05x\n", (int)opcode2, addr);
-                    exit(1);
+                    fault(Fault::UD);
                     break;
             }
             break;
