@@ -214,7 +214,10 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         status &= ~(Status_DRDY | Status_DSC | Status_DRQ | Status_ERR);
                     }
                     else
+                    {
                         status |= Status_ERR;
+                        error = Error_ABRT;
+                    }
                     break;
 
                 case ATACommand::RECALIBRATE:
