@@ -1411,6 +1411,23 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
 
+                case 0x21: // MOV from debug reg
+                {
+                    uint8_t modRM;
+                    if(!readMem8(addr + 2, modRM))
+                        return;
+
+                    //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+                    auto r = ((modRM >> 3) & 0x7);
+                    auto rm = static_cast<Reg32>(modRM & 0x7);
+
+                    printf("R DR%i @%08X\n", r, addr);
+                    reg(rm) = 0; // reg(r);
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
                 case 0x22: // MOV to control reg
                 {
                     uint8_t modRM;
@@ -1423,6 +1440,23 @@ void RAM_FUNC(CPU::executeInstruction)()
                     auto changed = reg(r) ^ reg(rm);
 
                     reg(r) = reg(rm);
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
+                case 0x23: // MOV to debug reg
+                {
+                    uint8_t modRM;
+                    if(!readMem8(addr + 2, modRM))
+                        return;
+
+                    //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+                    auto r = ((modRM >> 3) & 0x7);
+                    auto rm = static_cast<Reg32>(modRM & 0x7);
+
+                    printf("W DR%i = %08X @%08X\n", r, reg(rm), addr);
+                    //reg(r) = reg(rm);
 
                     reg(Reg32::EIP) += 2;
                     break;
