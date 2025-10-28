@@ -1185,6 +1185,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                         }
                         case 0x2: // LGDT
                         {
+                            if(cpl > 0)
+                            {
+                                fault(Fault::GP, 0);
+                                break;
+                            }
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
 
                             if(segment == Reg16::AX)
@@ -1200,6 +1205,11 @@ void RAM_FUNC(CPU::executeInstruction)()
                         }
                         case 0x3: // LIDT
                         {
+                            if(cpl > 0)
+                            {
+                                fault(Fault::GP, 0);
+                                break;
+                            }
                             auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
 
                             if(segment == Reg16::AX)
@@ -1224,6 +1234,12 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                         case 0x6: // LMSW
                         {
+                            if(cpl > 0)
+                            {
+                                fault(Fault::GP, 0);
+                                break;
+                            }
+
                             uint16_t tmp;
                             if(!readRM16(modRM, tmp, addr + 1))
                                 return;
@@ -1391,6 +1407,12 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 case 0x06: // CLTS
                 {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
                     reg(Reg32::CR0) &= ~(1 << 3);
                     reg(Reg32::EIP)++;
                     break;
@@ -1398,6 +1420,12 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 case 0x20: // MOV from control reg
                 {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
                     uint8_t modRM;
                     if(!readMem8(addr + 2, modRM))
                         return;
@@ -1413,6 +1441,12 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 case 0x21: // MOV from debug reg
                 {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
                     uint8_t modRM;
                     if(!readMem8(addr + 2, modRM))
                         return;
@@ -1430,14 +1464,18 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 case 0x22: // MOV to control reg
                 {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
                     uint8_t modRM;
                     if(!readMem8(addr + 2, modRM))
                         return;
 
                     auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
                     auto rm = static_cast<Reg32>(modRM & 0x7);
-
-                    auto changed = reg(r) ^ reg(rm);
 
                     reg(r) = reg(rm);
 
@@ -1447,6 +1485,12 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                 case 0x23: // MOV to debug reg
                 {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
                     uint8_t modRM;
                     if(!readMem8(addr + 2, modRM))
                         return;
