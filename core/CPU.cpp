@@ -914,6 +914,10 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             setSegmentReg(r, v);
 
+            // disable interrupts for one op after loading SS
+            if(r == Reg16::SS)
+                delayInterrupt = true;
+
             break;
         }
 
