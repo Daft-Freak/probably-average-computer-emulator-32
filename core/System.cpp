@@ -24,6 +24,9 @@ Chipset::Chipset(System &sys) : sys(sys)
 
     cmosRam[0x10] = 0x44; // floppy drive type
 
+    cmosRam[0x19] = 47; // fixed disk 0 user defined
+    cmosRam[0x1A] = 47; // fixed disk 1 user defined
+
     uint32_t extMemKB = 7 * 1024;
     cmosRam[0x15] = 128; //  128
     cmosRam[0x16] = 2;   // +512 = 640K
@@ -976,6 +979,18 @@ void Chipset::syncMouse()
 void Chipset::setSpeakerAudioCallback(SpeakerAudioCallback cb)
 {
     speakerCb = cb;
+}
+
+void Chipset::setFixedDiskPresent(int index, bool present)
+{
+    if(index > 1)
+        return;
+
+    // set to 15 to check the extension byte that we always set to 47
+    if(present)
+        cmosRam[0x12] |= 0xF0 >> (index * 8);
+    else
+        cmosRam[0x12] &= ~(0xF0 >> (index * 8));
 }
 
 uint8_t Chipset::PIC::read(int index)

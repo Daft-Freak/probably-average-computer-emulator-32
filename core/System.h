@@ -73,6 +73,9 @@ public:
     // PIT/speaker
     void setSpeakerAudioCallback(SpeakerAudioCallback cb);
 
+    // misc
+    void setFixedDiskPresent(int index, bool present);
+
 private:
     struct DMA
     {
