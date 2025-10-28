@@ -112,6 +112,8 @@ private:
         uint8_t service = 0;
         uint8_t mask = 0;
 
+        uint8_t inputs = 0; // raw unmasked state of inputs
+
         uint8_t statusRead = 0;
     };
 
