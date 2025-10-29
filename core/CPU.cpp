@@ -7968,7 +7968,16 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
 
     if(isProtectedMode())
     {
-        auto addr = idtBase + vector * 8;
+        auto addr = vector * 8;
+
+        if(addr + 7 > idtLimit)
+        {
+            // TODO: if the original vector was a fault, this is now a double fault
+            fault(Fault::GP, addr | 2 | (isInt ? 0 : 1));
+            return;
+        }
+
+        addr += idtBase;
 
         uint32_t offset;
         uint16_t tmp;
