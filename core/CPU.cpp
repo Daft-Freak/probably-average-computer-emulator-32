@@ -545,6 +545,11 @@ void CPU::reset()
 
     reg(Reg32::EIP) = 0xFFF0;
 
+    for(auto &entry : tlb)
+        entry.tag = 0;
+
+    tlbIndex = 0;
+
     cpl = 0;
 }
 
@@ -1503,6 +1508,13 @@ void RAM_FUNC(CPU::executeInstruction)()
                     auto rm = static_cast<Reg32>(modRM & 0x7);
 
                     reg(r) = reg(rm);
+
+                    if(r == Reg32::CR3)
+                    {
+                        // invalidate TLB
+                        for(auto &entry : tlb)
+                            entry.tag &= ~Page_Present;
+                    }
 
                     reg(Reg32::EIP) += 2;
                     break;
@@ -6559,6 +6571,51 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
         fault(Fault::PF, (protection ? 1 : 0) | (write ? 2 : 0) | (cpl == 3 ? 4 : 0));
     };
 
+    // user access if CPL 3 and this isn't accessing the GDT/LDT/IDT/TSS
+    // supervisor can do whatever it wants
+    bool user = cpl == 3 && !privileged;
+
+    // check TLB
+    int set = (virtAddr >> 30) & 3;
+    for(int i = set * 8; i < (set + 1) * 8; i++)
+    {
+        auto &entry = tlb[i];
+
+        if((entry.tag >> 12) != (virtAddr >> 12))
+            continue;
+        if(!(entry.tag & Page_Present))
+            continue;
+
+        // okay, we have a hit, validate
+        if(user)
+        {
+            // writable
+            if(forWrite && !(entry.tag & Page_Writable))
+            {
+                pageFault(true, forWrite, virtAddr);
+                return false;
+            }
+
+            // check user bit
+            if(!(entry.tag & Page_User))
+            {
+                pageFault(true, forWrite, virtAddr);
+                return false;
+            }
+        }
+
+        if(forWrite && !(entry.tag & Page_Dirty))
+        {
+            // fail so we can mark the page dirty
+            // also invalidate the entry
+            entry.tag &= ~Page_Present;
+            break;
+        }
+
+        physAddr = entry.data | (virtAddr & 0xFFF);
+        return true;
+    }
+
     auto dir = virtAddr >> 22;
     auto page = (virtAddr >> 12) & 0x3FF;
 
@@ -6585,10 +6642,6 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
     }
 
     auto combinedFlags = pageEntry & dirEntry;
-
-    // user access if CPL 3 and this isn't accessing the GDT/LDT/IDT/TSS
-    // supervisor can do whatever it wants
-    bool user = cpl == 3 && !privileged;
     
     if(user)
     {
@@ -6616,6 +6669,15 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
         sys.writeMem(pageEntryAddr, pageEntry | Page_Accessed | (forWrite ? Page_Dirty : 0));
 
     physAddr = (pageEntry & 0xFFFFF000) | (virtAddr & 0xFFF);
+
+    // add to TLB
+    // IDK how we should allocate this so just go around
+    // make sure we get the dirty bit
+    tlb[set * 8 + tlbIndex].tag = (virtAddr & 0xFFFFF000) | (combinedFlags & 0xFFF) | (forWrite ? Page_Dirty : 0);
+    tlb[set * 8 + tlbIndex].data = pageEntry & 0xFFFFF000;
+
+    tlbIndex = (tlbIndex + 1) % 8;
+
     return true;
 }
 

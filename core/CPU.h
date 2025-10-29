@@ -136,6 +136,12 @@ private:
         uint32_t limit;
     };
 
+    struct TLBEntry
+    {
+        uint32_t tag;
+        uint32_t data;
+    };
+
     bool readMem8(uint32_t offset, Reg16 segment, uint8_t &data);
     bool readMem16(uint32_t offset, Reg16 segment, uint16_t &data);
     bool readMem32(uint32_t offset, Reg16 segment, uint32_t &data);
@@ -236,6 +242,9 @@ private:
     uint32_t gdtBase, ldtBase, idtBase;
     uint16_t gdtLimit, ldtLimit, idtLimit;
     uint16_t ldtSelector;
+
+    TLBEntry tlb[4 * 8];
+    uint8_t tlbIndex;
 
     uint8_t cpl;
 
