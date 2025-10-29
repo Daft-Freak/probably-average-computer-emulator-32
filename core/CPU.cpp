@@ -6584,24 +6584,23 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
         return false;
     }
 
-    // dir writable
-    if(forWrite && cpl == 3 && !(dirEntry & Page_Writable))
-    {
-        pageFault(true, forWrite, virtAddr);
-        return false;
-    }
+    auto combinedFlags = pageEntry & dirEntry;
 
-    // page writable
-    if(forWrite && cpl == 3 && !(pageEntry & Page_Writable))
+    // user access if CPL 3 and this isn't accessing the GDT/LDT/IDT/TSS
+    // supervisor can do whatever it wants
+    bool user = cpl == 3 && !privileged;
+    
+    if(user)
     {
-        pageFault(true, forWrite, virtAddr);
-        return false;
-    }
+        // writable
+        if(forWrite && !(combinedFlags & Page_Writable))
+        {
+            pageFault(true, forWrite, virtAddr);
+            return false;
+        }
 
-    // check user bit if CPL 3 and this isn't accessing the GDT/LDT/IDT/TSS
-    if(cpl == 3 && !privileged)
-    {
-        if(!(dirEntry & Page_User) || !(pageEntry & Page_User))
+        // check user bit
+        if(!(combinedFlags & Page_User))
         {
             pageFault(true, forWrite, virtAddr);
             return false;
