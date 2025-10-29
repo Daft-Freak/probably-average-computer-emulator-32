@@ -6386,7 +6386,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                 // 7 is invalid
     
                 default:
-                    assert(!"invalid group2!");
+                    fault(Fault::UD);
             }
             break;
         }
