@@ -177,7 +177,10 @@ uint8_t Chipset::read(uint16_t addr)
             return pic[1].read(1);
 
         default:
-            printf("IO R %04X\n", addr);
+#ifndef NDEBUG
+            auto [cs, ip, opAddr] = sys.getCPU().getOpStartAddr();
+            printf("IO R %04X @%08X\n", addr, opAddr);
+#endif
     }
 
     return 0xFF;
@@ -664,7 +667,10 @@ void Chipset::write(uint16_t addr, uint8_t data)
         }
 
         default:
-            printf("IO W %04X = %02X\n", addr, data);
+#ifndef NDEBUG
+            auto [cs, ip, opAddr] = sys.getCPU().getOpStartAddr();
+            printf("IO W %04X = %02X @%08X\n", addr, data, opAddr);
+#endif
     }
 }
 
@@ -1375,7 +1381,11 @@ uint8_t RAM_FUNC(System::readIOPort)(uint16_t addr)
         if((addr & dev.ioMask) == dev.ioValue)
             return dev.dev->read(addr);
     }
-    printf("IO R %04X\n", addr);
+
+#ifndef NDEBUG
+    auto [cs, ip, opAddr] = cpu.getOpStartAddr();
+    printf("IO R %04X @%08X\n", addr, opAddr);
+#endif
 
     return 0xFF;
 }
@@ -1388,7 +1398,10 @@ uint16_t RAM_FUNC(System::readIOPort16)(uint16_t addr)
             return dev.dev->read16(addr);
     }
 
-    printf("IO R %04X\n", addr);
+#ifndef NDEBUG
+    auto [cs, ip, opAddr] = cpu.getOpStartAddr();
+    printf("IO R16 %04X @%08X\n", addr, opAddr);
+#endif
 
     return 0xFFFF;
 }
@@ -1400,7 +1413,11 @@ void RAM_FUNC(System::writeIOPort)(uint16_t addr, uint8_t data)
         if((addr & dev.ioMask) == dev.ioValue)
             return dev.dev->write(addr, data);
     }
-    printf("IO W %04X = %02X\n", addr, data);
+
+#ifndef NDEBUG
+    auto [cs, ip, opAddr] = cpu.getOpStartAddr();
+    printf("IO W %04X = %02X @%08X\n", addr, data, opAddr);
+#endif
 }
 
 void RAM_FUNC(System::writeIOPort16)(uint16_t addr, uint16_t data)
@@ -1410,7 +1427,11 @@ void RAM_FUNC(System::writeIOPort16)(uint16_t addr, uint16_t data)
         if((addr & dev.ioMask) == dev.ioValue)
             return dev.dev->write16(addr, data);
     }
-    printf("IO W %04X = %04X\n", addr, data);
+
+#ifndef NDEBUG
+    auto [cs, ip, opAddr] = cpu.getOpStartAddr();
+    printf("IO W16 %04X = %02X @%08X\n", addr, data, opAddr);
+#endif
 }
 
 void System::updateForInterrupts()
