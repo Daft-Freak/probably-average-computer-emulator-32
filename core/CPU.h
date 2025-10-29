@@ -207,6 +207,7 @@ private:
     // misc op helpers
     bool doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg = false);
     void farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32);
+    void farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr);
     void loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32);
 
     bool taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource source);

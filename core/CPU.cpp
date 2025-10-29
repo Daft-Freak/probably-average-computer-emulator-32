@@ -5731,55 +5731,8 @@ void RAM_FUNC(CPU::executeInstruction)()
 
             auto retAddr = reg(Reg32::EIP) + offset + 1 /*+2 for CS, -1 that was added by fetch*/;
 
-            if(isProtectedMode() && !(flags & Flag_VM))
-            {
-                if(!checkSegmentSelector(Reg16::CS, newCS, cpl, Selector_AllowSys))
-                    break;
+            farJump(newCS, newIP, retAddr);
 
-                auto newDesc = loadSegmentDescriptor(newCS);
-                auto newCSFlags = newDesc.flags;
-                unsigned rpl = newCS & 3;
-                unsigned dpl = (newCSFlags & SD_PrivilegeLevel) >> 21;
-
-                if(!(newCSFlags & SD_Type))
-                {
-                    switch(newCSFlags & SD_SysType)
-                    {
-                        case SD_SysTypeTaskGate:
-                        {
-                            if(dpl < cpl || dpl < rpl)
-                            {
-                                fault(Fault::GP, newCS & ~3);
-                                break;
-                            }
-
-                            auto tssSelector = newDesc.base & 0xFFFF;
-
-                            // must be in GDT
-                            if((tssSelector & 4)/*local*/ || (tssSelector | 7) > gdtLimit)
-                            {
-                                fault(Fault::GP, tssSelector & ~3);
-                                return;
-                            }
-
-                            if(!taskSwitch(tssSelector, retAddr, TaskSwitchSource::Jump))
-                                printf("JMP task switch fault!\n");
-
-                            break;
-                        }
-                        default:
-                            printf("jmp gate\n");
-                            exit(1);
-                    }
-
-                    break; // nothing to do (JMP IP ignored)
-                }
-                else  //  code segment
-                    newCS = (newCS & ~3) | cpl; // RPL = CPL
-            }
-
-            setSegmentReg(Reg16::CS, newCS);
-            setIP(newIP);
             break;
         }
         case 0xEB: // JMP short
@@ -7767,6 +7720,59 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
         setSegmentReg(Reg16::CS, newCS);
         reg(Reg32::EIP) = newIP;
     }
+}
+
+void CPU::farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
+{
+    if(isProtectedMode() && !(flags & Flag_VM))
+    {
+        if(!checkSegmentSelector(Reg16::CS, newCS, cpl, Selector_AllowSys))
+            return;
+
+        auto newDesc = loadSegmentDescriptor(newCS);
+        auto newCSFlags = newDesc.flags;
+        unsigned rpl = newCS & 3;
+        unsigned dpl = (newCSFlags & SD_PrivilegeLevel) >> 21;
+
+        if(!(newCSFlags & SD_Type))
+        {
+            switch(newCSFlags & SD_SysType)
+            {
+                case SD_SysTypeTaskGate:
+                {
+                    if(dpl < cpl || dpl < rpl)
+                    {
+                        fault(Fault::GP, newCS & ~3);
+                        return;
+                    }
+
+                    auto tssSelector = newDesc.base & 0xFFFF;
+
+                    // must be in GDT
+                    if((tssSelector & 4)/*local*/ || (tssSelector | 7) > gdtLimit)
+                    {
+                        fault(Fault::GP, tssSelector & ~3);
+                        return;
+                    }
+
+                    if(!taskSwitch(tssSelector, retAddr, TaskSwitchSource::Jump))
+                        printf("JMP task switch fault!\n");
+
+                    break;
+                }
+                default:
+                    printf("jmp gate\n");
+                    exit(1);
+            }
+
+            return; // nothing to do (JMP IP ignored)
+        }
+        else  //  code segment
+            newCS = (newCS & ~3) | cpl; // RPL = CPL
+    }
+
+    setSegmentReg(Reg16::CS, newCS);
+    reg(Reg32::EIP) = newIP;
 }
 
 // LES/LDS/...
