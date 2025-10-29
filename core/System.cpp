@@ -1386,6 +1386,11 @@ uint8_t RAM_FUNC(System::readIOPort)(uint16_t addr)
     if(addr >= 0xCF8 && addr < 0xD00) // PCI
         return 0xFF;
 
+    // 1C90, 2C90... FC90
+    // linux probing EATA devices
+    if((addr & 0xFFF) == 0xC90 && (addr >> 12) > 0)
+        return 0xFF;
+
     auto [cs, ip, opAddr] = cpu.getOpStartAddr();
     printf("IO R %04X @%08X\n", addr, opAddr);
 #endif
