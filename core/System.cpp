@@ -126,15 +126,7 @@ uint8_t Chipset::read(uint16_t addr)
 
             uint16_t ret = i8042Queue.pop();
 
-            // re-flag interrupt if enabled and more data
-            if(!i8042Queue.empty())
-            {
-                bool isSecondPort = i8042Queue.peek() >> 8;
-                if((i8042Configuration & (1 << 0)) && !isSecondPort)
-                    flagPICInterrupt(1);
-                else if((i8042Configuration & (1 << 1)) && isSecondPort)
-                    flagPICInterrupt(12);
-            }
+            update8042Interrupt();
             return ret & 0xFF;
         }
 
@@ -424,6 +416,8 @@ void Chipset::write(uint16_t addr, uint8_t data)
                 write8042DeviceData(data, devIndex);
             else
                 write8042DeviceCommand(data, devIndex);
+
+            update8042Interrupt();
             break;
         }
 
@@ -433,6 +427,7 @@ void Chipset::write(uint16_t addr, uint8_t data)
 
         case 0x64: // 8042 command
             write8042ControllerCommand(data);
+            update8042Interrupt();
             break;
 
         case 0x70: // CMOS index
@@ -758,9 +753,7 @@ void Chipset::sendKey(ATScancode scancode, bool down)
         i8042Queue.push(rawCode & 0xFF);
     }
 
-    // flag interrupt if enabled
-    if(i8042Configuration & (1 << 0))
-        flagPICInterrupt(1);
+    update8042Interrupt();
 }
 
 void Chipset::addMouseMotion(int x, int y)
@@ -807,9 +800,7 @@ void Chipset::syncMouse()
     mouseXMotion = 0;
     mouseYMotion = 0;
 
-    // flag interrupt if enabled
-    if(i8042Configuration & (1 << 1))
-        flagPICInterrupt(12);
+    update8042Interrupt();
 }
 
 void Chipset::setSpeakerAudioCallback(SpeakerAudioCallback cb)

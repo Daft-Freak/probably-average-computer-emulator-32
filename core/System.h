@@ -150,6 +150,8 @@ private:
     void write8042DeviceCommand(uint8_t data, int devIndex);
     void write8042DeviceData(uint8_t data, int devIndex);
 
+    void update8042Interrupt();
+
     System &sys;
 
     DMA dma;
