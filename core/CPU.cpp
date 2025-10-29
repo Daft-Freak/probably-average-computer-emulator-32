@@ -7968,6 +7968,17 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
 
     if(isProtectedMode())
     {
+        // INT only allowed in virtual-8086 mode if IOPL=3
+        if(isInt && (flags & Flag_VM))
+        {
+            int iopl = (flags & Flag_IOPL) >> 12;
+            if(iopl < 3)
+            {
+                fault(Fault::GP, 0);
+                return;
+            }
+        }
+
         auto addr = vector * 8;
 
         if(addr + 7 > idtLimit)
