@@ -197,11 +197,11 @@ private:
     using ALUOp16 = uint16_t(*)(uint16_t, uint16_t, uint32_t &);
     using ALUOp32 = uint32_t(*)(uint32_t, uint32_t, uint32_t &);
 
-    template<ALUOp8 op, bool d, int regCycles, int memCycles>
+    template<ALUOp8 op, bool d>
     void doALU8(uint32_t addr);
-    template<ALUOp16 op, bool d, int regCycles, int memCycles>
+    template<ALUOp16 op, bool d>
     void doALU16(uint32_t addr);
-    template<ALUOp32 op, bool d, int regCycles, int memCycles>
+    template<ALUOp32 op, bool d>
     void doALU32(uint32_t addr);
 
     template<ALUOp8 op>
