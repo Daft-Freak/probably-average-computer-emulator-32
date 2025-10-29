@@ -6135,7 +6135,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     break;
                 }
                 default:
-                    assert(!"invalid group1!");
+                    fault(Fault::UD);
             }
             break;
         }
@@ -6226,7 +6226,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                 // 6 is PUSH
                 // 7 is invalid
                 default:
-                    assert(!"invalid group2!");
+                    fault(Fault::UD);
             }
             break;
         }
