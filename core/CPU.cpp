@@ -1101,7 +1101,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                             // write access back
                             auto addr = (selector >> 3) * 8 + gdtBase;
-                            writeMem8(addr + 5, newDesc.flags >> 16);
+                            writeMem8(addr + 5, newDesc.flags >> 16, true);
 
                             reg(Reg32::EIP) += 2;
                             break;
@@ -6816,9 +6816,9 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 
     uint8_t descBytes[8];
 
-    // FIXME: faults?
+    // FIXME: a page fault could happen here?
     for(int i = 0; i < 8; i++)
-        readMem8(addr + i, descBytes[i]);
+       readMem8(addr + i, descBytes[i], true);
 
     desc.base = descBytes[2]
               | descBytes[3] <<  8
@@ -7920,7 +7920,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     {
         tssDesc.flags |= 2 << 16; // in the cache too
         auto addr = (selector >> 3) * 8 + gdtBase;
-        writeMem8(addr + 5, tssDesc.flags >> 16);
+        writeMem8(addr + 5, tssDesc.flags >> 16, true);
     }
 
     // load new TSS
@@ -7934,8 +7934,8 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     {
         auto addr = (oldTR >> 3) * 8 + gdtBase;
         uint8_t access;
-        readMem8(addr + 5, access);
-        writeMem8(addr + 5, access & ~2);
+        readMem8(addr + 5, access, true);
+        writeMem8(addr + 5, access & ~2, true);
     }
     else // otherwise set the back-link (same offset/size in 16/32bit TSS)
         writeMem16(tssDesc.base + 0, oldTR);
