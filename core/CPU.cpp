@@ -6427,24 +6427,24 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, Reg16 segment, uint32_t data)
     return writeMem32(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::readMem8)(uint32_t offset, uint8_t &data)
+bool RAM_FUNC(CPU::readMem8)(uint32_t offset, uint8_t &data, bool privileged)
 {
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr))
+    if(!getPhysicalAddress(offset, physAddr, false, privileged))
         return false;
 
     data = sys.readMem(physAddr);
     return true;
 }
 
-bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data)
+bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) == 0xFFF)
     {
         uint8_t tmp[2];
 
-        if(!readMem8(offset, tmp[0]) || !readMem8(offset + 1, tmp[1]))
+        if(!readMem8(offset, tmp[0], privileged) || !readMem8(offset + 1, tmp[1], privileged))
             return false;
 
         data = tmp[0] | tmp[1] << 8;
@@ -6453,22 +6453,25 @@ bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data)
     }
 
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr))
+    if(!getPhysicalAddress(offset, physAddr, false, privileged))
         return false;
 
     data = sys.readMem(physAddr) | sys.readMem(physAddr + 1) << 8;
     return true;
 }
 
-bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data)
+bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
     {
         uint8_t tmp[4];
 
-        if(!readMem8(offset, tmp[0]) || !readMem8(offset + 1, tmp[1]) || !readMem8(offset + 2, tmp[2]) || !readMem8(offset + 3, tmp[3]))
+        if(!readMem8(offset, tmp[0], privileged) || !readMem8(offset + 1, tmp[1], privileged) ||
+           !readMem8(offset + 2, tmp[2], privileged) || !readMem8(offset + 3, tmp[3], privileged))
+        {
             return false;
+        }
 
         data = tmp[0] | tmp[1] << 8 | tmp[2] << 16 | tmp[3] << 24;
 
@@ -6476,7 +6479,7 @@ bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data)
     }
 
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr))
+    if(!getPhysicalAddress(offset, physAddr, false, privileged))
         return false;
 
     data = sys.readMem(physAddr + 0)       |
@@ -6487,27 +6490,27 @@ bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, uint8_t data)
+bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, uint8_t data, bool privileged)
 {
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr, true))
+    if(!getPhysicalAddress(offset, physAddr, true, privileged))
         return false;
 
     sys.writeMem(physAddr, data);
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data)
+bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
     {
         // FIXME: what if the first page is valid, but the second isn't?
-        return writeMem8(offset, data & 0xFF) && writeMem8(offset + 1, data >> 8);
+        return writeMem8(offset, data & 0xFF, privileged) && writeMem8(offset + 1, data >> 8, privileged);
     }
 
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr, true))
+    if(!getPhysicalAddress(offset, physAddr, true, privileged))
         return false;
 
     sys.writeMem(physAddr, data & 0xFF);
@@ -6515,17 +6518,17 @@ bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data)
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data)
+bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
     {
-        return writeMem8(offset    , data & 0xFF) && writeMem8(offset + 1, data >> 8 )
-            && writeMem8(offset + 2, data >> 16 ) && writeMem8(offset + 3, data >> 24);
+        return writeMem8(offset    , data & 0xFF, privileged) && writeMem8(offset + 1, data >> 8 , privileged)
+            && writeMem8(offset + 2, data >> 16 , privileged) && writeMem8(offset + 3, data >> 24, privileged);
     }
 
     uint32_t physAddr;
-    if(!getPhysicalAddress(offset, physAddr, true))
+    if(!getPhysicalAddress(offset, physAddr, true, privileged))
         return false;
 
     sys.writeMem(physAddr + 0, data & 0xFF);
@@ -6535,7 +6538,7 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data)
     return true;
 }
 
-bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite)
+bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
 {
     // paging not enabled
     if(!(reg(Reg32::CR0) & (1 << 31)))

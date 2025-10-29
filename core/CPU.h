@@ -144,21 +144,22 @@ private:
     bool writeMem32(uint32_t offset, Reg16 segment, uint32_t data);
 
     // some internal stuff that already has a linear address
-    bool readMem8(uint32_t offset, uint8_t &data);
-    bool readMem16(uint32_t offset, uint16_t &data);
-    bool readMem32(uint32_t offset, uint32_t &data);
-    bool writeMem8(uint32_t offset, uint8_t data);
-    bool writeMem16(uint32_t offset, uint16_t data);
-    bool writeMem32(uint32_t offset, uint32_t data);
+    bool readMem8(uint32_t offset, uint8_t &data, bool privileged = false);
+    bool readMem16(uint32_t offset, uint16_t &data, bool privileged = false);
+    bool readMem32(uint32_t offset, uint32_t &data, bool privileged = false);
+    bool writeMem8(uint32_t offset, uint8_t data, bool privileged = false);
+    bool writeMem16(uint32_t offset, uint16_t data, bool privileged = false);
+    bool writeMem32(uint32_t offset, uint32_t data, bool privileged = false);
 
     // extra helpers
     bool readMem8 (uint32_t offset, uint32_t &data) {uint8_t  tmp; if(!readMem8 (offset, tmp)) return false; data = tmp; return true;}
-    bool readMem16(uint32_t offset, uint32_t &data) {uint16_t tmp; if(!readMem16(offset, tmp)) return false; data = tmp; return true;}
+    // getTSSStackPointer uses this one
+    bool readMem16(uint32_t offset, uint32_t &data, bool privileged = false) {uint16_t tmp; if(!readMem16(offset, tmp, privileged)) return false; data = tmp; return true;}
     bool readMem8 (uint32_t offset,  int32_t &data) {uint8_t  tmp; if(!readMem8 (offset, tmp)) return false; data = int8_t (tmp); return true;}
     bool readMem16(uint32_t offset,  int32_t &data) {uint16_t tmp; if(!readMem16(offset, tmp)) return false; data = int16_t(tmp); return true;}
     bool readMem32(uint32_t offset,  int32_t &data) {uint32_t tmp; if(!readMem32(offset, tmp)) return false; data = int32_t(tmp); return true;}
 
-    bool getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite = false);
+    bool getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite = false, bool privileged = false);
 
     std::tuple<uint32_t, Reg16> getEffectiveAddress(int mod, int rm, bool rw, uint32_t addr);
 
