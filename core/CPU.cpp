@@ -6482,10 +6482,7 @@ bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data, bool privileged)
     if(!getPhysicalAddress(offset, physAddr, false, privileged))
         return false;
 
-    data = sys.readMem(physAddr + 0)       |
-           sys.readMem(physAddr + 1) <<  8 |
-           sys.readMem(physAddr + 2) << 16 |
-           sys.readMem(physAddr + 3) << 24;
+    data = sys.readMem32(physAddr + 0);
 
     return true;
 }
@@ -6558,10 +6555,7 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
 
     // directory
     auto dirEntryAddr = (reg(Reg32::CR3) & 0xFFFFF000) + dir * 4;
-    uint32_t dirEntry = sys.readMem(dirEntryAddr)
-                      | sys.readMem(dirEntryAddr + 1) << 8
-                      | sys.readMem(dirEntryAddr + 2) << 16
-                      | sys.readMem(dirEntryAddr + 3) << 24;
+    uint32_t dirEntry = sys.readMem32(dirEntryAddr);
 
     // not present
     if(!(dirEntry & 1))
@@ -6573,10 +6567,7 @@ bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrit
     // page table
     auto pageEntryAddr = (dirEntry & 0xFFFFF000) + page * 4;
 
-    uint32_t pageEntry = sys.readMem(pageEntryAddr)
-                       | sys.readMem(pageEntryAddr + 1) << 8
-                       | sys.readMem(pageEntryAddr + 2) << 16
-                       | sys.readMem(pageEntryAddr + 3) << 24;
+    uint32_t pageEntry = sys.readMem32(pageEntryAddr);
 
     if(!(pageEntry & 1))
     {

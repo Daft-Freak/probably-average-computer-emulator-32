@@ -1378,6 +1378,33 @@ uint8_t RAM_FUNC(System::readMem)(uint32_t addr)
     return 0xFF;
 }
 
+uint32_t RAM_FUNC(System::readMem32)(uint32_t addr)
+{
+    if(addr >= maxAddress)
+        return 0xFFFFFFFF;
+
+    if((addr & (1 << 20)) && !chipset.getA20())
+        addr &= ~(1 << 20);
+
+    // this should work fine so long as nobody tries to read past the end of the block before A0000...
+    auto block = addr / blockSize;
+
+    auto ptr = memMap[block];
+
+    if(ptr)
+        return *reinterpret_cast<uint32_t *>(ptr + addr);
+
+    // final attempt for complicated mappings
+    if(memReadCb && addr >= memAccessCbBase && addr < memAccessCbEnd)
+    {
+        return memReadCb(addr + 0, memAccessUserData)       |
+               memReadCb(addr + 1, memAccessUserData) << 8  |
+               memReadCb(addr + 2, memAccessUserData) << 16 |
+               memReadCb(addr + 3, memAccessUserData) << 24;
+    }
+    return 0xFFFFFFFF;
+}
+
 void RAM_FUNC(System::writeMem)(uint32_t addr, uint8_t data)
 {
     if(addr >= maxAddress)
