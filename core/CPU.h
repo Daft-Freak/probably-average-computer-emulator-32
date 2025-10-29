@@ -168,6 +168,8 @@ private:
     bool checkIOPermission(uint16_t addr);
     bool checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write);
 
+    bool checkStackSpace(int words, bool op32, bool addr32);
+
     bool isProtectedMode() {return reg(Reg32::CR0) & 1;}
     bool isOperandSize32(bool override);
     bool isStackAddressSize32();
