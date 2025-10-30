@@ -482,6 +482,9 @@ int main(int argc, char *argv[])
 
     // attempt to open VGA BIOS
     biosFile.open(basePath + "vgabios.bin", std::ios::binary);
+    if(!biosFile)
+        biosFile.open(basePath + "vgabios-isavga.bin", std::ios::binary);
+
     if(biosFile)
     {
         std::cout << "loading VGA BIOS\n";
