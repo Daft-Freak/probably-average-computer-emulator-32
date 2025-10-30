@@ -10,6 +10,13 @@ VGACard::VGACard(System &sys) : sys(sys)
 
 void VGACard::drawScanline(int line, uint8_t *output)
 {
+#ifdef VGA_RGB565
+    auto outputPixel = [&output](int r, int g, int b)
+    {
+        *reinterpret_cast<uint16_t *>(output) = r >> 1 | g << 5 | (b >> 1) << 11;
+        output += 2;
+    };
+#else
     //RGB888
     auto outputPixel = [&output](int r, int g, int b)
     {
@@ -18,6 +25,7 @@ void VGACard::drawScanline(int line, uint8_t *output)
         *output++ = b << 2 | b >> 4;
         output++;
     };
+#endif
 
     lastOutputLine = line;
 
