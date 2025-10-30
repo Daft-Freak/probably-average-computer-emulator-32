@@ -59,7 +59,7 @@ pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/dpi.pio)
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 
 # usual setup
-target_link_libraries(PACEPico2 PACECore PACEPicoShared PACEPicoBIOS hardware_dma hardware_spi pico_multicore pico_stdlib)
+target_link_libraries(PACEPico2 PACECore PACEPicoShared PACEPicoBIOS hardware_dma hardware_riscv_platform_timer hardware_spi pico_multicore pico_stdlib)
 
 pico_enable_stdio_uart(PACEPico2 1)
 pico_add_extra_outputs(PACEPico2)

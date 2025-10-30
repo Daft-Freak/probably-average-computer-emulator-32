@@ -3,6 +3,7 @@
 #include "hardware/clocks.h"
 #include "hardware/irq.h"
 #include "hardware/timer.h"
+#include "hardware/riscv_platform_timer.h"
 #include "hardware/vreg.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
@@ -90,8 +91,14 @@ static void runEmulator(absolute_time_t &time)
         }
     }
 }
+
 static void core1Main()
 {
+    // configure the riscv timer to count cycles so we can use it for the "system" clock
+    // (which is really just the PIT)
+    riscv_timer_set_fullspeed(true);
+    riscv_timer_set_enabled(true);
+
     auto time = get_absolute_time();
     while(true)
         runEmulator(time);

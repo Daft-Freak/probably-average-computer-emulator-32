@@ -7,6 +7,10 @@
 #include "FIFO.h"
 #include "Scancode.h"
 
+#ifdef PICO_BUILD
+#include "hardware/riscv_platform_timer.h"
+#endif
+
 class System;
 
 class IODevice
@@ -196,7 +200,16 @@ public:
 
     CPU &getCPU() {return cpu;}
 
-    uint32_t getCycleCount() const {return cycleCount;}
+    uint32_t getCycleCount()
+    {
+#ifdef PICO_BUILD
+        // TODO: assumes 250MHz clock (250 / 209 = ~1.196Mhz)
+        // technically we should adjust the upper bits periodically to have proper wraping
+        // but I don't think we need to worry about that...
+        cycleCount = (riscv_timer_get_mtime() / 209) * pitClkDiv;
+#endif
+        return cycleCount;
+    }
 
     void addMemory(uint32_t base, uint32_t size, uint8_t *ptr);
     void addReadOnlyMemory(uint32_t base, uint32_t size, const uint8_t *ptr);
