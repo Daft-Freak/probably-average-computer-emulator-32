@@ -77,6 +77,14 @@ void VGACard::drawScanline(int line, uint8_t *output)
 
             // TODO: cursor
 
+            if(!fontLine) // skip blank chars (TODO: also do blink here)
+            {
+                for(int x = 0; x < charWidth; x++)
+                    outputPixel(bgCol[0], bgCol[1], bgCol[2]);
+                
+                continue;
+            }
+
             for(int x = 0; x < charWidth; x++)
             {
                 bool fontVal = ((fontLine << x) & 0x8000);
