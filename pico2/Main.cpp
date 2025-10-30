@@ -24,6 +24,7 @@
 
 #include "ATAController.h"
 #include "FloppyController.h"
+#include "QEMUConfig.h"
 #include "Scancode.h"
 #include "System.h"
 #include "VGACard.h"
@@ -33,6 +34,8 @@ static FATFS fs;
 static System sys;
 
 static FloppyController fdc(sys);
+
+static QEMUConfig qemuCfg(sys);
 
 static VGACard vga(sys);
 
@@ -141,6 +144,8 @@ int main()
     auto biosSize = _binary_bios_bin_end - _binary_bios_bin_start;
     auto biosBase = 0x100000 - biosSize;
     memcpy(psram + biosBase, bios, biosBase);
+
+    qemuCfg.setVGABIOS(reinterpret_cast<const uint8_t *>(_binary_vgabios_bin_start));
 
     sys.reset();
 

@@ -37,10 +37,12 @@ set_target_properties(PACEPicoBIOS PROPERTIES LINKER_LANGUAGE C)
 
 # embed VGA BIOS
 set(VGA_BIOS_FILE vgabios.bin)
+set(RENAME_ARG)
 
 if(NOT EXISTS ${BIOS_PATH}${VGA_BIOS_FILE})
     message("Could not find ${VGA_BIOS_FILE}, trying vgabios-isavga.bin")
     set(VGA_BIOS_FILE vgabios-isavga.bin)
+    set(RENAME_ARG --redefine-sym "_binary_vgabios_isavga_bin_start=_binary_vgabios_bin_start")
 endif()
 
 if(NOT EXISTS ${BIOS_PATH}${VGA_BIOS_FILE})
@@ -50,7 +52,7 @@ endif()
 add_custom_command(
     OUTPUT vga-bios.o
     WORKING_DIRECTORY ${BIOS_PATH}
-    COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-littlearm -B armv6s-m --rename-section .data=.rodata,alloc,load,readonly,data,contents ${VGA_BIOS_FILE} ${CMAKE_CURRENT_BINARY_DIR}/vga-bios.o
+    COMMAND ${CMAKE_OBJCOPY} -I binary -O elf32-littlearm -B armv6s-m --rename-section .data=.rodata,alloc,load,readonly,data,contents ${RENAME_ARG} ${VGA_BIOS_FILE} ${CMAKE_CURRENT_BINARY_DIR}/vga-bios.o
     DEPENDS ${BIOS_PATH}${VGA_BIOS_FILE}
 )
 
