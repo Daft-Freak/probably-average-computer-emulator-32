@@ -6556,7 +6556,7 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data, bool privileged)
     return true;
 }
 
-bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
+bool RAM_FUNC(CPU::getPhysicalAddress)(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
 {
     // paging not enabled
     if(!(reg(Reg32::CR0) & (1 << 31)))
@@ -6857,7 +6857,7 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
     return {memAddr, segBase};
 }
 
-CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
+CPU::SegmentDescriptor RAM_FUNC(CPU::loadSegmentDescriptor)(uint16_t selector)
 {
     // null descriptor
     if(!selector)
@@ -6912,7 +6912,7 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 
 // if this returns false we faulted
 // gpFault is usually GP, but overridden sometimes when doing TSS-related things
-bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags, Fault gpFault)
+bool RAM_FUNC(CPU::checkSegmentSelector)(Reg16 r, uint16_t value, unsigned cpl, int flags, Fault gpFault)
 {
     // check limit
     auto limit = (value & 4)/*local*/ ? ldtLimit : gdtLimit;
@@ -7037,7 +7037,7 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags,
     return true;
 }
 
-bool CPU::setSegmentReg(Reg16 r, uint16_t value, bool checkFaults)
+bool RAM_FUNC(CPU::setSegmentReg)(Reg16 r, uint16_t value, bool checkFaults)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7132,7 +7132,7 @@ bool CPU::getTSSStackPointer(int dpl, uint32_t &newSP, uint16_t &newSS)
     return true;
 }
 
-bool CPU::checkIOPermission(uint16_t addr)
+bool RAM_FUNC(CPU::checkIOPermission)(uint16_t addr)
 {
     // no IO permissions in real mode
     if(!isProtectedMode())
@@ -7181,7 +7181,7 @@ bool CPU::checkIOPermission(uint16_t addr)
     return false;
 }
 
-bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write)
+bool RAM_FUNC(CPU::checkSegmentAccess)(Reg16 segment, uint32_t offset, int width, bool write)
 {
     auto &desc = getCachedSegmentDescriptor(segment);
 
@@ -7238,14 +7238,14 @@ bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool wri
 }
 
 // checks if we can push a number of words
-bool CPU::checkStackSpace(int words, bool op32, bool addr32)
+bool RAM_FUNC(CPU::checkStackSpace)(int words, bool op32, bool addr32)
 {
     auto sp = addr32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
     return checkStackSpace(sp, getCachedSegmentDescriptor(Reg16::SS), words, op32, addr32);
 }
 
-bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32)
+bool RAM_FUNC(CPU::checkStackSpace)(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32)
 {
     int wordSize = op32 ? 4 : 2;
 
@@ -7302,7 +7302,7 @@ bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int word
 }
 
 // also address size, but with a different override prefix
-bool CPU::isOperandSize32(bool override)
+bool RAM_FUNC(CPU::isOperandSize32)(bool override)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7319,7 +7319,7 @@ bool CPU::isOperandSize32(bool override)
     return override;
 }
 
-bool CPU::isStackAddressSize32()
+bool RAM_FUNC(CPU::isStackAddressSize32)()
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7577,7 +7577,7 @@ void CPU::doALU32AImm(uint32_t addr)
     reg(Reg32::EIP) += 4;
 }
 
-bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
+bool RAM_FUNC(CPU::doPush)(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
 {
     uint32_t sp = addr32 ? reg(Reg32::ESP) : reg(Reg16::SP);
     if(sp == 0 && !addr32)
@@ -7602,7 +7602,7 @@ bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
     return true;
 }
 
-void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32)
+void RAM_FUNC(CPU::farCall)(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32)
 {
     if(!operandSize32)
         newIP &= 0xFFFF;
@@ -7828,7 +7828,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
     }
 }
 
-void CPU::farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
+void RAM_FUNC(CPU::farJump)(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7882,7 +7882,7 @@ void CPU::farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
 }
 
 // LES/LDS/...
-void CPU::loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32)
+void RAM_FUNC(CPU::loadFarPointer)(uint32_t addr, Reg16 segmentReg, bool operandSize32)
 {
     uint8_t modRM;
     if(!readMem8(addr + 1, modRM))
