@@ -257,7 +257,7 @@ private:
     bool halted = false;
 
     Reg16 segmentOverride;
-    bool addressSizeOverride;
+    bool addressSize32;
 
     uint32_t faultIP;
 

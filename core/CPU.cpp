@@ -614,7 +614,7 @@ void RAM_FUNC(CPU::executeInstruction)()
     bool rep = false, repZ = true;
     segmentOverride = Reg16::AX; // not a segment reg, also == 0
     bool operandSizeOverride = false;
-    addressSizeOverride = false;
+    bool addressSizeOverride = false;
 
     // tracing
     if(trace.isEnabled())
@@ -713,12 +713,12 @@ void RAM_FUNC(CPU::executeInstruction)()
     }
 
     bool operandSize32 = isOperandSize32(operandSizeOverride);
-    bool addressSize32 = isOperandSize32(addressSizeOverride);
+    addressSize32 = isOperandSize32(addressSizeOverride);
     bool stackAddrSize32 = isStackAddressSize32();
 
     // returns address after end of modr/m and disp
     // nextAddr is the address of the byte after the rm byte
-    auto getDispEnd = [this, &addressSize32](uint8_t modRM, uint32_t nextAddr)
+    auto getDispEnd = [this](uint8_t modRM, uint32_t nextAddr)
     {
         return getRMDispEnd(modRM, nextAddr, addressSize32);
     };
@@ -6625,8 +6625,6 @@ bool RAM_FUNC(CPU::getPhysicalAddress)(uint32_t virtAddr, uint32_t &physAddr, bo
 // returns {0, AX(0)} if there was a fault fetching a disp (or SIB)
 std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int rm, bool rw, uint32_t addr)
 {
-    bool addressSize32 = isOperandSize32(addressSizeOverride); // TODO: cache?
-
     uint32_t memAddr = 0;
     Reg16 segBase = Reg16::DS;
 
