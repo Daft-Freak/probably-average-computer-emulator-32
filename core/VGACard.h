@@ -26,6 +26,9 @@ private:
     void setupMemory();
     void updateOutputResolution();
 
+    void updatePalette16(int index);
+    void updatePalette256(int index);
+
     uint8_t readMem(uint32_t addr);
     void writeMem(uint32_t addr, uint8_t data);
 
@@ -81,6 +84,10 @@ private:
 
     int outputW = 0, outputH = 0;
     int lastOutputLine = 0;
+
+#ifdef VGA_RGB565
+    uint16_t rgb565pal16[16];
+#endif
 
     uint8_t ram[256 * 1024];
 };

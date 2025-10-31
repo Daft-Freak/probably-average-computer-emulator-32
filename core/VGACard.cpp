@@ -26,9 +26,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
     auto paletteLookup16 = [this](int index)
     {
-        uint8_t pal64 = attribPalette[index];
-        auto pal256 = dacPalette + pal64 * 3;
-        return pal256[0] >> 1 | pal256[1] << 5 | (pal256[2] >> 1) << 11;
+        return rgb565pal16[index];
     };
 
     auto paletteLookup256 = [this](int index)
@@ -311,7 +309,10 @@ void VGACard::write(uint16_t addr, uint8_t data)
             if(attributeIsData)
             {
                 if(attributeIndex < 0x10)
+                {
                     attribPalette[attributeIndex] = data;
+                    updatePalette16(attributeIndex);
+                }
                 else if(attributeIndex == 0x10)
                     attribMode = data;
                 else if(attributeIndex == 0x12)
@@ -369,7 +370,9 @@ void VGACard::write(uint16_t addr, uint8_t data)
             dacIndexWrite = data * 3;
             break;
         case 0x3C9: // DAC data
-            dacPalette[dacIndexWrite++] = data;
+            dacPalette[dacIndexWrite] = data;
+            updatePalette256(dacIndexWrite / 3);
+            dacIndexWrite++;
             break;
 
         case 0x3CE: // graphics controller address
@@ -476,6 +479,29 @@ void VGACard::updateOutputResolution()
         outputW /= 2;
 
     printf("VGA res %ix%i\n", outputW, outputH);
+}
+
+void VGACard::updatePalette16(int index)
+{
+#ifdef VGA_RGB565
+    uint8_t pal64 = attribPalette[index];
+    auto pal256 = dacPalette + pal64 * 3;
+    rgb565pal16[index] = pal256[0] >> 1 | pal256[1] << 5 | (pal256[2] >> 1) << 11;
+#endif
+}
+
+void VGACard::updatePalette256(int index)
+{
+#ifdef VGA_RGB565
+    if(index < 64)
+    {
+        for(int i = 0; i < 16; i++)
+        {
+            if(attribPalette[i] == index)
+                updatePalette16(i);
+        }
+    }
+#endif
 }
 
 uint8_t VGACard::readMem(uint32_t addr)
