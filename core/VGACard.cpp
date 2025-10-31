@@ -166,24 +166,53 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         uint8_t planeEnable = attribPlaneEnable;
 
-        for(int i = 0; i < outputW / 8; i++)
+        auto endPtr0 = ptr0 + outputW / 8;
+
+        for(; ptr0 != endPtr0; ptr0++)
         {
             uint8_t byte0 = (planeEnable & (1 << 0)) ? ptr0[0x00000] : 0;
             uint8_t byte1 = (planeEnable & (1 << 1)) ? ptr0[0x10000] : 0;
             uint8_t byte2 = (planeEnable & (1 << 2)) ? ptr0[0x20000] : 0;
             uint8_t byte3 = (planeEnable & (1 << 3)) ? ptr0[0x30000] : 0;
-            ptr0++;
 
-            uint32_t v = byte0 | byte1 << 8 | byte2 << 16 | byte3 << 24;
+            // interleave the four bytes
+            uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
+            v0 = (v0 | v0 << 12) & 0x000F000F;
+            v0 = (v0 | v0 <<  6) & 0x03030303;
+            v0 = (v0 | v0 <<  3) & 0x11111111;
 
+            v1 = (v1 | v1 << 12) & 0x000F000F;
+            v1 = (v1 | v1 <<  6) & 0x03030303;
+            v1 = (v1 | v1 <<  3) & 0x11111111;
+
+            v2 = (v2 | v2 << 12) & 0x000F000F;
+            v2 = (v2 | v2 <<  6) & 0x03030303;
+            v2 = (v2 | v2 <<  3) & 0x11111111;
+
+            v3 = (v3 | v3 << 12) & 0x000F000F;
+            v3 = (v3 | v3 <<  6) & 0x03030303;
+            v3 = (v3 | v3 <<  3) & 0x11111111;
+
+            uint32_t interleaved = v0 | v1 << 1 | v2 << 2 | v3 << 3;
+
+#ifdef VGA_RGB565
+            // really need to squeeze out the last few cycles
+            auto pal = rgb565pal16;
+            auto output32 = reinterpret_cast<uint32_t *>(output);
+            *output32++ = pal[(interleaved >> 28) & 0xF] | pal[(interleaved >> 24) & 0xF] << 16;
+            *output32++ = pal[(interleaved >> 20) & 0xF] | pal[(interleaved >> 16) & 0xF] << 16;
+            *output32++ = pal[(interleaved >> 12) & 0xF] | pal[(interleaved >>  8) & 0xF] << 16;
+            *output32++ = pal[(interleaved >>  4) & 0xF] | pal[(interleaved >>  0) & 0xF] << 16;
+            output = reinterpret_cast<uint8_t *>(output32);
+#else
             for(int j = 0; j < 8; j++)
             {
-                uint32_t tmp = v & 0x80808080;
-                uint8_t col = tmp >> 7 | tmp >> (8 + 6) | tmp >> (16 + 5) | tmp >> (24 + 4);
-                v <<= 1;
+                auto index = interleaved >> 28;
+                interleaved <<= 4;
 
-                outputPixel(paletteLookup16(col));
+                outputPixel(paletteLookup16(index));
             }
+#endif
         }
     }
 }
