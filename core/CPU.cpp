@@ -8285,13 +8285,13 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
     halted = false;
 }
 
-void CPU::fault(Fault fault)
+void RAM_FUNC(CPU::fault)(Fault fault)
 {
     reg(Reg32::EIP) = faultIP; // return address should be at the start of the instruction
     serviceInterrupt(static_cast<int>(fault));
 }
 
-void CPU::fault(Fault fault, uint32_t code)
+void RAM_FUNC(CPU::fault)(Fault fault, uint32_t code)
 {
     this->fault(fault);
     // might have changed the stack address size
