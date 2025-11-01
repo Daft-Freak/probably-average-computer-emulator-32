@@ -5,7 +5,7 @@ add_executable(PACEPico2
 )
 
 # some additional target-specific options
-option(PICO2_CPU_IN_RAM "Move main CPU interpreter+memory access code to RAM" OFF)
+option(PICO2_CPU_IN_RAM "Move main CPU interpreter+memory access code to RAM" ON)
 
 if(PICO2_CPU_IN_RAM)
     target_compile_definitions(PACEPico2 PRIVATE PICO_CPU_IN_RAM=1)
