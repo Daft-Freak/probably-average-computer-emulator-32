@@ -327,7 +327,6 @@ void VGACard::write(uint16_t addr, uint8_t data)
 
         case 0x3B5: // CRTC data
         case 0x3D5:
-            printf("VGA W crtc %02X = %02X\n", crtcIndex, data);
             crtcRegs[crtcIndex] = data;
 
             if(crtcIndex == 0x1 /*horizontal end*/ || crtcIndex == 0x7 /*overflow bits*/ || crtcIndex == 0x12 /*vertical end*/)
