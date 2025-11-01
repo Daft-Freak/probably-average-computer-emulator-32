@@ -24,6 +24,12 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         output += 2;
     };
 
+    auto outputPixel2 = [&output](uint16_t col)
+    {
+        *reinterpret_cast<uint32_t *>(output) = col | col << 16;
+        output += 4;
+    };
+
     auto paletteLookup16 = [this](int index)
     {
         return rgb565pal16[index];
@@ -44,6 +50,26 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         *output++ = r << 2 | r >> 4;
         *output++ = g << 2 | g >> 4;
         *output++ = b << 2 | b >> 4;
+        output++;
+    };
+
+    auto outputPixel2 = [&output](uint8_t *col)
+    {
+        uint8_t r = col[0];
+        uint8_t g = col[1];
+        uint8_t b = col[2];
+        r = r << 2 | r >> 4;
+        g = g << 2 | g >> 4;
+        b = b << 2 | b >> 4;
+
+        *output++ = r;
+        *output++ = g;
+        *output++ = b;
+        output++;
+
+        *output++ = r;
+        *output++ = g;
+        *output++ = b;
         output++;
     };
 
@@ -133,7 +159,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         auto ptr0 = plane0 + startAddr + offset * (byteAccess ? 2 : 8) * (line / charHeight);
 
-        for(int i = 0; i < outputW / 4; i++)
+        for(int i = 0; i < outputW / 8; i++)
         {
             uint8_t byte0 = (attribPlaneEnable & (1 << 0)) ? ptr0[0x00000] : 0;
             uint8_t byte1 = (attribPlaneEnable & (1 << 1)) ? ptr0[0x10000] : 0;
@@ -141,10 +167,10 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
             uint8_t byte3 = (attribPlaneEnable & (1 << 3)) ? ptr0[0x30000] : 0;
             ptr0 += byteAccess ? 1 : 4;
 
-            outputPixel(paletteLookup256(byte0));
-            outputPixel(paletteLookup256(byte1));
-            outputPixel(paletteLookup256(byte2));
-            outputPixel(paletteLookup256(byte3));
+            outputPixel2(paletteLookup256(byte0));
+            outputPixel2(paletteLookup256(byte1));
+            outputPixel2(paletteLookup256(byte2));
+            outputPixel2(paletteLookup256(byte3));
         }
     }
     else if(gfxMode & (1 << 4)) // interleaved
@@ -497,14 +523,9 @@ void VGACard::updateOutputResolution()
     int charWidth = seqClockMode & 1 ? 8 : 9;
     int hDispChars = crtcRegs[1] + 1;
     int vDisp = (crtcRegs[0x12] | (crtcRegs[0x7] & (1 << 1)) << 7 | (crtcRegs[0x7] & (1 << 6)) << 3) + 1;
-    bool is8Bit = attribMode & (1 << 6);
 
     outputW = charWidth * hDispChars;
     outputH = vDisp;
-
-    // 256 colour mode has half width
-    if(is8Bit)
-        outputW /= 2;
 
     printf("VGA res %ix%i\n", outputW, outputH);
 }
