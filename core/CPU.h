@@ -165,12 +165,8 @@ private:
     bool readMemIP32(uint32_t offset, uint32_t &data);
 
     // extra helpers
-    bool readMem8 (uint32_t offset, uint32_t &data) {uint8_t  tmp; if(!readMem8 (offset, tmp)) return false; data = tmp; return true;}
     // getTSSStackPointer uses this one
     bool readMem16(uint32_t offset, uint32_t &data, bool privileged = false) {uint16_t tmp; if(!readMem16(offset, tmp, privileged)) return false; data = tmp; return true;}
-    bool readMem8 (uint32_t offset,  int32_t &data) {uint8_t  tmp; if(!readMem8 (offset, tmp)) return false; data = int8_t (tmp); return true;}
-    bool readMem16(uint32_t offset,  int32_t &data) {uint16_t tmp; if(!readMem16(offset, tmp)) return false; data = int16_t(tmp); return true;}
-    bool readMem32(uint32_t offset,  int32_t &data) {uint32_t tmp; if(!readMem32(offset, tmp)) return false; data = int32_t(tmp); return true;}
 
     bool getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite = false, bool privileged = false);
 
