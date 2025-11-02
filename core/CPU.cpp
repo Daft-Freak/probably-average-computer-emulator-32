@@ -582,6 +582,8 @@ void CPU::reset()
     idtBase = 0;
     idtLimit = 0x3FF;
 
+    stackAddrSize32 = false;
+
     reg(Reg16::DX) = 3 << 8; // 386
 
     reg(Reg32::CR0) = 0;
@@ -762,7 +764,6 @@ void RAM_FUNC(CPU::executeInstruction)()
 
     bool operandSize32 = isOperandSize32(operandSizeOverride);
     addressSize32 = isOperandSize32(addressSizeOverride);
-    bool stackAddrSize32 = isStackAddressSize32();
 
     // returns address after end of modr/m and disp
     // nextAddr is the address of the byte after the rm byte
@@ -781,12 +782,12 @@ void RAM_FUNC(CPU::executeInstruction)()
     };
 
     //push/pop
-    auto push = [this, stackAddrSize32](uint32_t val, bool is32)
+    auto push = [this](uint32_t val, bool is32)
     {
         return doPush(val, is32, stackAddrSize32);
     };
 
-    auto pushSeg = [this, stackAddrSize32](uint32_t val, bool is32)
+    auto pushSeg = [this](uint32_t val, bool is32)
     {
         return doPush(val, is32, stackAddrSize32, true);
     };
@@ -799,7 +800,7 @@ void RAM_FUNC(CPU::executeInstruction)()
         assert(ok);
     };
 
-    auto pop = [this, stackAddrSize32](bool is32, uint32_t &v)
+    auto pop = [this](bool is32, uint32_t &v)
     {
         uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
@@ -835,7 +836,7 @@ void RAM_FUNC(CPU::executeInstruction)()
     };
 
     // sometimes we need to check values (segments) before affecting SP
-    auto peek = [this, stackAddrSize32](bool is32, int offset, uint32_t &v, int byteOffset = 0)
+    auto peek = [this](bool is32, int offset, uint32_t &v, int byteOffset = 0)
     {
         uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
@@ -5116,7 +5117,7 @@ void RAM_FUNC(CPU::executeInstruction)()
 
                     setSegmentReg(Reg16::SS, newSS, false);
 
-                    if(isStackAddressSize32())
+                    if(stackAddrSize32)
                         reg(Reg32::ESP) = newSP + imm;
                     else
                         reg(Reg16::SP) = newSP + imm;
@@ -5329,7 +5330,7 @@ void RAM_FUNC(CPU::executeInstruction)()
                     // setup new stack
                     setSegmentReg(Reg16::SS, newSS);
 
-                    if(isStackAddressSize32())
+                    if(stackAddrSize32)
                         reg(Reg32::ESP) = newESP;
                     else
                         reg(Reg16::SP) = newESP;
@@ -7151,6 +7152,8 @@ bool RAM_FUNC(CPU::setSegmentReg)(Reg16 r, uint16_t value, bool checkFaults)
 
         if(r == Reg16::CS)
             cpl = value & 3;
+        else if(r == Reg16::SS)
+            stackAddrSize32 = getCachedSegmentDescriptor(Reg16::SS).flags & SD_Size;
     }
     else
     {
@@ -7163,6 +7166,8 @@ bool RAM_FUNC(CPU::setSegmentReg)(Reg16 r, uint16_t value, bool checkFaults)
             desc.flags &= ~SD_PrivilegeLevel; // clear privilege level
             desc.limit = 0xFFFF;
         }
+        else if(r == Reg16::SS)
+            stackAddrSize32 = false;
     }
 
     return true;
@@ -8177,14 +8182,12 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
 
 void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
 {
-    bool stackAddrSize32 = isStackAddressSize32();
-
-    auto push = [this, &stackAddrSize32](uint32_t val, bool is32)
+    auto push = [this](uint32_t val, bool is32)
     {
         doPush(val, is32, stackAddrSize32);
     };
 
-    auto pushSeg = [this, &stackAddrSize32](uint32_t val, bool is32)
+    auto pushSeg = [this](uint32_t val, bool is32)
     {
         doPush(val, is32, stackAddrSize32, true);
     };
@@ -8281,9 +8284,6 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
 
                 assert(gate32);
 
-                // restore stack address size
-                stackAddrSize32 = isStackAddressSize32();
-
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
                 else
@@ -8327,9 +8327,6 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
                 cpl = newCSDPL;
 
                 setSegmentReg(Reg16::SS, newSS);
-
-                // update stack address size
-                stackAddrSize32 = isStackAddressSize32();
 
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
@@ -8412,5 +8409,5 @@ void RAM_FUNC(CPU::fault)(Fault fault, uint32_t code)
     this->fault(fault);
     // might have changed the stack address size
     if(isProtectedMode())
-        doPush(code, isOperandSize32(false), isStackAddressSize32());
+        doPush(code, isOperandSize32(false), stackAddrSize32);
 }

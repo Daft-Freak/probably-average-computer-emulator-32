@@ -195,7 +195,6 @@ private:
 
     bool isProtectedMode() {return reg(Reg32::CR0) & 1;}
     bool isOperandSize32(bool override);
-    bool isStackAddressSize32();
 
     // R/M helpers
 
@@ -263,6 +262,7 @@ private:
 
     Reg16 segmentOverride;
     bool addressSize32;
+    bool stackAddrSize32;
 
     uint32_t faultIP;
 
