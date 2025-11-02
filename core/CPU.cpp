@@ -11,6 +11,7 @@
 #endif
 
 #include "CPU.h"
+#include "GCCBuiltin.h"
 #include "System.h"
 
 enum Flags

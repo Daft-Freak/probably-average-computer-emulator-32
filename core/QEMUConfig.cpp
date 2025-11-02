@@ -1,6 +1,7 @@
 #include <cstdio>
 
 #include "QEMUConfig.h"
+#include "GCCBuiltin.h"
 
 struct QEMUConfigFile
 {
