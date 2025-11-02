@@ -855,1355 +855,8 @@ void RAM_FUNC(CPU::executeInstruction)()
             break;
 
         case 0x0F:
-        {
-            uint8_t opcode2;
-            if(!readMemIP8(addr + 1, opcode2))
-                return;
-
-            // LOCK prefix validation, part 2
-            if(lock)
-            {
-                // only bit testing ops
-                if(opcode2 != 0xA3 && opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
-                {
-                    fault(Fault::UD);
-                    return;
-                }
-
-                // now we need to check the r/m
-                uint8_t modRM;
-                if(!readMemIP8(addr + 2, modRM))
-                    return; // give up if we faulted early
-
-                // not a memory operand, can't lock a register
-                if((modRM >> 6) == 3)
-                {
-                    fault(Fault::UD);
-                    return;
-                }
-            }
-
-            switch(opcode2)
-            {
-                case 0x00:
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto exOp = (modRM >> 3) & 0x7;
-
-                    switch(exOp)
-                    {
-                        case 0x0: // SLDT
-                        {
-                            // not recognised in real/virtual-8086 mode
-                            if(!isProtectedMode() || (flags & Flag_VM))
-                            {
-                                fault(Fault::UD);
-                                break;
-                            }
-                            
-                            reg(Reg32::EIP) += 2;
-
-                            // with 32bit operand size writing to mem only writes 16 bits
-                            // writing to reg leaves high 16 bits undefined
-                            writeRM16(modRM, ldtSelector, addr);
-                            break;
-                        }
-                        case 0x1: // STR
-                        {
-                            // not recognised in real/virtual-8086 mode
-                            if(!isProtectedMode() || (flags & Flag_VM))
-                            {
-                                fault(Fault::UD);
-                                break;
-                            }
-
-                            reg(Reg32::EIP) += 2;
-
-                            // with 32bit operand size writing to mem only writes 16 bits
-                            // writing to reg zeroes the high 16 bits
-                            if(operandSize32 && (modRM >> 6) == 3)
-                                reg(static_cast<Reg32>(modRM & 7)) = reg(Reg16::TR);
-                            else
-                                writeRM16(modRM, reg(Reg16::TR), addr);
-
-                            break;
-                        }
-                        case 0x2: // LLDT
-                        {
-                            // not recognised in real/virtual-8086 mode
-                            if(!isProtectedMode() || (flags & Flag_VM))
-                            {
-                                fault(Fault::UD);
-                                break;
-                            }
-
-                            uint16_t selector;
-
-                            if(readRM16(modRM, selector, addr + 1) && setLDT(selector))
-                                reg(Reg32::EIP) += 2;
-                            break;
-                        }
-                        case 0x3: // LTR
-                        {
-                            // not recognised in real/virtual-8086 mode
-                            if(!isProtectedMode() || (flags & Flag_VM))
-                            {
-                                fault(Fault::UD);
-                                break;
-                            }
-
-                            uint16_t selector;
-                            if(!readRM16(modRM, selector, addr + 1))
-                                break;
-
-                            // must be global
-                            if((selector & 4) || (selector | 7) > gdtLimit)
-                            {
-                                fault(Fault::GP, selector & ~3);
-                                break;
-                            }
-
-                            auto newDesc = loadSegmentDescriptor(selector);
-
-                            // make sure it's a TSS
-                            auto sysType = newDesc.flags & SD_SysType;
-                            if((newDesc.flags & SD_Type) || (sysType != SD_SysTypeTSS16 && sysType != SD_SysTypeTSS32))
-                            {
-                                fault(Fault::GP, selector & ~3);
-                                break;
-                            }
-
-                            if(!(newDesc.flags & SD_Present))
-                            {
-                                fault(Fault::NP, selector & ~3);
-                                break;
-                            }
-
-                            // set busy in the cache
-                            newDesc.flags |= 2 << 16;
-
-                            getCachedSegmentDescriptor(Reg16::TR) = newDesc;
-                            reg(Reg16::TR) = selector;
-
-                            // write access back
-                            auto descAddr = (selector >> 3) * 8 + gdtBase;
-                            writeMem8(descAddr + 5, newDesc.flags >> 16, true);
-
-                            reg(Reg32::EIP) += 2;
-                            break;
-                        }
-
-                        case 0x4: // VERR
-                        case 0x5: // VERW
-                        {
-                            // not recognised in real/virtual-8086 mode
-                            if(!isProtectedMode() || (flags & Flag_VM))
-                            {
-                                fault(Fault::UD);
-                                break;
-                            }
-
-                            uint16_t selector;
-                            if(!readRM16(modRM, selector, addr + 1))
-                                break;
-
-                            SegmentDescriptor desc;
-                            bool validDesc = false;
-
-                            if(selector >= 4)
-                            {
-                                desc = loadSegmentDescriptor(selector);
-
-                                // privileges
-                                int rpl = selector & 3;
-                                int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
-
-                                // no priv checks for conforming code segment
-                                bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
-
-                                validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
-
-                                // has to be data/code segment
-                                if(!(desc.flags & SD_Type))
-                                    validDesc = false;
-
-                                // code segments may not be readable, but data segments always are
-                                if(exOp == 0x4 && (desc.flags & SD_Executable) && !(desc.flags & SD_ReadWrite))
-                                    validDesc = false;
-
-                                // code segments aren't writable, data segments may be
-                                if(exOp == 0x5 && ((desc.flags & SD_Executable) || !(desc.flags & SD_ReadWrite)))
-                                    validDesc = false;
-                            }
-
-                            if(validDesc)
-                                flags |= Flag_Z;
-                            else
-                                flags &= ~Flag_Z;
-
-                            reg(Reg32::EIP) += 2;
-                            break;
-                        }
-
-                        default:
-                            printf("op 0f 00 %02x @%05x\n", (int)exOp, addr);
-                            fault(Fault::UD);
-                            break;
-                    }
-
-                    break;
-                }
-                case 0x01:
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto exOp = (modRM >> 3) & 0x7;
-
-                    switch(exOp)
-                    {
-                        case 0x0: // SGDT
-                        {
-                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
-
-                            if(segment == Reg16::AX)
-                                return;
-
-                            if(writeMem16(offset, segment, gdtLimit) && writeMem32(offset + 2, segment, gdtBase))
-                                reg(Reg32::EIP) += 2;
-                            break;
-                        }
-                        case 0x1: // SIDT
-                        {
-                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
-
-                            if(segment == Reg16::AX)
-                                return;
-
-                            if(writeMem16(offset, segment, idtLimit) && writeMem32(offset + 2, segment, idtBase))
-                                reg(Reg32::EIP) += 2;
-                            break;
-                        }
-                        case 0x2: // LGDT
-                        {
-                            if(cpl > 0)
-                            {
-                                fault(Fault::GP, 0);
-                                break;
-                            }
-                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
-
-                            if(segment == Reg16::AX)
-                                return;
-
-                            if(readMem16(offset, segment, gdtLimit) && readMem32(offset + 2, segment, gdtBase))
-                            {
-                                if(!operandSize32)
-                                    gdtBase &= 0xFFFFFF;
-                                reg(Reg32::EIP) += 2;
-                            }
-                            break;
-                        }
-                        case 0x3: // LIDT
-                        {
-                            if(cpl > 0)
-                            {
-                                fault(Fault::GP, 0);
-                                break;
-                            }
-                            auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
-
-                            if(segment == Reg16::AX)
-                                return;
-
-                            if(readMem16(offset, segment, idtLimit) && readMem32(offset + 2, segment, idtBase))
-                            {
-                                if(!operandSize32)
-                                    idtBase &= 0xFFFFFF;
-
-                                reg(Reg32::EIP) += 2;
-                            }
-                            break;
-                        }
-
-                        case 0x4: // SMSW
-                        {
-                            reg(Reg32::EIP) += 2;
-                            writeRM16(modRM, reg(Reg32::CR0), addr + 1);
-                            break;
-                        }
-
-                        case 0x6: // LMSW
-                        {
-                            if(cpl > 0)
-                            {
-                                fault(Fault::GP, 0);
-                                break;
-                            }
-
-                            uint16_t tmp;
-                            if(!readRM16(modRM, tmp, addr + 1))
-                                return;
-
-                            reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0xF) | (tmp & 0xF);
-                            reg(Reg32::EIP) += 2;
-                            break;
-                        }
-
-                        default:
-                            printf("op 0f 01 %02x @%05x\n", (int)exOp, addr);
-                            fault(Fault::UD);
-                            break;
-                    }
-
-                    break;
-                }
-
-                case 0x02: // LAR
-                {
-                    // not recognised in real/virtual-8086 mode
-                    if(!isProtectedMode() || (flags & Flag_VM))
-                    {
-                        fault(Fault::UD);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint16_t selector;
-                    if(!readRM16(modRM, selector, addr + 1))
-                        break;
-
-                    bool validDesc = false;
-                    SegmentDescriptor desc;
-
-                    // check if null before reading
-                    if(selector >= 4)
-                    {
-                        desc = loadSegmentDescriptor(selector);
-                        // if the limit check fails, the descriptor flags will be zero
-                        // which is an invalid system descriptor type
-
-                        // privileges
-                        int rpl = selector & 3;
-                        int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
-
-                        // no priv checks for conforming code segment
-                        bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
-
-                        validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
-
-                        if(!(desc.flags & SD_Type) && validDesc)
-                        {
-                            // everything valid except interrupt/trap gates
-                            switch(desc.flags & SD_SysType)
-                            {
-                                case SD_SysTypeTSS16:
-                                case SD_SysTypeLDT:
-                                case SD_SysTypeBusyTSS16:
-                                case SD_SysTypeCallGate16:
-                                case SD_SysTypeTaskGate:
-                                case SD_SysTypeTSS32:
-                                case SD_SysTypeBusyTSS32:
-                                case SD_SysTypeCallGate32:
-                                    break;
-                                default:
-                                    validDesc = false;
-                            }
-                        }
-                    }
-
-                    if(validDesc)
-                    {
-                        flags |= Flag_Z;
-
-                        // reorder the bits
-                        auto access = (desc.flags & 0xFF0000) >> 8 | (desc.flags & 0xF000) << 8;
-
-                        if(operandSize32)
-                            reg(static_cast<Reg32>(r)) = access;
-                        else
-                            reg(static_cast<Reg16>(r)) = access;
-                    }
-                    else
-                        flags &= ~Flag_Z;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-                case 0x03: // LSL
-                {
-                    // not recognised in real/virtual-8086 mode
-                    if(!isProtectedMode() || (flags & Flag_VM))
-                    {
-                        fault(Fault::UD);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint16_t selector;
-                    if(!readRM16(modRM, selector, addr + 1))
-                        break;
-
-                    bool validDesc = false;
-                    SegmentDescriptor desc;
-
-                    // check if null before reading
-                    if(selector >= 4)
-                    {
-                        desc = loadSegmentDescriptor(selector);
-                        // if the limit check fails, the descriptor flags will be zero
-                        // which is an invalid system descriptor type
-
-                        // privileges
-                        int rpl = selector & 3;
-                        int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
-
-                        // no priv checks for conforming code segment
-                        bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
-
-                        validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
-
-                        if(!(desc.flags & SD_Type))
-                        {
-                            // more limited set than LAR (because gates don't have limits)
-                            switch(desc.flags & SD_SysType)
-                            {
-                                case SD_SysTypeTSS16:
-                                case SD_SysTypeLDT:
-                                case SD_SysTypeBusyTSS16:
-                                case SD_SysTypeTSS32:
-                                case SD_SysTypeBusyTSS32:
-                                    break;
-                                default:
-                                    validDesc = false;
-                            }
-                        }
-                    }
-
-                    if(validDesc)
-                    {
-                        flags |= Flag_Z;
-
-                        if(operandSize32)
-                            reg(static_cast<Reg32>(r)) = desc.limit;
-                        else
-                            reg(static_cast<Reg16>(r)) = desc.limit;
-                    }
-                    else
-                        flags &= ~Flag_Z;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0x06: // CLTS
-                {
-                    if(cpl > 0)
-                    {
-                        fault(Fault::GP, 0);
-                        break;
-                    }
-
-                    reg(Reg32::CR0) &= ~(1 << 3);
-                    reg(Reg32::EIP)++;
-                    break;
-                }
-
-                case 0x20: // MOV from control reg
-                {
-                    if(cpl > 0)
-                    {
-                        fault(Fault::GP, 0);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
-                    auto rm = static_cast<Reg32>(modRM & 0x7);
-
-                    reg(rm) = reg(r);
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0x21: // MOV from debug reg
-                {
-                    if(cpl > 0)
-                    {
-                        fault(Fault::GP, 0);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
-                    auto r = ((modRM >> 3) & 0x7);
-                    auto rm = static_cast<Reg32>(modRM & 0x7);
-
-#ifndef NDEBUG
-                    printf("R DR%i @%08X\n", r, addr);
-#endif
-
-                    reg(rm) = 0; // reg(r);
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0x22: // MOV to control reg
-                {
-                    if(cpl > 0)
-                    {
-                        fault(Fault::GP, 0);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
-                    auto rm = static_cast<Reg32>(modRM & 0x7);
-
-                    reg(r) = reg(rm);
-
-                    if(r == Reg32::CR3)
-                    {
-                        // invalidate TLB
-                        for(auto &entry : tlb)
-                            entry.tag &= ~Page_Present;
-
-                        // also invalidate our special IP cache
-                        linearIP = 0;
-                    }
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0x23: // MOV to debug reg
-                {
-                    if(cpl > 0)
-                    {
-                        fault(Fault::GP, 0);
-                        break;
-                    }
-
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
-                    auto r = ((modRM >> 3) & 0x7);
-                    auto rm = static_cast<Reg32>(modRM & 0x7);
-#ifndef NDEBUG
-                    printf("W DR%i = %08X @%08X\n", r, reg(rm), addr);
-#endif
-                    //reg(r) = reg(rm);
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0x80: // JO
-                case 0x81: // JNO
-                case 0x82: // JB/JNAE
-                case 0x83: // JAE/JNB
-                case 0x84: // JE/JZ
-                case 0x85: // JNE/JNZ
-                case 0x86: // JBE/JNA
-                case 0x87: // JNBE/JA
-                case 0x88: // JS
-                case 0x89: // JNS
-                case 0x8A: // JP/JPE
-                case 0x8B: // JNP/JPO
-                case 0x8C: // JL/JNGE
-                case 0x8D: // JNL/JGE
-                case 0x8E: // JLE/JNG
-                case 0x8F: // JNLE/JG
-                {
-                    int cond = opcode2 & 0xF;
-
-                    uint32_t off;
-
-                    if(operandSize32)
-                    {
-                        if(!readMemIP32(addr + 2, off))
-                            return;
-                    }
-                    else
-                    {
-                        uint16_t tmp;
-                        if(!readMemIP16(addr + 2, tmp))
-                            return;
-
-                        off = (tmp & 0x8000) ? (0xFFFF0000 | tmp) : tmp;
-                    }
-
-                    if(getCondValue(cond, flags))
-                        setIP(reg(Reg32::EIP) + (operandSize32 ? 5 : 3) + off);
-                    else
-                        reg(Reg32::EIP) += operandSize32 ? 5 : 3;
-                    break;
-                }
-                case 0x90: // SETO
-                case 0x91: // SETNO
-                case 0x92: // SETB/SETNAE
-                case 0x93: // SETAE/SETNB
-                case 0x94: // SETE/SETZ
-                case 0x95: // SETNE/SETNZ
-                case 0x96: // SETBE/SETNA
-                case 0x97: // SETNBE/SETA
-                case 0x98: // SETS
-                case 0x99: // SETNS
-                case 0x9A: // SETP/SETPE
-                case 0x9B: // SETNP/SETPO
-                case 0x9C: // SETL/JNGE
-                case 0x9D: // SETNL/SETGE
-                case 0x9E: // SETLE/SETNG
-                case 0x9F: // SETNLE/SETG
-                {
-                    int cond = opcode2 & 0xF;
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    reg(Reg32::EIP) += 2;
-
-                    writeRM8(modRM, getCondValue(cond, flags) ? 1 : 0, addr + 1);
-                    break;
-                }
-
-                case 0xA0: // PUSH FS
-                    reg(Reg32::EIP)++;
-                    pushSeg(reg(Reg16::FS), operandSize32);
-                    break;
-                case 0xA1: // POP FS
-                {
-                    uint32_t v;
-                    if(!pop(operandSize32, v))
-                        break;
-
-                    if(setSegmentReg(Reg16::FS, v))
-                        reg(Reg32::EIP)++;
-
-                    break;
-                }
-                case 0xA3: // BT
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    int bit;
-                    bool value;
-
-                    if(operandSize32)
-                    {
-                        bit = reg(static_cast<Reg32>(r));
-
-                        uint32_t data;
-                        if(!readRM32(modRM, data, addr + 1, (bit / 32) * 4))
-                            break;
-
-                        value = data & (1 << (bit & 31));
-                    }
-                    else
-                    {
-                        bit = reg(static_cast<Reg16>(r));
-
-                        uint16_t data;
-                        if(!readRM16(modRM, data, addr + 1, (bit / 16) * 2))
-                            break;
-
-                        value = data & (1 << (bit & 15));
-                    }
-
-                    if(value)
-                        flags |= Flag_C;
-                    else
-                        flags &= ~Flag_C;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xA4: // SHLD by imm
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                
-                    uint8_t count;
-                    if(!readMemIP8(getDispEnd(modRM, addr + 3), count))
-                        return;
-
-                    count &= 0x1F;
-                    reg(Reg32::EIP) += 3;
-
-                    if(operandSize32)
-                    {
-                        uint32_t v;
-                        if(!readRM32(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg32>(r));
-                        writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
-                    }
-                    else
-                    {
-                        uint16_t v;
-
-                        if(!readRM16(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg16>(r));
-                        writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
-                    }
-
-                    break;
-                }
-                case 0xA5: // SHLD by CL
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    reg(Reg32::EIP) += 2;
-
-                    auto count = reg(Reg8::CL) & 0x1F;
-
-                    if(operandSize32)
-                    {
-                        uint32_t v;
-                        if(!readRM32(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg32>(r));
-                        writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
-                    }
-                    else
-                    {
-                        uint16_t v;
-                        if(!readRM16(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg16>(r));
-                        writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
-                    }
-
-                    break;
-                }
-
-                case 0xA8: // PUSH GS
-                    reg(Reg32::EIP)++;
-                    pushSeg(reg(Reg16::GS), operandSize32);
-                    break;
-                case 0xA9: // POP GS
-                {
-                    uint32_t v;
-                    if(!pop(operandSize32, v))
-                        break;
-
-                    if(setSegmentReg(Reg16::GS, v))
-                        reg(Reg32::EIP)++;
-
-                    break;
-                }
-
-                case 0xAB: // BTS
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    int bit;
-                    bool value;
-
-                    if(operandSize32)
-                    {
-                        bit = reg(static_cast<Reg32>(r));
-
-                        int off = (bit / 32) * 4;
-                        bit &= 31;
-
-                        uint32_t data;
-                        if(!readRM32(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM32(modRM, data | 1 << bit, addr + 1, true, off))
-                            break;
-                    }
-                    else
-                    {
-                        bit = reg(static_cast<Reg16>(r));
-
-                        int off = (bit / 16) * 2;
-                        bit &= 15;
-
-                        uint16_t data;
-                        if(!readRM16(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM16(modRM, data | 1 << bit, addr + 1, true, off))
-                            break;
-                    }
-
-                    if(value)
-                        flags |= Flag_C;
-                    else
-                        flags &= ~Flag_C;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xAC: // SHRD by imm
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint8_t count;
-                    if(!readMemIP8(getDispEnd(modRM, addr + 3), count))
-                        return;
-
-                    count &= 0x1F;
-                    reg(Reg32::EIP) += 3;
-
-                    if(operandSize32)
-                    {
-                        uint32_t v;
-                        if(!readRM32(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg32>(r));
-                        writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
-                    }
-                    else
-                    {
-                        uint16_t v;
-                        if(!readRM16(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg16>(r));
-                        writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
-                    }
-
-                    break;
-                }
-                case 0xAD: // SHRD by CL
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    reg(Reg32::EIP) += 2;
-
-                    auto count = reg(Reg8::CL) & 0x1F;
-
-                    if(operandSize32)
-                    {
-                        uint32_t v;
-                        if(!readRM32(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg32>(r));
-                        writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
-                    }
-                    else
-                    {
-                        uint16_t v;
-                        if(!readRM16(modRM, v, addr + 1))
-                            break;
-
-                        auto src = reg(static_cast<Reg16>(r));
-                        writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
-                    }
-
-                    break;
-                }
-
-                case 0xAF: // IMUL r, r/m
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    if(operandSize32)
-                    {
-                        uint32_t tmp;
-                        if(!readRM32(modRM, tmp, addr + 1))
-                            break;
-
-                        int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp))
-                                    * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
-                        reg(static_cast<Reg32>(r)) = res;
-
-                        // check if upper half matches lower half's sign
-                        if(res >> 32 != (res & 0x80000000 ? -1 : 0))
-                            flags |= Flag_C | Flag_O;
-                        else
-                            flags &= ~(Flag_C | Flag_O);
-                    }
-                    else
-                    {
-                        uint16_t tmp;
-                        if(!readRM16(modRM, tmp, addr + 1))
-                            break;
-
-                        int32_t res = static_cast<int16_t>(tmp) * static_cast<int16_t>(reg(static_cast<Reg16>(r)));
-                        reg(static_cast<Reg16>(r)) = res;
-
-                        // check if upper half matches lower half's sign
-                        if(res >> 16 != (res & 0x8000 ? -1 : 0))
-                            flags |= Flag_C | Flag_O;
-                        else
-                            flags &= ~(Flag_C | Flag_O);
-                    }
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xB2: // LSS
-                    reg(Reg32::EIP)++;
-                    loadFarPointer(addr + 1, Reg16::SS, operandSize32);
-                    break;
-
-                case 0xB3: // BTR
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    int bit;
-                    bool value;
-
-                    if(operandSize32)
-                    {
-                        bit = reg(static_cast<Reg32>(r));
-
-                        int off = (bit / 32) * 4;
-                        bit &= 31;
-
-                        uint32_t data;
-                        if(!readRM32(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off))
-                            break;
-                    }
-                    else
-                    {
-                        bit = reg(static_cast<Reg16>(r));
-
-                        int off = (bit / 16) * 2;
-                        bit &= 15;
-
-                        uint16_t data;
-                        if(!readRM16(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off))
-                            break;
-                    }
-
-                    if(value)
-                        flags |= Flag_C;
-                    else
-                        flags &= ~Flag_C;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xB4: // LFS
-                    reg(Reg32::EIP)++;
-                    loadFarPointer(addr + 1, Reg16::FS, operandSize32);
-                    break;
-                case 0xB5: // LGS
-                    reg(Reg32::EIP)++;
-                    loadFarPointer(addr + 1, Reg16::GS, operandSize32);
-                    break;
-
-                case 0xB6: // MOVZX 8 -> 16/32
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint8_t v;
-                    if(!readRM8(modRM, v, addr + 1))
-                        break;
-
-                    if(operandSize32)
-                        reg(static_cast<Reg32>(r)) = v;
-                    else
-                        reg(static_cast<Reg16>(r)) = v;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-                case 0xB7: // MOVZX 16 -> 16/32
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint16_t v;
-                    if(!readRM16(modRM, v, addr + 1))
-                        break;
-
-                    if(operandSize32)
-                        reg(static_cast<Reg32>(r)) = v;
-                    else
-                        reg(static_cast<Reg16>(r)) = v;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xBA:
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    uint8_t bit;
-                    if(!readMemIP8(getDispEnd(modRM, addr + 3), bit))
-                        return;
-
-                    reg(Reg32::EIP) += 3;
-
-                    auto exOp = (modRM >> 3) & 0x7;
-
-                    uint32_t data;
-                    bool value;
-                    int off;
-
-                    if(operandSize32)
-                    {
-                        off = (bit / 32) * 4;
-                        bit &= 31;
-
-                        if(!readRM32(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                    }
-                    else
-                    {
-                        off = (bit / 16) * 2;
-                        bit &= 15;
-
-                        uint16_t data16;
-                        if(!readRM16(modRM, data16, addr + 1, off))
-                            break;
-
-                        value = data16 & (1 << bit);
-                        data = data16;
-                    }
-
-                    switch(exOp)
-                    {
-                        case 4: // BT
-                            break; // nothing else to do
-                        case 5: // BTS
-                        {
-                            if(operandSize32)
-                                writeRM32(modRM, data | 1 << bit, addr + 1, true, off);
-                            else
-                                writeRM16(modRM, data | 1 << bit, addr + 1, true, off);
-
-                            break;
-                        }
-                        case 6: // BTR
-                        {
-                            if(operandSize32)
-                                writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off);
-                            else
-                                writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off);
-
-                            break;
-                        }
-                        case 7: // BTC
-                        {
-                            if(operandSize32)
-                                writeRM32(modRM, data ^ ~(1 << bit), addr + 1, true, off);
-                            else
-                                writeRM16(modRM, data ^ ~(1 << bit), addr + 1, true, off);
-
-                            break;
-                        }
-                        default:
-                            fault(Fault::UD);
-                            break;
-                    }
-
-                    if(value)
-                        flags |= Flag_C;
-                    else
-                        flags &= ~Flag_C;
-
-                    break;
-                }
-
-                case 0xBB: // BTC
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-                    int bit;
-                    bool value;
-
-                    if(operandSize32)
-                    {
-                        bit = reg(static_cast<Reg32>(r));
-
-                        int off = (bit / 32) * 4;
-                        bit &= 31;
-
-                        uint32_t data;
-                        if(!readRM32(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM32(modRM, data ^ 1 << bit, addr + 1, true, off))
-                            break;
-                    }
-                    else
-                    {
-                        bit = reg(static_cast<Reg16>(r));
-
-                        int off = (bit / 16) * 2;
-                        bit &= 15;
-
-                        uint16_t data;
-                        if(!readRM16(modRM, data, addr + 1, off))
-                            break;
-
-                        value = data & (1 << bit);
-                        if(!writeRM16(modRM, data ^ 1 << bit, addr + 1, true, off))
-                            break;
-                    }
-
-                    if(value)
-                        flags |= Flag_C;
-                    else
-                        flags &= ~Flag_C;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xBC: // BSF
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint32_t val;
-
-                    if(operandSize32)
-                    {
-                        if(!readRM32(modRM, val, addr + 1))
-                            break;
-                    }
-                    else
-                    {
-                        uint16_t tmp;
-                        if(!readRM16(modRM, tmp, addr + 1))
-                            break;
-
-                        val = tmp;
-                    }
-
-                    if(!val)
-                        flags |= Flag_Z;
-                    else
-                    {
-                        flags &= ~Flag_Z;
-
-                        int bit = __builtin_ctz(val);
-                        if(operandSize32)
-                            reg(static_cast<Reg32>(r)) = bit;
-                        else
-                            reg(static_cast<Reg16>(r)) = bit;
-                    }
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-                case 0xBD: // BSR
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint32_t val;
-
-                    if(operandSize32)
-                    {
-                        if(!readRM32(modRM, val, addr + 1))
-                            break;
-                    }
-                    else
-                    {
-                        uint16_t tmp;
-                        if(!readRM16(modRM, tmp, addr + 1))
-                            break;
-
-                        val = tmp;
-                    }
-                    if(!val)
-                        flags |= Flag_Z;
-                    else
-                    {
-                        flags &= ~Flag_Z;
-
-                        int bit = 31 - __builtin_clz(val);
-                        if(operandSize32)
-                            reg(static_cast<Reg32>(r)) = bit;
-                        else
-                            reg(static_cast<Reg16>(r)) = bit;
-                    }
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xBE: // MOVSX 8 -> 16/32
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint32_t v;
-                    uint8_t v8;
-                    if(!readRM8(modRM, v8, addr + 1))
-                        break;
-
-                    // sign extend
-                    if(v8 & 0x80)
-                        v = v8 | 0xFFFFFF00;
-                    else
-                        v = v8;
-
-                    if(operandSize32)
-                        reg(static_cast<Reg32>(r)) = v;
-                    else
-                        reg(static_cast<Reg16>(r)) = v;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-                case 0xBF: // MOVSX 16 -> 16/32
-                {
-                    uint8_t modRM;
-                    if(!readMemIP8(addr + 2, modRM))
-                        return;
-
-                    auto r = (modRM >> 3) & 0x7;
-
-                    uint32_t v;
-                    uint16_t v16;
-                    if(!readRM16(modRM, v16, addr + 1))
-                        break;
-
-                    // sign extend
-                    if(v16 & 0x8000)
-                        v = v16 | 0xFFFF0000;
-                    else
-                        v = v16;
-
-                    if(operandSize32)
-                        reg(static_cast<Reg32>(r)) = v;
-                    else
-                        reg(static_cast<Reg16>(r)) = v;
-
-                    reg(Reg32::EIP) += 2;
-                    break;
-                }
-
-                case 0xC8: // BSWAP (486, need for seabios)
-                case 0xC9:
-                case 0xCA:
-                case 0xCB:
-                case 0xCC:
-                case 0xCD:
-                case 0xCE:
-                case 0xCF:
-                {
-                    auto r = static_cast<Reg32>(opcode2 & 3);
-                    reg(r) = __builtin_bswap32(reg(r));
-                    reg(Reg32::EIP)++;
-                    break;
-                }
-
-                case 0x0B: // UD2
-                case 0xB9: // UD1
-                case 0xFF: // UD0
-                {
-                    // these cases are only to avoid the logging in the default case
-                    fault(Fault::UD);
-                    break;
-                }
-
-                default:
-                    printf("op 0f %02x @%05x\n", (int)opcode2, addr);
-                    fault(Fault::UD);
-                    break;
-            }
+            executeInstruction0F(addr, operandSize32, lock);
             break;
-        }
 
         case 0x10: // ADC r/m8 r8
             doALU8<doAddWithCarry, false>(addr);
@@ -6250,6 +4903,1363 @@ void RAM_FUNC(CPU::executeInstruction)()
         default:
             printf("op %x @%05x\n", (int)opcode, addr);
             exit(1);
+            break;
+    }
+}
+
+void RAM_FUNC(CPU::executeInstruction0F)(uint32_t addr, bool operandSize32, bool lock)
+{
+    uint8_t opcode2;
+    if(!readMemIP8(addr + 1, opcode2))
+        return;
+
+    // LOCK prefix validation, part 2
+    if(lock)
+    {
+        // only bit testing ops
+        if(opcode2 != 0xA3 && opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
+        {
+            fault(Fault::UD);
+            return;
+        }
+
+        // now we need to check the r/m
+        uint8_t modRM;
+        if(!readMemIP8(addr + 2, modRM))
+            return; // give up if we faulted early
+
+        // not a memory operand, can't lock a register
+        if((modRM >> 6) == 3)
+        {
+            fault(Fault::UD);
+            return;
+        }
+    }
+
+    switch(opcode2)
+    {
+        case 0x00:
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto exOp = (modRM >> 3) & 0x7;
+
+            switch(exOp)
+            {
+                case 0x0: // SLDT
+                {
+                    // not recognised in real/virtual-8086 mode
+                    if(!isProtectedMode() || (flags & Flag_VM))
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
+                    
+                    reg(Reg32::EIP) += 2;
+
+                    // with 32bit operand size writing to mem only writes 16 bits
+                    // writing to reg leaves high 16 bits undefined
+                    writeRM16(modRM, ldtSelector, addr);
+                    break;
+                }
+                case 0x1: // STR
+                {
+                    // not recognised in real/virtual-8086 mode
+                    if(!isProtectedMode() || (flags & Flag_VM))
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
+
+                    reg(Reg32::EIP) += 2;
+
+                    // with 32bit operand size writing to mem only writes 16 bits
+                    // writing to reg zeroes the high 16 bits
+                    if(operandSize32 && (modRM >> 6) == 3)
+                        reg(static_cast<Reg32>(modRM & 7)) = reg(Reg16::TR);
+                    else
+                        writeRM16(modRM, reg(Reg16::TR), addr);
+
+                    break;
+                }
+                case 0x2: // LLDT
+                {
+                    // not recognised in real/virtual-8086 mode
+                    if(!isProtectedMode() || (flags & Flag_VM))
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
+
+                    uint16_t selector;
+
+                    if(readRM16(modRM, selector, addr + 1) && setLDT(selector))
+                        reg(Reg32::EIP) += 2;
+                    break;
+                }
+                case 0x3: // LTR
+                {
+                    // not recognised in real/virtual-8086 mode
+                    if(!isProtectedMode() || (flags & Flag_VM))
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
+
+                    uint16_t selector;
+                    if(!readRM16(modRM, selector, addr + 1))
+                        break;
+
+                    // must be global
+                    if((selector & 4) || (selector | 7) > gdtLimit)
+                    {
+                        fault(Fault::GP, selector & ~3);
+                        break;
+                    }
+
+                    auto newDesc = loadSegmentDescriptor(selector);
+
+                    // make sure it's a TSS
+                    auto sysType = newDesc.flags & SD_SysType;
+                    if((newDesc.flags & SD_Type) || (sysType != SD_SysTypeTSS16 && sysType != SD_SysTypeTSS32))
+                    {
+                        fault(Fault::GP, selector & ~3);
+                        break;
+                    }
+
+                    if(!(newDesc.flags & SD_Present))
+                    {
+                        fault(Fault::NP, selector & ~3);
+                        break;
+                    }
+
+                    // set busy in the cache
+                    newDesc.flags |= 2 << 16;
+
+                    getCachedSegmentDescriptor(Reg16::TR) = newDesc;
+                    reg(Reg16::TR) = selector;
+
+                    // write access back
+                    auto descAddr = (selector >> 3) * 8 + gdtBase;
+                    writeMem8(descAddr + 5, newDesc.flags >> 16, true);
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
+                case 0x4: // VERR
+                case 0x5: // VERW
+                {
+                    // not recognised in real/virtual-8086 mode
+                    if(!isProtectedMode() || (flags & Flag_VM))
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
+
+                    uint16_t selector;
+                    if(!readRM16(modRM, selector, addr + 1))
+                        break;
+
+                    SegmentDescriptor desc;
+                    bool validDesc = false;
+
+                    if(selector >= 4)
+                    {
+                        desc = loadSegmentDescriptor(selector);
+
+                        // privileges
+                        int rpl = selector & 3;
+                        int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
+
+                        // no priv checks for conforming code segment
+                        bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
+
+                        validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
+
+                        // has to be data/code segment
+                        if(!(desc.flags & SD_Type))
+                            validDesc = false;
+
+                        // code segments may not be readable, but data segments always are
+                        if(exOp == 0x4 && (desc.flags & SD_Executable) && !(desc.flags & SD_ReadWrite))
+                            validDesc = false;
+
+                        // code segments aren't writable, data segments may be
+                        if(exOp == 0x5 && ((desc.flags & SD_Executable) || !(desc.flags & SD_ReadWrite)))
+                            validDesc = false;
+                    }
+
+                    if(validDesc)
+                        flags |= Flag_Z;
+                    else
+                        flags &= ~Flag_Z;
+
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
+                default:
+                    printf("op 0f 00 %02x @%05x\n", (int)exOp, addr);
+                    fault(Fault::UD);
+                    break;
+            }
+
+            break;
+        }
+        case 0x01:
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto exOp = (modRM >> 3) & 0x7;
+
+            switch(exOp)
+            {
+                case 0x0: // SGDT
+                {
+                    auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                    if(segment == Reg16::AX)
+                        return;
+
+                    if(writeMem16(offset, segment, gdtLimit) && writeMem32(offset + 2, segment, gdtBase))
+                        reg(Reg32::EIP) += 2;
+                    break;
+                }
+                case 0x1: // SIDT
+                {
+                    auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                    if(segment == Reg16::AX)
+                        return;
+
+                    if(writeMem16(offset, segment, idtLimit) && writeMem32(offset + 2, segment, idtBase))
+                        reg(Reg32::EIP) += 2;
+                    break;
+                }
+                case 0x2: // LGDT
+                {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+                    auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                    if(segment == Reg16::AX)
+                        return;
+
+                    if(readMem16(offset, segment, gdtLimit) && readMem32(offset + 2, segment, gdtBase))
+                    {
+                        if(!operandSize32)
+                            gdtBase &= 0xFFFFFF;
+                        reg(Reg32::EIP) += 2;
+                    }
+                    break;
+                }
+                case 0x3: // LIDT
+                {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+                    auto [offset, segment] = getEffectiveAddress(modRM >> 6, modRM & 7, false, addr + 1);
+
+                    if(segment == Reg16::AX)
+                        return;
+
+                    if(readMem16(offset, segment, idtLimit) && readMem32(offset + 2, segment, idtBase))
+                    {
+                        if(!operandSize32)
+                            idtBase &= 0xFFFFFF;
+
+                        reg(Reg32::EIP) += 2;
+                    }
+                    break;
+                }
+
+                case 0x4: // SMSW
+                {
+                    reg(Reg32::EIP) += 2;
+                    writeRM16(modRM, reg(Reg32::CR0), addr + 1);
+                    break;
+                }
+
+                case 0x6: // LMSW
+                {
+                    if(cpl > 0)
+                    {
+                        fault(Fault::GP, 0);
+                        break;
+                    }
+
+                    uint16_t tmp;
+                    if(!readRM16(modRM, tmp, addr + 1))
+                        return;
+
+                    reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0xF) | (tmp & 0xF);
+                    reg(Reg32::EIP) += 2;
+                    break;
+                }
+
+                default:
+                    printf("op 0f 01 %02x @%05x\n", (int)exOp, addr);
+                    fault(Fault::UD);
+                    break;
+            }
+
+            break;
+        }
+
+        case 0x02: // LAR
+        {
+            // not recognised in real/virtual-8086 mode
+            if(!isProtectedMode() || (flags & Flag_VM))
+            {
+                fault(Fault::UD);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint16_t selector;
+            if(!readRM16(modRM, selector, addr + 1))
+                break;
+
+            bool validDesc = false;
+            SegmentDescriptor desc;
+
+            // check if null before reading
+            if(selector >= 4)
+            {
+                desc = loadSegmentDescriptor(selector);
+                // if the limit check fails, the descriptor flags will be zero
+                // which is an invalid system descriptor type
+
+                // privileges
+                int rpl = selector & 3;
+                int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
+
+                // no priv checks for conforming code segment
+                bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
+
+                validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
+
+                if(!(desc.flags & SD_Type) && validDesc)
+                {
+                    // everything valid except interrupt/trap gates
+                    switch(desc.flags & SD_SysType)
+                    {
+                        case SD_SysTypeTSS16:
+                        case SD_SysTypeLDT:
+                        case SD_SysTypeBusyTSS16:
+                        case SD_SysTypeCallGate16:
+                        case SD_SysTypeTaskGate:
+                        case SD_SysTypeTSS32:
+                        case SD_SysTypeBusyTSS32:
+                        case SD_SysTypeCallGate32:
+                            break;
+                        default:
+                            validDesc = false;
+                    }
+                }
+            }
+
+            if(validDesc)
+            {
+                flags |= Flag_Z;
+
+                // reorder the bits
+                auto access = (desc.flags & 0xFF0000) >> 8 | (desc.flags & 0xF000) << 8;
+
+                if(operandSize32)
+                    reg(static_cast<Reg32>(r)) = access;
+                else
+                    reg(static_cast<Reg16>(r)) = access;
+            }
+            else
+                flags &= ~Flag_Z;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+        case 0x03: // LSL
+        {
+            // not recognised in real/virtual-8086 mode
+            if(!isProtectedMode() || (flags & Flag_VM))
+            {
+                fault(Fault::UD);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint16_t selector;
+            if(!readRM16(modRM, selector, addr + 1))
+                break;
+
+            bool validDesc = false;
+            SegmentDescriptor desc;
+
+            // check if null before reading
+            if(selector >= 4)
+            {
+                desc = loadSegmentDescriptor(selector);
+                // if the limit check fails, the descriptor flags will be zero
+                // which is an invalid system descriptor type
+
+                // privileges
+                int rpl = selector & 3;
+                int dpl = (desc.flags & SD_PrivilegeLevel) >> 21;
+
+                // no priv checks for conforming code segment
+                bool isConformingCode = (desc.flags & (SD_Type | SD_DirConform | SD_Executable)) == (SD_Type | SD_DirConform | SD_Executable);
+
+                validDesc = isConformingCode || (cpl <= dpl && rpl <= dpl);
+
+                if(!(desc.flags & SD_Type))
+                {
+                    // more limited set than LAR (because gates don't have limits)
+                    switch(desc.flags & SD_SysType)
+                    {
+                        case SD_SysTypeTSS16:
+                        case SD_SysTypeLDT:
+                        case SD_SysTypeBusyTSS16:
+                        case SD_SysTypeTSS32:
+                        case SD_SysTypeBusyTSS32:
+                            break;
+                        default:
+                            validDesc = false;
+                    }
+                }
+            }
+
+            if(validDesc)
+            {
+                flags |= Flag_Z;
+
+                if(operandSize32)
+                    reg(static_cast<Reg32>(r)) = desc.limit;
+                else
+                    reg(static_cast<Reg16>(r)) = desc.limit;
+            }
+            else
+                flags &= ~Flag_Z;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0x06: // CLTS
+        {
+            if(cpl > 0)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            reg(Reg32::CR0) &= ~(1 << 3);
+            reg(Reg32::EIP)++;
+            break;
+        }
+
+        case 0x20: // MOV from control reg
+        {
+            if(cpl > 0)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+            auto rm = static_cast<Reg32>(modRM & 0x7);
+
+            reg(rm) = reg(r);
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0x21: // MOV from debug reg
+        {
+            if(cpl > 0)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+            auto r = ((modRM >> 3) & 0x7);
+            auto rm = static_cast<Reg32>(modRM & 0x7);
+
+#ifndef NDEBUG
+            printf("R DR%i @%08X\n", r, addr);
+#endif
+
+            reg(rm) = 0; // reg(r);
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0x22: // MOV to control reg
+        {
+            if(cpl > 0)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+            auto rm = static_cast<Reg32>(modRM & 0x7);
+
+            reg(r) = reg(rm);
+
+            if(r == Reg32::CR3)
+            {
+                // invalidate TLB
+                for(auto &entry : tlb)
+                    entry.tag &= ~Page_Present;
+
+                // also invalidate our special IP cache
+                linearIP = 0;
+            }
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0x23: // MOV to debug reg
+        {
+            if(cpl > 0)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            //auto r = static_cast<Reg32>(((modRM >> 3) & 0x7) + static_cast<int>(Reg32::CR0));
+            auto r = ((modRM >> 3) & 0x7);
+            auto rm = static_cast<Reg32>(modRM & 0x7);
+#ifndef NDEBUG
+            printf("W DR%i = %08X @%08X\n", r, reg(rm), addr);
+#endif
+            //reg(r) = reg(rm);
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0x80: // JO
+        case 0x81: // JNO
+        case 0x82: // JB/JNAE
+        case 0x83: // JAE/JNB
+        case 0x84: // JE/JZ
+        case 0x85: // JNE/JNZ
+        case 0x86: // JBE/JNA
+        case 0x87: // JNBE/JA
+        case 0x88: // JS
+        case 0x89: // JNS
+        case 0x8A: // JP/JPE
+        case 0x8B: // JNP/JPO
+        case 0x8C: // JL/JNGE
+        case 0x8D: // JNL/JGE
+        case 0x8E: // JLE/JNG
+        case 0x8F: // JNLE/JG
+        {
+            int cond = opcode2 & 0xF;
+
+            uint32_t off;
+
+            if(operandSize32)
+            {
+                if(!readMemIP32(addr + 2, off))
+                    return;
+            }
+            else
+            {
+                uint16_t tmp;
+                if(!readMemIP16(addr + 2, tmp))
+                    return;
+
+                off = (tmp & 0x8000) ? (0xFFFF0000 | tmp) : tmp;
+            }
+
+            if(getCondValue(cond, flags))
+            {
+                uint32_t newIP = reg(Reg32::EIP) + (operandSize32 ? 5 : 3) + off;
+
+                if(!operandSize32)
+                    newIP &= 0xFFFF;
+
+                reg(Reg32::EIP) = newIP;
+            }
+            else
+                reg(Reg32::EIP) += operandSize32 ? 5 : 3;
+            break;
+        }
+        case 0x90: // SETO
+        case 0x91: // SETNO
+        case 0x92: // SETB/SETNAE
+        case 0x93: // SETAE/SETNB
+        case 0x94: // SETE/SETZ
+        case 0x95: // SETNE/SETNZ
+        case 0x96: // SETBE/SETNA
+        case 0x97: // SETNBE/SETA
+        case 0x98: // SETS
+        case 0x99: // SETNS
+        case 0x9A: // SETP/SETPE
+        case 0x9B: // SETNP/SETPO
+        case 0x9C: // SETL/JNGE
+        case 0x9D: // SETNL/SETGE
+        case 0x9E: // SETLE/SETNG
+        case 0x9F: // SETNLE/SETG
+        {
+            int cond = opcode2 & 0xF;
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            reg(Reg32::EIP) += 2;
+
+            writeRM8(modRM, getCondValue(cond, flags) ? 1 : 0, addr + 1);
+            break;
+        }
+
+        case 0xA0: // PUSH FS
+            reg(Reg32::EIP)++;
+            doPush(reg(Reg16::FS), operandSize32, stackAddrSize32, true);
+            break;
+        case 0xA1: // POP FS
+        {
+            uint32_t v;
+            if(!doPop(v, operandSize32, stackAddrSize32))
+                break;
+
+            if(setSegmentReg(Reg16::FS, v))
+                reg(Reg32::EIP)++;
+
+            break;
+        }
+        case 0xA3: // BT
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            int bit;
+            bool value;
+
+            if(operandSize32)
+            {
+                bit = reg(static_cast<Reg32>(r));
+
+                uint32_t data;
+                if(!readRM32(modRM, data, addr + 1, (bit / 32) * 4))
+                    break;
+
+                value = data & (1 << (bit & 31));
+            }
+            else
+            {
+                bit = reg(static_cast<Reg16>(r));
+
+                uint16_t data;
+                if(!readRM16(modRM, data, addr + 1, (bit / 16) * 2))
+                    break;
+
+                value = data & (1 << (bit & 15));
+            }
+
+            if(value)
+                flags |= Flag_C;
+            else
+                flags &= ~Flag_C;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xA4: // SHLD by imm
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+        
+            uint8_t count;
+            if(!readMemIP8(getRMDispEnd(modRM, addr + 3, addressSize32), count))
+                return;
+
+            count &= 0x1F;
+            reg(Reg32::EIP) += 3;
+
+            if(operandSize32)
+            {
+                uint32_t v;
+                if(!readRM32(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg32>(r));
+                writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
+            }
+            else
+            {
+                uint16_t v;
+
+                if(!readRM16(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg16>(r));
+                writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
+            }
+
+            break;
+        }
+        case 0xA5: // SHLD by CL
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            reg(Reg32::EIP) += 2;
+
+            auto count = reg(Reg8::CL) & 0x1F;
+
+            if(operandSize32)
+            {
+                uint32_t v;
+                if(!readRM32(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg32>(r));
+                writeRM32(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
+            }
+            else
+            {
+                uint16_t v;
+                if(!readRM16(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg16>(r));
+                writeRM16(modRM, doDoubleShiftLeft(v, src, count, flags), addr + 1, true);
+            }
+
+            break;
+        }
+
+        case 0xA8: // PUSH GS
+            reg(Reg32::EIP)++;
+            doPush(reg(Reg16::GS), operandSize32, stackAddrSize32, true);
+            break;
+        case 0xA9: // POP GS
+        {
+            uint32_t v;
+            if(!doPop(v, operandSize32, stackAddrSize32))
+                break;
+
+            if(setSegmentReg(Reg16::GS, v))
+                reg(Reg32::EIP)++;
+
+            break;
+        }
+
+        case 0xAB: // BTS
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            int bit;
+            bool value;
+
+            if(operandSize32)
+            {
+                bit = reg(static_cast<Reg32>(r));
+
+                int off = (bit / 32) * 4;
+                bit &= 31;
+
+                uint32_t data;
+                if(!readRM32(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM32(modRM, data | 1 << bit, addr + 1, true, off))
+                    break;
+            }
+            else
+            {
+                bit = reg(static_cast<Reg16>(r));
+
+                int off = (bit / 16) * 2;
+                bit &= 15;
+
+                uint16_t data;
+                if(!readRM16(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM16(modRM, data | 1 << bit, addr + 1, true, off))
+                    break;
+            }
+
+            if(value)
+                flags |= Flag_C;
+            else
+                flags &= ~Flag_C;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xAC: // SHRD by imm
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint8_t count;
+            if(!readMemIP8(getRMDispEnd(modRM, addr + 3, addressSize32), count))
+                return;
+
+            count &= 0x1F;
+            reg(Reg32::EIP) += 3;
+
+            if(operandSize32)
+            {
+                uint32_t v;
+                if(!readRM32(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg32>(r));
+                writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
+            }
+            else
+            {
+                uint16_t v;
+                if(!readRM16(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg16>(r));
+                writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
+            }
+
+            break;
+        }
+        case 0xAD: // SHRD by CL
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            reg(Reg32::EIP) += 2;
+
+            auto count = reg(Reg8::CL) & 0x1F;
+
+            if(operandSize32)
+            {
+                uint32_t v;
+                if(!readRM32(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg32>(r));
+                writeRM32(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
+            }
+            else
+            {
+                uint16_t v;
+                if(!readRM16(modRM, v, addr + 1))
+                    break;
+
+                auto src = reg(static_cast<Reg16>(r));
+                writeRM16(modRM, doDoubleShiftRight(v, src, count, flags), addr + 1, true);
+            }
+
+            break;
+        }
+
+        case 0xAF: // IMUL r, r/m
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            if(operandSize32)
+            {
+                uint32_t tmp;
+                if(!readRM32(modRM, tmp, addr + 1))
+                    break;
+
+                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp))
+                            * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
+                reg(static_cast<Reg32>(r)) = res;
+
+                // check if upper half matches lower half's sign
+                if(res >> 32 != (res & 0x80000000 ? -1 : 0))
+                    flags |= Flag_C | Flag_O;
+                else
+                    flags &= ~(Flag_C | Flag_O);
+            }
+            else
+            {
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr + 1))
+                    break;
+
+                int32_t res = static_cast<int16_t>(tmp) * static_cast<int16_t>(reg(static_cast<Reg16>(r)));
+                reg(static_cast<Reg16>(r)) = res;
+
+                // check if upper half matches lower half's sign
+                if(res >> 16 != (res & 0x8000 ? -1 : 0))
+                    flags |= Flag_C | Flag_O;
+                else
+                    flags &= ~(Flag_C | Flag_O);
+            }
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xB2: // LSS
+            reg(Reg32::EIP)++;
+            loadFarPointer(addr + 1, Reg16::SS, operandSize32);
+            break;
+
+        case 0xB3: // BTR
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            int bit;
+            bool value;
+
+            if(operandSize32)
+            {
+                bit = reg(static_cast<Reg32>(r));
+
+                int off = (bit / 32) * 4;
+                bit &= 31;
+
+                uint32_t data;
+                if(!readRM32(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off))
+                    break;
+            }
+            else
+            {
+                bit = reg(static_cast<Reg16>(r));
+
+                int off = (bit / 16) * 2;
+                bit &= 15;
+
+                uint16_t data;
+                if(!readRM16(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off))
+                    break;
+            }
+
+            if(value)
+                flags |= Flag_C;
+            else
+                flags &= ~Flag_C;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xB4: // LFS
+            reg(Reg32::EIP)++;
+            loadFarPointer(addr + 1, Reg16::FS, operandSize32);
+            break;
+        case 0xB5: // LGS
+            reg(Reg32::EIP)++;
+            loadFarPointer(addr + 1, Reg16::GS, operandSize32);
+            break;
+
+        case 0xB6: // MOVZX 8 -> 16/32
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint8_t v;
+            if(!readRM8(modRM, v, addr + 1))
+                break;
+
+            if(operandSize32)
+                reg(static_cast<Reg32>(r)) = v;
+            else
+                reg(static_cast<Reg16>(r)) = v;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+        case 0xB7: // MOVZX 16 -> 16/32
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint16_t v;
+            if(!readRM16(modRM, v, addr + 1))
+                break;
+
+            if(operandSize32)
+                reg(static_cast<Reg32>(r)) = v;
+            else
+                reg(static_cast<Reg16>(r)) = v;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xBA:
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            uint8_t bit;
+            if(!readMemIP8(getRMDispEnd(modRM, addr + 3, addressSize32), bit))
+                return;
+
+            reg(Reg32::EIP) += 3;
+
+            auto exOp = (modRM >> 3) & 0x7;
+
+            uint32_t data;
+            bool value;
+            int off;
+
+            if(operandSize32)
+            {
+                off = (bit / 32) * 4;
+                bit &= 31;
+
+                if(!readRM32(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+            }
+            else
+            {
+                off = (bit / 16) * 2;
+                bit &= 15;
+
+                uint16_t data16;
+                if(!readRM16(modRM, data16, addr + 1, off))
+                    break;
+
+                value = data16 & (1 << bit);
+                data = data16;
+            }
+
+            switch(exOp)
+            {
+                case 4: // BT
+                    break; // nothing else to do
+                case 5: // BTS
+                {
+                    if(operandSize32)
+                        writeRM32(modRM, data | 1 << bit, addr + 1, true, off);
+                    else
+                        writeRM16(modRM, data | 1 << bit, addr + 1, true, off);
+
+                    break;
+                }
+                case 6: // BTR
+                {
+                    if(operandSize32)
+                        writeRM32(modRM, data & ~(1 << bit), addr + 1, true, off);
+                    else
+                        writeRM16(modRM, data & ~(1 << bit), addr + 1, true, off);
+
+                    break;
+                }
+                case 7: // BTC
+                {
+                    if(operandSize32)
+                        writeRM32(modRM, data ^ ~(1 << bit), addr + 1, true, off);
+                    else
+                        writeRM16(modRM, data ^ ~(1 << bit), addr + 1, true, off);
+
+                    break;
+                }
+                default:
+                    fault(Fault::UD);
+                    break;
+            }
+
+            if(value)
+                flags |= Flag_C;
+            else
+                flags &= ~Flag_C;
+
+            break;
+        }
+
+        case 0xBB: // BTC
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+            int bit;
+            bool value;
+
+            if(operandSize32)
+            {
+                bit = reg(static_cast<Reg32>(r));
+
+                int off = (bit / 32) * 4;
+                bit &= 31;
+
+                uint32_t data;
+                if(!readRM32(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM32(modRM, data ^ 1 << bit, addr + 1, true, off))
+                    break;
+            }
+            else
+            {
+                bit = reg(static_cast<Reg16>(r));
+
+                int off = (bit / 16) * 2;
+                bit &= 15;
+
+                uint16_t data;
+                if(!readRM16(modRM, data, addr + 1, off))
+                    break;
+
+                value = data & (1 << bit);
+                if(!writeRM16(modRM, data ^ 1 << bit, addr + 1, true, off))
+                    break;
+            }
+
+            if(value)
+                flags |= Flag_C;
+            else
+                flags &= ~Flag_C;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xBC: // BSF
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint32_t val;
+
+            if(operandSize32)
+            {
+                if(!readRM32(modRM, val, addr + 1))
+                    break;
+            }
+            else
+            {
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr + 1))
+                    break;
+
+                val = tmp;
+            }
+
+            if(!val)
+                flags |= Flag_Z;
+            else
+            {
+                flags &= ~Flag_Z;
+
+                int bit = __builtin_ctz(val);
+                if(operandSize32)
+                    reg(static_cast<Reg32>(r)) = bit;
+                else
+                    reg(static_cast<Reg16>(r)) = bit;
+            }
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+        case 0xBD: // BSR
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint32_t val;
+
+            if(operandSize32)
+            {
+                if(!readRM32(modRM, val, addr + 1))
+                    break;
+            }
+            else
+            {
+                uint16_t tmp;
+                if(!readRM16(modRM, tmp, addr + 1))
+                    break;
+
+                val = tmp;
+            }
+            if(!val)
+                flags |= Flag_Z;
+            else
+            {
+                flags &= ~Flag_Z;
+
+                int bit = 31 - __builtin_clz(val);
+                if(operandSize32)
+                    reg(static_cast<Reg32>(r)) = bit;
+                else
+                    reg(static_cast<Reg16>(r)) = bit;
+            }
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xBE: // MOVSX 8 -> 16/32
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint32_t v;
+            uint8_t v8;
+            if(!readRM8(modRM, v8, addr + 1))
+                break;
+
+            // sign extend
+            if(v8 & 0x80)
+                v = v8 | 0xFFFFFF00;
+            else
+                v = v8;
+
+            if(operandSize32)
+                reg(static_cast<Reg32>(r)) = v;
+            else
+                reg(static_cast<Reg16>(r)) = v;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+        case 0xBF: // MOVSX 16 -> 16/32
+        {
+            uint8_t modRM;
+            if(!readMemIP8(addr + 2, modRM))
+                return;
+
+            auto r = (modRM >> 3) & 0x7;
+
+            uint32_t v;
+            uint16_t v16;
+            if(!readRM16(modRM, v16, addr + 1))
+                break;
+
+            // sign extend
+            if(v16 & 0x8000)
+                v = v16 | 0xFFFF0000;
+            else
+                v = v16;
+
+            if(operandSize32)
+                reg(static_cast<Reg32>(r)) = v;
+            else
+                reg(static_cast<Reg16>(r)) = v;
+
+            reg(Reg32::EIP) += 2;
+            break;
+        }
+
+        case 0xC8: // BSWAP (486, need for seabios)
+        case 0xC9:
+        case 0xCA:
+        case 0xCB:
+        case 0xCC:
+        case 0xCD:
+        case 0xCE:
+        case 0xCF:
+        {
+            auto r = static_cast<Reg32>(opcode2 & 3);
+            reg(r) = __builtin_bswap32(reg(r));
+            reg(Reg32::EIP)++;
+            break;
+        }
+
+        case 0x0B: // UD2
+        case 0xB9: // UD1
+        case 0xFF: // UD0
+        {
+            // these cases are only to avoid the logging in the default case
+            fault(Fault::UD);
+            break;
+        }
+
+        default:
+            printf("op 0f %02x @%05x\n", (int)opcode2, addr);
+            fault(Fault::UD);
             break;
     }
 }

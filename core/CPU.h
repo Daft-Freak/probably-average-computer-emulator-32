@@ -91,6 +91,7 @@ public:
     void updateFlags(uint32_t newFlags, uint32_t mask, bool is32);
 
     void executeInstruction();
+    void executeInstruction0F(uint32_t addr, bool operandSize32, bool lock);
 
     // returns CS, IP, virt addr
     std::tuple<uint16_t, uint32_t, uint32_t> getOpStartAddr();
