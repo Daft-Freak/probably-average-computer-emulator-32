@@ -706,61 +706,8 @@ void RAM_FUNC(CPU::executeInstruction)()
     }
 
     // validate LOCK prefix
-    if(lock)
-    {
-        if(opcode == 0x0F)
-        {} // check it when we have the 2nd opcode byte
-        // allow x0-x3,x8-xB for ALU ops
-        else if(opcode < 0x34 && (opcode & 4))
-        {
-            fault(Fault::UD);
-            return;
-        }
-        // nothing in 34-7F, 88-F5
-        // 84/85 are TEST
-        // F8-FD are flag set/clears
-        else if(opcode < 0x80 || (opcode > 0x87 && opcode < 0xF6) || opcode == 0x84 || opcode == 0x85 || (opcode > 0xF7 && opcode < 0xFE))
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        // now we need to check the r/m
-        uint8_t modRM;
-        if(!readMemIP8(addr + 1, modRM))
-            return; // give up if we faulted early
-
-        // not a memory operand, can't lock a register
-        if((modRM >> 6) == 3)
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        auto subOp = (modRM >> 3) & 0x7;
-
-        // ALU with imm, sub op needs to be anything other than 7 (CMP)
-        if(opcode >= 0x80 && opcode <= 0x83 && subOp == 7)
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        // only NOT/NEG here
-        if((opcode == 0xF6 || opcode == 0xF7) && subOp != 2 && subOp != 3)
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        // INC/DEC
-        // (technically also for FE, but 0/1 are the only valid values there)
-        if(opcode == 0xFF && subOp > 1)
-        {
-            fault(Fault::UD);
-            return;
-        }
-    }
+    if(lock && !validateLOCKPrefix(opcode, addr))
+        return;
 
     bool operandSize32 = isOperandSize32(operandSizeOverride);
     addressSize32 = isOperandSize32(addressSizeOverride);
@@ -7383,6 +7330,66 @@ void RAM_FUNC(CPU::validateSegmentsForReturn)()
     checkSeg(Reg16::DS);
     checkSeg(Reg16::FS);
     checkSeg(Reg16::GS);
+}
+
+// main part of validation, 0F prefixed ops handled there
+// TODO: does this need to be in RAM, I don't expect there to be a huge number of LOCK prefixes...
+bool RAM_FUNC(CPU::validateLOCKPrefix)(uint8_t opcode, uint32_t addr)
+{
+    if(opcode == 0x0F)
+    {} // check it when we have the 2nd opcode byte
+    // allow x0-x3,x8-xB for ALU ops
+    else if(opcode < 0x34 && (opcode & 4))
+    {
+        fault(Fault::UD);
+        return false;
+    }
+    // nothing in 34-7F, 88-F5
+    // 84/85 are TEST
+    // F8-FD are flag set/clears
+    else if(opcode < 0x80 || (opcode > 0x87 && opcode < 0xF6) || opcode == 0x84 || opcode == 0x85 || (opcode > 0xF7 && opcode < 0xFE))
+    {
+        fault(Fault::UD);
+        return false;
+    }
+
+    // now we need to check the r/m
+    uint8_t modRM;
+    if(!readMemIP8(addr + 1, modRM))
+        return false; // give up if we faulted early
+
+    // not a memory operand, can't lock a register
+    if((modRM >> 6) == 3)
+    {
+        fault(Fault::UD);
+        return false;
+    }
+
+    auto subOp = (modRM >> 3) & 0x7;
+
+    // ALU with imm, sub op needs to be anything other than 7 (CMP)
+    if(opcode >= 0x80 && opcode <= 0x83 && subOp == 7)
+    {
+        fault(Fault::UD);
+        return false;
+    }
+
+    // only NOT/NEG here
+    if((opcode == 0xF6 || opcode == 0xF7) && subOp != 2 && subOp != 3)
+    {
+        fault(Fault::UD);
+        return false;
+    }
+
+    // INC/DEC
+    // (technically also for FE, but 0/1 are the only valid values there)
+    if(opcode == 0xFF && subOp > 1)
+    {
+        fault(Fault::UD);
+        return false;
+    }
+
+    return true;
 }
 
 // also address size, but with a different override prefix

@@ -185,6 +185,7 @@ private:
 
     bool getTSSStackPointer(int dpl, uint32_t &newSP, uint16_t &newSS);
 
+    // validation/privilege stuff
     bool checkIOPermission(uint16_t addr);
     bool checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write);
 
@@ -192,6 +193,8 @@ private:
     bool checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32);
 
     void validateSegmentsForReturn();
+
+    bool validateLOCKPrefix(uint8_t opcode, uint32_t addr);
 
     bool isProtectedMode() {return reg(Reg32::CR0) & 1;}
     bool isOperandSize32(bool override);
