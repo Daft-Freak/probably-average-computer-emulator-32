@@ -73,10 +73,16 @@ static constexpr bool parity(uint8_t v)
 };
 
 template<class T>
-static constexpr T signBit()
+static constexpr uint32_t signBit()
 {
     return 1u << ((sizeof(T) * 8) - 1);
 }
+
+// bigger int type, used for multiply. defaults to 32bit
+template<class T> struct BiggerInt {using type = int32_t;};
+template<> struct BiggerInt<int32_t> {using type = int64_t;};
+
+template<class T> using BiggerInt_t=typename BiggerInt<T>::type;
 
 template<class T>
 static T doAdd(T dest, T src, uint32_t &flags)
@@ -157,6 +163,21 @@ static T doInc(T dest, uint32_t &flags)
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (res == signBit<T>() ? Flag_O : 0);
+
+    return res;
+}
+
+template<class T>
+static T doMultiplySigned(T dest, T src, uint32_t &flags)
+{
+    // use BiggerInt to only do 64-bit multiply if necessary
+    auto res = static_cast<BiggerInt_t<T>>(dest) * src;
+
+    // check if upper half matches lower half's sign
+    if(res >> (sizeof(T) * 8) != ((res & signBit<T>()) ? -1 : 0))
+        flags |= Flag_C | Flag_O;
+    else
+        flags &= ~(Flag_C | Flag_O);
 
     return res;
 }
@@ -1473,14 +1494,7 @@ void CPU::executeInstruction()
                 if(!readRM32(modRM, tmp, addr))
                     break;
 
-                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp)) * static_cast<int32_t>(imm);
-                reg(static_cast<Reg32>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 32 != (res & 0x80000000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                reg(static_cast<Reg32>(r)) = doMultiplySigned(static_cast<int32_t>(tmp), static_cast<int32_t>(imm), flags);
 
                 reg(Reg32::EIP) += 5;
             }
@@ -1495,14 +1509,7 @@ void CPU::executeInstruction()
                 if(!readRM16(modRM, tmp, addr))
                     break;
 
-                int32_t res = static_cast<int16_t>(tmp) * static_cast<int16_t>(imm);
-                reg(static_cast<Reg16>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 16 != (res & 0x8000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                reg(static_cast<Reg16>(r)) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), flags);
 
                 reg(Reg32::EIP) += 3;
             }
@@ -1540,14 +1547,7 @@ void CPU::executeInstruction()
                 if(!readRM32(modRM, tmp, addr))
                     break;
 
-                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp)) * imm;
-                reg(static_cast<Reg32>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 32 != (res & 0x80000000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                reg(static_cast<Reg32>(r)) = doMultiplySigned(static_cast<int32_t>(tmp), imm, flags);
             }
             else
             {
@@ -1555,14 +1555,7 @@ void CPU::executeInstruction()
                 if(!readRM16(modRM, tmp, addr))
                     break;
 
-                int32_t res = static_cast<int16_t>(tmp) * imm;
-                reg(static_cast<Reg16>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 16 != (res & 0x8000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                reg(static_cast<Reg16>(r)) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), flags);
             }
 
             reg(Reg32::EIP) += 2;
@@ -5338,15 +5331,8 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 if(!readRM32(modRM, tmp, addr + 1))
                     break;
 
-                int64_t res = static_cast<int64_t>(static_cast<int32_t>(tmp))
-                            * static_cast<int32_t>(reg(static_cast<Reg32>(r)));
-                reg(static_cast<Reg32>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 32 != (res & 0x80000000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                auto regVal = static_cast<int32_t>(reg(static_cast<Reg32>(r)));
+                reg(static_cast<Reg32>(r)) = doMultiplySigned(regVal, static_cast<int32_t>(tmp), flags);
             }
             else
             {
@@ -5354,14 +5340,8 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 if(!readRM16(modRM, tmp, addr + 1))
                     break;
 
-                int32_t res = static_cast<int16_t>(tmp) * static_cast<int16_t>(reg(static_cast<Reg16>(r)));
-                reg(static_cast<Reg16>(r)) = res;
-
-                // check if upper half matches lower half's sign
-                if(res >> 16 != (res & 0x8000 ? -1 : 0))
-                    flags |= Flag_C | Flag_O;
-                else
-                    flags &= ~(Flag_C | Flag_O);
+                auto regVal = static_cast<int16_t>(reg(static_cast<Reg16>(r)));
+                reg(static_cast<Reg16>(r)) = doMultiplySigned(regVal, static_cast<int16_t>(tmp), flags);
             }
 
             reg(Reg32::EIP) += 2;
