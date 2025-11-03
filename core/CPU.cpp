@@ -3,13 +3,6 @@
 #include <cstdlib> // exit
 #include <cstring>
 
-#ifdef PICO_CPU_IN_RAM
-#include "pico.h"
-#define RAM_FUNC(x) __not_in_flash_func(x)
-#else
-#define RAM_FUNC(x) x
-#endif
-
 #include "CPU.h"
 #include "GCCBuiltin.h"
 #include "System.h"
@@ -86,7 +79,7 @@ static constexpr T signBit()
 }
 
 template<class T>
-static T RAM_FUNC(doAdd)(T dest, T src, uint32_t &flags)
+static T doAdd(T dest, T src, uint32_t &flags)
 {
     T res = dest + src;
 
@@ -104,7 +97,7 @@ static T RAM_FUNC(doAdd)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doAddWithCarry)(T dest, T src, uint32_t &flags)
+static T doAddWithCarry(T dest, T src, uint32_t &flags)
 {
     int c = flags & Flag_C ? 1 : 0;
     T res = dest + src + c;
@@ -124,7 +117,7 @@ static T RAM_FUNC(doAddWithCarry)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doAnd)(T dest, T src, uint32_t &flags)
+static T doAnd(T dest, T src, uint32_t &flags)
 {
     T res = dest & src;
 
@@ -139,7 +132,7 @@ static T RAM_FUNC(doAnd)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doDec)(T dest, uint32_t &flags)
+static T doDec(T dest, uint32_t &flags)
 {
     T res = dest - 1;
 
@@ -154,7 +147,7 @@ static T RAM_FUNC(doDec)(T dest, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doInc)(T dest, uint32_t &flags)
+static T doInc(T dest, uint32_t &flags)
 {
     T res = dest + 1;
 
@@ -169,7 +162,7 @@ static T RAM_FUNC(doInc)(T dest, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doOr)(T dest, T src, uint32_t &flags)
+static T doOr(T dest, T src, uint32_t &flags)
 {
     T res = dest | src;
 
@@ -184,7 +177,7 @@ static T RAM_FUNC(doOr)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doRotateLeft)(T dest, int count, uint32_t &flags)
+static T doRotateLeft(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -205,7 +198,7 @@ static T RAM_FUNC(doRotateLeft)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doRotateLeftCarry)(T dest, int count, uint32_t &flags)
+static T doRotateLeftCarry(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -246,7 +239,7 @@ static T RAM_FUNC(doRotateLeftCarry)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doRotateRight)(T dest, int count, uint32_t &flags)
+static T doRotateRight(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -267,7 +260,7 @@ static T RAM_FUNC(doRotateRight)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doRotateRightCarry)(T dest, int count, uint32_t &flags)
+static T doRotateRightCarry(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -309,7 +302,7 @@ static T RAM_FUNC(doRotateRightCarry)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doShiftLeft)(T dest, int count, uint32_t &flags)
+static T doShiftLeft(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -333,7 +326,7 @@ static T RAM_FUNC(doShiftLeft)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doDoubleShiftLeft)(T dest, T src, int count, uint32_t &flags)
+static T doDoubleShiftLeft(T dest, T src, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -360,7 +353,7 @@ static T RAM_FUNC(doDoubleShiftLeft)(T dest, T src, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doShiftRight)(T dest, int count, uint32_t &flags)
+static T doShiftRight(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -384,7 +377,7 @@ static T RAM_FUNC(doShiftRight)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doShiftRightArith)(T dest, int count, uint32_t &flags)
+static T doShiftRightArith(T dest, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -411,7 +404,7 @@ static T RAM_FUNC(doShiftRightArith)(T dest, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doDoubleShiftRight)(T dest, T src, int count, uint32_t &flags)
+static T doDoubleShiftRight(T dest, T src, int count, uint32_t &flags)
 {
     if(!count)
         return dest;
@@ -438,7 +431,7 @@ static T RAM_FUNC(doDoubleShiftRight)(T dest, T src, int count, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doSub)(T dest, T src, uint32_t &flags)
+static T doSub(T dest, T src, uint32_t &flags)
 {
     T res = dest - src;
 
@@ -456,7 +449,7 @@ static T RAM_FUNC(doSub)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doSubWithBorrow)(T dest, T src, uint32_t &flags)
+static T doSubWithBorrow(T dest, T src, uint32_t &flags)
 {
     int c = flags & Flag_C ? 1 : 0;
     T res = dest - src - c;
@@ -476,7 +469,7 @@ static T RAM_FUNC(doSubWithBorrow)(T dest, T src, uint32_t &flags)
 }
 
 template<class T>
-static T RAM_FUNC(doXor)(T dest, T src, uint32_t &flags)
+static T doXor(T dest, T src, uint32_t &flags)
 {
     T res = dest ^ src;
 
@@ -492,7 +485,7 @@ static T RAM_FUNC(doXor)(T dest, T src, uint32_t &flags)
 
 // higher level shift wrapper
 template<class T>
-static T RAM_FUNC(doShift)(int exOp, T dest, int count, uint32_t &flags)
+static T doShift(int exOp, T dest, int count, uint32_t &flags)
 {
     count &= 0x1F;
 
@@ -520,7 +513,7 @@ static T RAM_FUNC(doShift)(int exOp, T dest, int count, uint32_t &flags)
 
 // checks a condition code
 // used by Jcc/SETcc
-static bool RAM_FUNC(getCondValue)(int cond, uint32_t flags)
+static bool getCondValue(int cond, uint32_t flags)
 {
     bool condVal;
     switch(cond)
@@ -603,7 +596,7 @@ void CPU::reset()
     cpl = 0;
 }
 
-void RAM_FUNC(CPU::run)(int ms)
+void CPU::run(int ms)
 {
     uint32_t cycles = (System::getClockSpeed() * ms) / 1000;
 
@@ -651,7 +644,7 @@ void CPU::updateFlags(uint32_t newFlags, uint32_t mask, bool is32)
     flags = (flags & ~mask) | (newFlags & mask);
 }
 
-void RAM_FUNC(CPU::executeInstruction)()
+void CPU::executeInstruction()
 {
     faultIP = reg(Reg32::EIP);
     auto addr = getSegmentOffset(Reg16::CS) + (reg(Reg32::EIP)++);
@@ -4907,7 +4900,7 @@ void RAM_FUNC(CPU::executeInstruction)()
     }
 }
 
-void RAM_FUNC(CPU::executeInstruction0F)(uint32_t addr, bool operandSize32, bool lock)
+void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
 {
     uint8_t opcode2;
     if(!readMemIP8(addr + 1, opcode2))
@@ -6275,49 +6268,49 @@ void CPU::dumpTrace()
     trace.dump();
 }
 
-bool RAM_FUNC(CPU::readMem8)(uint32_t offset, Reg16 segment, uint8_t &data)
+bool CPU::readMem8(uint32_t offset, Reg16 segment, uint8_t &data)
 {
     if(!checkSegmentAccess(segment, offset, 1, false))
         return false;
     return readMem8(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::readMem16)(uint32_t offset, Reg16 segment, uint16_t &data)
+bool CPU::readMem16(uint32_t offset, Reg16 segment, uint16_t &data)
 {
     if(!checkSegmentAccess(segment, offset, 2, false))
         return false;
     return readMem16(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::readMem32)(uint32_t offset, Reg16 segment, uint32_t &data)
+bool CPU::readMem32(uint32_t offset, Reg16 segment, uint32_t &data)
 {
     if(!checkSegmentAccess(segment, offset, 4, false))
         return false;
     return readMem32(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, Reg16 segment, uint8_t data)
+bool CPU::writeMem8(uint32_t offset, Reg16 segment, uint8_t data)
 {
     if(!checkSegmentAccess(segment, offset, 1, true))
         return false;
     return writeMem8(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, Reg16 segment, uint16_t data)
+bool CPU::writeMem16(uint32_t offset, Reg16 segment, uint16_t data)
 {
     if(!checkSegmentAccess(segment, offset, 2, true))
         return false;
     return writeMem16(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, Reg16 segment, uint32_t data)
+bool CPU::writeMem32(uint32_t offset, Reg16 segment, uint32_t data)
 {
     if(!checkSegmentAccess(segment, offset, 4, true))
         return false;
     return writeMem32(offset + getSegmentOffset(segment), data);
 }
 
-bool RAM_FUNC(CPU::readMem8)(uint32_t offset, uint8_t &data, bool privileged)
+bool CPU::readMem8(uint32_t offset, uint8_t &data, bool privileged)
 {
     uint32_t physAddr;
     if(!getPhysicalAddress(offset, physAddr, false, privileged))
@@ -6327,7 +6320,7 @@ bool RAM_FUNC(CPU::readMem8)(uint32_t offset, uint8_t &data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data, bool privileged)
+bool CPU::readMem16(uint32_t offset, uint16_t &data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) == 0xFFF)
@@ -6350,7 +6343,7 @@ bool RAM_FUNC(CPU::readMem16)(uint32_t offset, uint16_t &data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data, bool privileged)
+bool CPU::readMem32(uint32_t offset, uint32_t &data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
@@ -6377,7 +6370,7 @@ bool RAM_FUNC(CPU::readMem32)(uint32_t offset, uint32_t &data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, uint8_t data, bool privileged)
+bool CPU::writeMem8(uint32_t offset, uint8_t data, bool privileged)
 {
     uint32_t physAddr;
     if(!getPhysicalAddress(offset, physAddr, true, privileged))
@@ -6387,7 +6380,7 @@ bool RAM_FUNC(CPU::writeMem8)(uint32_t offset, uint8_t data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data, bool privileged)
+bool CPU::writeMem16(uint32_t offset, uint16_t data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
@@ -6405,7 +6398,7 @@ bool RAM_FUNC(CPU::writeMem16)(uint32_t offset, uint16_t data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data, bool privileged)
+bool CPU::writeMem32(uint32_t offset, uint32_t data, bool privileged)
 {
     // break up access if crossing page boundary
     if((reg(Reg32::CR0) & (1 << 31)) && (offset & 0xFFF) > 0xFFC)
@@ -6425,7 +6418,7 @@ bool RAM_FUNC(CPU::writeMem32)(uint32_t offset, uint32_t data, bool privileged)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMemIP8)(uint32_t offset, uint8_t &data)
+bool CPU::readMemIP8(uint32_t offset, uint8_t &data)
 {
     // check if we would cross a page boundary (even if not paging)
     if(linearIP >> 12 != offset >> 12)
@@ -6442,7 +6435,7 @@ bool RAM_FUNC(CPU::readMemIP8)(uint32_t offset, uint8_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMemIP8)(uint32_t offset, int32_t &data)
+bool CPU::readMemIP8(uint32_t offset, int32_t &data)
 {
     uint8_t tmp;
     if(!readMemIP8(offset, tmp))
@@ -6452,7 +6445,7 @@ bool RAM_FUNC(CPU::readMemIP8)(uint32_t offset, int32_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMemIP16)(uint32_t offset, uint16_t &data)
+bool CPU::readMemIP16(uint32_t offset, uint16_t &data)
 {
     // split if we cross a page boundary mid-read
     if((offset & 0xFFF) > 0xFFE)
@@ -6482,7 +6475,7 @@ bool RAM_FUNC(CPU::readMemIP16)(uint32_t offset, uint16_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMemIP16)(uint32_t offset, uint32_t &data)
+bool CPU::readMemIP16(uint32_t offset, uint32_t &data)
 {
     uint16_t tmp;
     if(!readMemIP16(offset, tmp))
@@ -6492,7 +6485,7 @@ bool RAM_FUNC(CPU::readMemIP16)(uint32_t offset, uint32_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::readMemIP32)(uint32_t offset, uint32_t &data)
+bool CPU::readMemIP32(uint32_t offset, uint32_t &data)
 {
     // split if we cross a page boundary mid-read
     if((offset & 0xFFF) > 0xFFC)
@@ -6525,7 +6518,7 @@ bool RAM_FUNC(CPU::readMemIP32)(uint32_t offset, uint32_t &data)
     return true;
 }
 
-bool RAM_FUNC(CPU::getPhysicalAddress)(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
+bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
 {
     // paging not enabled
     if(!(reg(Reg32::CR0) & (1 << 31)))
@@ -6588,7 +6581,7 @@ bool RAM_FUNC(CPU::getPhysicalAddress)(uint32_t virtAddr, uint32_t &physAddr, bo
     return lookupPageTable(virtAddr, physAddr, forWrite, user);
 }
 
-bool RAM_FUNC(CPU::lookupPageTable)(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool user)
+bool CPU::lookupPageTable(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool user)
 {
     auto pageFault = [this](bool protection, bool write, uint32_t virtAddr)
     {
@@ -6664,7 +6657,7 @@ bool RAM_FUNC(CPU::lookupPageTable)(uint32_t virtAddr, uint32_t &physAddr, bool 
 
 // rw is true if this is a write that was read in the same op (to avoid counting disp twice)
 // returns {0, AX(0)} if there was a fault fetching a disp (or SIB)
-std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int rm, bool rw, uint32_t addr)
+std::tuple<uint32_t, CPU::Reg16> CPU::getEffectiveAddress(int mod, int rm, bool rw, uint32_t addr)
 {
     uint32_t memAddr = 0;
     Reg16 segBase = Reg16::DS;
@@ -6831,7 +6824,7 @@ std::tuple<uint32_t, CPU::Reg16> RAM_FUNC(CPU::getEffectiveAddress)(int mod, int
     return {memAddr, segBase};
 }
 
-uint32_t RAM_FUNC(CPU::getRMDispEnd)(uint8_t modRM, uint32_t nextAddr, bool addressSize32)
+uint32_t CPU::getRMDispEnd(uint8_t modRM, uint32_t nextAddr, bool addressSize32)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -6878,7 +6871,7 @@ uint32_t RAM_FUNC(CPU::getRMDispEnd)(uint8_t modRM, uint32_t nextAddr, bool addr
     return nextAddr + mod; // mod 1 == 8bit, mod 2 == 16bit
 }
 
-CPU::SegmentDescriptor RAM_FUNC(CPU::loadSegmentDescriptor)(uint16_t selector)
+CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 {
     // null descriptor
     if(!selector)
@@ -6933,7 +6926,7 @@ CPU::SegmentDescriptor RAM_FUNC(CPU::loadSegmentDescriptor)(uint16_t selector)
 
 // if this returns false we faulted
 // gpFault is usually GP, but overridden sometimes when doing TSS-related things
-bool RAM_FUNC(CPU::checkSegmentSelector)(Reg16 r, uint16_t value, unsigned cpl, int flags, Fault gpFault)
+bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags, Fault gpFault)
 {
     // check limit
     auto limit = (value & 4)/*local*/ ? ldtLimit : gdtLimit;
@@ -7058,7 +7051,7 @@ bool RAM_FUNC(CPU::checkSegmentSelector)(Reg16 r, uint16_t value, unsigned cpl, 
     return true;
 }
 
-bool RAM_FUNC(CPU::setSegmentReg)(Reg16 r, uint16_t value, bool checkFaults)
+bool CPU::setSegmentReg(Reg16 r, uint16_t value, bool checkFaults)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7155,7 +7148,7 @@ bool CPU::getTSSStackPointer(int dpl, uint32_t &newSP, uint16_t &newSS)
     }
 }
 
-bool RAM_FUNC(CPU::checkIOPermission)(uint16_t addr)
+bool CPU::checkIOPermission(uint16_t addr)
 {
     // no IO permissions in real mode
     if(!isProtectedMode())
@@ -7204,7 +7197,7 @@ bool RAM_FUNC(CPU::checkIOPermission)(uint16_t addr)
     return false;
 }
 
-bool RAM_FUNC(CPU::checkSegmentAccess)(Reg16 segment, uint32_t offset, int width, bool write)
+bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write)
 {
     auto &desc = getCachedSegmentDescriptor(segment);
 
@@ -7261,14 +7254,14 @@ bool RAM_FUNC(CPU::checkSegmentAccess)(Reg16 segment, uint32_t offset, int width
 }
 
 // checks if we can push a number of words
-bool RAM_FUNC(CPU::checkStackSpace)(int words, bool op32, bool addr32)
+bool CPU::checkStackSpace(int words, bool op32, bool addr32)
 {
     auto sp = addr32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
     return checkStackSpace(sp, getCachedSegmentDescriptor(Reg16::SS), words, op32, addr32);
 }
 
-bool RAM_FUNC(CPU::checkStackSpace)(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32)
+bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32)
 {
     int wordSize = op32 ? 4 : 2;
 
@@ -7324,7 +7317,7 @@ bool RAM_FUNC(CPU::checkStackSpace)(uint32_t sp, const SegmentDescriptor &ssDesc
     return (endSP >> 12 == sp >> 12) || getPhysicalAddress(endSP, temp, true);
 }
 
-void RAM_FUNC(CPU::validateSegmentsForReturn)()
+void CPU::validateSegmentsForReturn()
 {
     // check ES/DS/FS/GS descriptors against new CPL for RET/IRET to outer privilege
     auto checkSeg = [this](Reg16 r)
@@ -7343,8 +7336,7 @@ void RAM_FUNC(CPU::validateSegmentsForReturn)()
 }
 
 // main part of validation, 0F prefixed ops handled there
-// TODO: does this need to be in RAM, I don't expect there to be a huge number of LOCK prefixes...
-bool RAM_FUNC(CPU::validateLOCKPrefix)(uint8_t opcode, uint32_t addr)
+bool CPU::validateLOCKPrefix(uint8_t opcode, uint32_t addr)
 {
     if(opcode == 0x0F)
     {} // check it when we have the 2nd opcode byte
@@ -7403,7 +7395,7 @@ bool RAM_FUNC(CPU::validateLOCKPrefix)(uint8_t opcode, uint32_t addr)
 }
 
 // also address size, but with a different override prefix
-bool RAM_FUNC(CPU::isOperandSize32)(bool override)
+bool CPU::isOperandSize32(bool override)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -7420,7 +7412,7 @@ bool RAM_FUNC(CPU::isOperandSize32)(bool override)
     return override;
 }
 
-bool RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint8_t &v, uint32_t addr, int additionalOffset)
+bool CPU::readRM8(uint8_t modRM, uint8_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7439,7 +7431,7 @@ bool RAM_FUNC(CPU::readRM8)(uint8_t modRM, uint8_t &v, uint32_t addr, int additi
     }
 }
 
-bool RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint16_t &v, uint32_t addr, int additionalOffset)
+bool CPU::readRM16(uint8_t modRM, uint16_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7458,7 +7450,7 @@ bool RAM_FUNC(CPU::readRM16)(uint8_t modRM, uint16_t &v, uint32_t addr, int addi
     }
 }
 
-bool RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t &v, uint32_t addr, int additionalOffset)
+bool CPU::readRM32(uint8_t modRM, uint32_t &v, uint32_t addr, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7477,7 +7469,7 @@ bool RAM_FUNC(CPU::readRM32)(uint8_t modRM, uint32_t &v, uint32_t addr, int addi
     }
 }
 
-bool RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, uint32_t addr, bool rw, int additionalOffset)
+bool CPU::writeRM8(uint8_t modRM, uint8_t v, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7495,7 +7487,7 @@ bool RAM_FUNC(CPU::writeRM8)(uint8_t modRM, uint8_t v, uint32_t addr, bool rw, i
     return true;
 }
 
-bool RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, uint32_t addr, bool rw, int additionalOffset)
+bool CPU::writeRM16(uint8_t modRM, uint16_t v, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7513,7 +7505,7 @@ bool RAM_FUNC(CPU::writeRM16)(uint8_t modRM, uint16_t v, uint32_t addr, bool rw,
     return true;
 }
 
-bool RAM_FUNC(CPU::writeRM32)(uint8_t modRM, uint32_t v, uint32_t addr, bool rw, int additionalOffset)
+bool CPU::writeRM32(uint8_t modRM, uint32_t v, uint32_t addr, bool rw, int additionalOffset)
 {
     auto mod = modRM >> 6;
     auto rm = modRM & 7;
@@ -7666,7 +7658,7 @@ void CPU::doALU32AImm(uint32_t addr)
     reg(Reg32::EIP) += 4;
 }
 
-bool RAM_FUNC(CPU::doPush)(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
+bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
 {
     uint32_t sp = addr32 ? reg(Reg32::ESP) : reg(Reg16::SP);
     if(sp == 0 && !addr32)
@@ -7691,7 +7683,7 @@ bool RAM_FUNC(CPU::doPush)(uint32_t val, bool op32, bool addr32, bool isSegmentR
     return true;
 }
 
-bool RAM_FUNC(CPU::doPop)(uint32_t &val, bool op32, bool addr32)
+bool CPU::doPop(uint32_t &val, bool op32, bool addr32)
 {
     uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
@@ -7720,7 +7712,7 @@ bool RAM_FUNC(CPU::doPop)(uint32_t &val, bool op32, bool addr32)
 
 // sometimes we need to check values (segments) before affecting SP
 // offset is in words, byteOffset is for far RET to outer (with stack adjustment)
-bool RAM_FUNC(CPU::doPeek)(uint32_t &val, bool op32, bool addr32, int offset, int byteOffset)
+bool CPU::doPeek(uint32_t &val, bool op32, bool addr32, int offset, int byteOffset)
 {
     uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
@@ -7742,7 +7734,7 @@ bool RAM_FUNC(CPU::doPeek)(uint32_t &val, bool op32, bool addr32, int offset, in
     return true;
 }
 
-void RAM_FUNC(CPU::farCall)(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32)
+void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32)
 {
     if(!operandSize32)
         newIP &= 0xFFFF;
@@ -7968,7 +7960,7 @@ void RAM_FUNC(CPU::farCall)(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bo
     }
 }
 
-void RAM_FUNC(CPU::farJump)(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
+void CPU::farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
 {
     if(isProtectedMode() && !(flags & Flag_VM))
     {
@@ -8022,7 +8014,7 @@ void RAM_FUNC(CPU::farJump)(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
 }
 
 // LES/LDS/...
-void RAM_FUNC(CPU::loadFarPointer)(uint32_t addr, Reg16 segmentReg, bool operandSize32)
+void CPU::loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32)
 {
     uint8_t modRM;
     if(!readMemIP8(addr + 1, modRM))
@@ -8197,7 +8189,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     return true;
 }
 
-void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
+void CPU::serviceInterrupt(uint8_t vector, bool isInt)
 {
     auto push = [this](uint32_t val, bool is32)
     {
@@ -8415,13 +8407,13 @@ void RAM_FUNC(CPU::serviceInterrupt)(uint8_t vector, bool isInt)
     halted = false;
 }
 
-void RAM_FUNC(CPU::fault)(Fault fault)
+void CPU::fault(Fault fault)
 {
     reg(Reg32::EIP) = faultIP; // return address should be at the start of the instruction
     serviceInterrupt(static_cast<int>(fault));
 }
 
-void RAM_FUNC(CPU::fault)(Fault fault, uint32_t code)
+void CPU::fault(Fault fault, uint32_t code)
 {
     this->fault(fault);
     // might have changed the stack address size
