@@ -58,6 +58,10 @@ target_include_directories(PACEPico2 PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/dpi.pio)
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/i2s.pio)
 
+#custom linker script (puts all of CPU.cpp in RAM)
+set_target_properties(PACEPico2 PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
+pico_add_link_depend(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
+
 # usual setup
 target_link_libraries(PACEPico2 PACECore PACEPicoShared PACEPicoBIOS hardware_dma hardware_riscv_platform_timer hardware_spi pico_multicore pico_stdlib)
 
