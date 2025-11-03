@@ -299,7 +299,7 @@ private:
 
     uint32_t faultIP;
 
-    uint32_t linearIP = 0; // the linear IP that was used to map pcPtr
+    uint32_t pcPtrBase = 0; // the top 20 bits of the linear IP that was used to map pcPtr
     const uint8_t *pcPtr = nullptr;
 
     // RAM

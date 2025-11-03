@@ -4758,7 +4758,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                     entry.tag &= ~Page_Present;
 
                 // also invalidate our special IP cache
-                linearIP = 0;
+                pcPtrBase = 0;
             }
 
             reg(Reg32::EIP) += 2;
@@ -5726,14 +5726,14 @@ bool CPU::writeMem32(uint32_t offset, uint32_t data, bool privileged)
 bool CPU::readMemIP8(uint32_t offset, uint8_t &data)
 {
     // check if we would cross a page boundary (even if not paging)
-    if(linearIP >> 12 != offset >> 12)
+    if(pcPtrBase != offset >> 12)
     {
         uint32_t physAddr;
         if(!getPhysicalAddress(offset, physAddr))
             return false;
 
         pcPtr = sys.mapAddress(physAddr) - offset;
-        linearIP = offset;
+        pcPtrBase = offset >> 12;
     }
 
     data = pcPtr[offset];
@@ -5766,14 +5766,14 @@ bool CPU::readMemIP16(uint32_t offset, uint16_t &data)
     }
 
     // usual boundary check
-    if(linearIP >> 12 != offset >> 12)
+    if(pcPtrBase != offset >> 12)
     {
         uint32_t physAddr;
         if(!getPhysicalAddress(offset, physAddr))
             return false;
 
         pcPtr = sys.mapAddress(physAddr) - offset;
-        linearIP = offset;
+        pcPtrBase = offset >> 12;
     }
 
     data = *reinterpret_cast<const uint16_t *>(pcPtr + offset);
@@ -5809,14 +5809,14 @@ bool CPU::readMemIP32(uint32_t offset, uint32_t &data)
     }
 
     // usual boundary check
-    if(linearIP >> 12 != offset >> 12)
+    if(pcPtrBase != offset >> 12)
     {
         uint32_t physAddr;
         if(!getPhysicalAddress(offset, physAddr))
             return false;
 
         pcPtr = sys.mapAddress(physAddr) - offset;
-        linearIP = offset;
+        pcPtrBase = offset >> 12;
     }
 
     data = *reinterpret_cast<const uint32_t *>(pcPtr + offset);
