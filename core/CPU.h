@@ -261,6 +261,7 @@ private:
     bool doPeek(uint32_t &val, bool op32, bool addr32, int offset, int byteOffset = 0);
     void farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operandSize32, bool stackAddress32);
     void farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr);
+    void interruptReturn(bool operandSize32);
     void loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32);
 
     bool taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource source);

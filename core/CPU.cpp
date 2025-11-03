@@ -3226,200 +3226,8 @@ void CPU::executeInstruction()
         }
 
         case 0xCF: // IRET
-        {
-            delayInterrupt = true;
-
-            uint32_t newIP, newCS, newFlags;
-
-            // need to validate CS BEFORE popping anything...
-            if(isProtectedMode() && !(flags & Flag_VM) && !(flags & Flag_NT))
-            {
-                if(!peek(operandSize32, 1, newCS) || !peek(operandSize32, 2, newFlags))
-                    break; // whoops stack fault
-
-                uint32_t tmp;
-
-                // not a segment selector if we're switching to virtual-8086 mode
-                if(!(newFlags & Flag_VM) && !checkSegmentSelector(Reg16::CS, newCS, newCS & 3))
-                    break;
-                else if(newFlags & Flag_VM)
-                {
-                    // check extra pops
-                    // IP, CS, FLAGS, SP, SS, ES, DS, FS, GS
-                    if(!peek(operandSize32, 8, tmp))
-                        break;
-                }
-                else if((newCS & 3) > cpl)
-                {
-                    // check extra pops
-                    // IP, CS, FLAGS, SP, SS
-                    if(!peek(operandSize32, 4, tmp))
-                        break;
-                }
-            }
-            // check we can pop the first three anyway, except for task returns, which don't do any
-            else if(!(flags & Flag_NT) && !peek(operandSize32, 2, newFlags))
-                break;
-
-            if(!isProtectedMode()) // real mode
-            {
-                // pop IP
-                popPreChecked(operandSize32, newIP);
-
-                // pop CS
-                popPreChecked(operandSize32, newCS);
-
-                // pop flags
-                popPreChecked(operandSize32, newFlags);
-
-                // real mode
-                uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R;
-                updateFlags(newFlags, flagMask, operandSize32);
-
-                setSegmentReg(Reg16::CS, newCS);
-                setIP(newIP);
-            }
-            else if(flags & Flag_VM)
-            {
-                // virtual 8086 mode
-                unsigned iopl = (flags & Flag_IOPL) >> 12;
-                if(iopl == 3)
-                {
-                    // pop IP
-                    popPreChecked(operandSize32, newIP);
-
-                    // pop CS
-                    popPreChecked(operandSize32, newCS);
-
-                    // pop flags
-                    popPreChecked(operandSize32, newFlags);
-
-                    setSegmentReg(Reg16::CS, newCS);
-                    setIP(newIP);
-
-                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_NT | Flag_R;
-                    updateFlags(newFlags, flagMask, operandSize32);
-                }
-                else
-                {
-                    fault(Fault::GP, 0);
-                }
-            }
-            else if(flags & Flag_NT) // task return
-            {
-                auto &curTSSDesc = getCachedSegmentDescriptor(Reg16::TR);
-                uint16_t prevTSS;
-                readMem16(curTSSDesc.base, prevTSS, true);
-
-                // NULL or local descriptor
-                // TODO: also check GDT limit, descriptor type and present
-                if(prevTSS < 8)
-                {
-                    fault(Fault::TS, prevTSS & ~3);
-                    break;
-                }
-
-                taskSwitch(prevTSS, reg(Reg32::EIP), TaskSwitchSource::IntRet);
-            }
-            else
-            {
-                // we know that these aren't going to fault as we've already read them
-                // pop IP
-                popPreChecked(operandSize32, newIP);
-
-                // pop CS
-                popPreChecked(operandSize32, newCS);
-
-                // pop flags
-                popPreChecked(operandSize32, newFlags);
-
-                unsigned newCSRPL = newCS & 3;
-
-                if((newFlags & Flag_VM) && cpl == 0)
-                {
-                    // return to virtual 8086 mode
-                    assert(operandSize32);
-
-                    // make sure to do all the pops before switching mode
-
-                    // prepare new stack
-                    uint32_t newESP, newSS;
-                    popPreChecked(operandSize32, newESP);
-                    popPreChecked(operandSize32, newSS);
-
-                    // pop segments
-                    uint32_t newES, newDS, newFS, newGS;
-                    popPreChecked(operandSize32, newES);
-                    popPreChecked(operandSize32, newDS);
-                    popPreChecked(operandSize32, newFS);
-                    popPreChecked(operandSize32, newGS);
-
-                    // set new flags and CS (we're now in v86 mode at the new privilege level)
-                    // I/IOPL are always allowed here as CPL must be 0
-                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R | Flag_VM;
-                    updateFlags(newFlags, flagMask, operandSize32);
-                    setSegmentReg(Reg16::CS, newCS);
-                    setIP(newIP);
-                    cpl = 3;
-
-                    // ... and set all the new segments after
-                    setSegmentReg(Reg16::ES, newES);
-                    setSegmentReg(Reg16::DS, newDS);
-                    setSegmentReg(Reg16::FS, newFS);
-                    setSegmentReg(Reg16::GS, newGS);
-
-                    setSegmentReg(Reg16::SS, newSS);
-                    reg(Reg32::ESP) = newESP;
-                }
-                else if(newCSRPL > cpl) // return to outer privilege
-                {
-                    uint32_t newESP, newSS;
-                    popPreChecked(operandSize32, newESP);
-                    popPreChecked(operandSize32, newSS);
-
-                    // flags
-                    unsigned iopl = (flags & Flag_IOPL) >> 12;
-
-                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
-                    if(cpl <= iopl)
-                        flagMask |= Flag_I;
-                    if(cpl == 0)
-                        flagMask |= Flag_IOPL;
-                    updateFlags(newFlags, flagMask, operandSize32);
-
-                    // new CS:IP
-                    setSegmentReg(Reg16::CS, newCS, false);
-                    setIP(newIP);
-
-                    // setup new stack
-                    setSegmentReg(Reg16::SS, newSS);
-
-                    if(stackAddrSize32)
-                        reg(Reg32::ESP) = newESP;
-                    else
-                        reg(Reg16::SP) = newESP;
-
-                    // check ES/DS/FS/GS descriptors against new CPL
-                    validateSegmentsForReturn();
-                }
-                else // return to same privilege
-                {
-                    unsigned iopl = (flags & Flag_IOPL) >> 12;
-
-                    uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
-                    if(cpl <= iopl)
-                        flagMask |= Flag_I;
-                    if(cpl == 0)
-                        flagMask |= Flag_IOPL;
-                    updateFlags(newFlags, flagMask, operandSize32);
-
-                    setSegmentReg(Reg16::CS, newCS, false);
-                    setIP(newIP);
-                }
-            }
-
+            interruptReturn(operandSize32);
             break;
-        }
 
         case 0xD0: // shift r/m8 by 1
         {
@@ -7672,6 +7480,216 @@ void CPU::farJump(uint32_t newCS, uint32_t newIP, uint32_t retAddr)
 
     setSegmentReg(Reg16::CS, newCS);
     reg(Reg32::EIP) = newIP;
+}
+
+void CPU::interruptReturn(bool operandSize32)
+{
+    // with 16-bit operands the high bits of IP should be zeroed
+    auto setIP = [this, &operandSize32](uint32_t newIP)
+    {
+        if(!operandSize32)
+            newIP &= 0xFFFF;
+        
+        reg(Reg32::EIP) = newIP;
+    };
+
+    // copied here until we actually have a function to skip the checks...
+    auto popPreChecked = [this](bool is32, uint32_t &v)
+    {
+        [[maybe_unused]] bool ok = doPop(v, is32, stackAddrSize32);
+        assert(ok);
+    };
+
+    delayInterrupt = true;
+
+    uint32_t newIP, newCS, newFlags;
+
+    // need to validate CS BEFORE popping anything...
+    if(isProtectedMode() && !(flags & Flag_VM) && !(flags & Flag_NT))
+    {
+        if(!doPeek(newCS, operandSize32, stackAddrSize32, 1) || !doPeek(newFlags, operandSize32, stackAddrSize32, 2))
+            return; // whoops stack fault
+
+        uint32_t tmp;
+
+        // not a segment selector if we're switching to virtual-8086 mode
+        if(!(newFlags & Flag_VM) && !checkSegmentSelector(Reg16::CS, newCS, newCS & 3))
+            return;
+        else if(newFlags & Flag_VM)
+        {
+            // check extra pops
+            // IP, CS, FLAGS, SP, SS, ES, DS, FS, GS
+            if(!doPeek(tmp, operandSize32, stackAddrSize32, 8))
+                return;
+        }
+        else if((newCS & 3) > cpl)
+        {
+            // check extra pops
+            // IP, CS, FLAGS, SP, SS
+            if(!doPeek(tmp, operandSize32, stackAddrSize32, 4))
+                return;
+        }
+    }
+    // check we can pop the first three anyway, except for task returns, which don't do any
+    else if(!(flags & Flag_NT) && !doPeek(newFlags, operandSize32, stackAddrSize32, 2))
+        return;
+
+    if(!isProtectedMode()) // real mode
+    {
+        // pop IP
+        popPreChecked(operandSize32, newIP);
+
+        // pop CS
+        popPreChecked(operandSize32, newCS);
+
+        // pop flags
+        popPreChecked(operandSize32, newFlags);
+
+        // real mode
+        uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R;
+        updateFlags(newFlags, flagMask, operandSize32);
+
+        setSegmentReg(Reg16::CS, newCS);
+        setIP(newIP);
+    }
+    else if(flags & Flag_VM)
+    {
+        // virtual 8086 mode
+        unsigned iopl = (flags & Flag_IOPL) >> 12;
+        if(iopl == 3)
+        {
+            // pop IP
+            popPreChecked(operandSize32, newIP);
+
+            // pop CS
+            popPreChecked(operandSize32, newCS);
+
+            // pop flags
+            popPreChecked(operandSize32, newFlags);
+
+            setSegmentReg(Reg16::CS, newCS);
+            setIP(newIP);
+
+            uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_NT | Flag_R;
+            updateFlags(newFlags, flagMask, operandSize32);
+        }
+        else
+        {
+            fault(Fault::GP, 0);
+        }
+    }
+    else if(flags & Flag_NT) // task return
+    {
+        auto &curTSSDesc = getCachedSegmentDescriptor(Reg16::TR);
+        uint16_t prevTSS;
+        readMem16(curTSSDesc.base, prevTSS, true);
+
+        // NULL or local descriptor
+        // TODO: also check GDT limit, descriptor type and present
+        if(prevTSS < 8)
+        {
+            fault(Fault::TS, prevTSS & ~3);
+            return;
+        }
+
+        taskSwitch(prevTSS, reg(Reg32::EIP), TaskSwitchSource::IntRet);
+    }
+    else
+    {
+        // we know that these aren't going to fault as we've already read them
+        // pop IP
+        popPreChecked(operandSize32, newIP);
+
+        // pop CS
+        popPreChecked(operandSize32, newCS);
+
+        // pop flags
+        popPreChecked(operandSize32, newFlags);
+
+        unsigned newCSRPL = newCS & 3;
+
+        if((newFlags & Flag_VM) && cpl == 0)
+        {
+            // return to virtual 8086 mode
+            assert(operandSize32);
+
+            // make sure to do all the pops before switching mode
+
+            // prepare new stack
+            uint32_t newESP, newSS;
+            popPreChecked(operandSize32, newESP);
+            popPreChecked(operandSize32, newSS);
+
+            // pop segments
+            uint32_t newES, newDS, newFS, newGS;
+            popPreChecked(operandSize32, newES);
+            popPreChecked(operandSize32, newDS);
+            popPreChecked(operandSize32, newFS);
+            popPreChecked(operandSize32, newGS);
+
+            // set new flags and CS (we're now in v86 mode at the new privilege level)
+            // I/IOPL are always allowed here as CPL must be 0
+            uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_I | Flag_D | Flag_O | Flag_IOPL | Flag_NT | Flag_R | Flag_VM;
+            updateFlags(newFlags, flagMask, operandSize32);
+            setSegmentReg(Reg16::CS, newCS);
+            setIP(newIP);
+            cpl = 3;
+
+            // ... and set all the new segments after
+            setSegmentReg(Reg16::ES, newES);
+            setSegmentReg(Reg16::DS, newDS);
+            setSegmentReg(Reg16::FS, newFS);
+            setSegmentReg(Reg16::GS, newGS);
+
+            setSegmentReg(Reg16::SS, newSS);
+            reg(Reg32::ESP) = newESP;
+        }
+        else if(newCSRPL > cpl) // return to outer privilege
+        {
+            uint32_t newESP, newSS;
+            popPreChecked(operandSize32, newESP);
+            popPreChecked(operandSize32, newSS);
+
+            // flags
+            unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+            uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
+            if(cpl <= iopl)
+                flagMask |= Flag_I;
+            if(cpl == 0)
+                flagMask |= Flag_IOPL;
+            updateFlags(newFlags, flagMask, operandSize32);
+
+            // new CS:IP
+            setSegmentReg(Reg16::CS, newCS, false);
+            setIP(newIP);
+
+            // setup new stack
+            setSegmentReg(Reg16::SS, newSS);
+
+            if(stackAddrSize32)
+                reg(Reg32::ESP) = newESP;
+            else
+                reg(Reg16::SP) = newESP;
+
+            // check ES/DS/FS/GS descriptors against new CPL
+            validateSegmentsForReturn();
+        }
+        else // return to same privilege
+        {
+            unsigned iopl = (flags & Flag_IOPL) >> 12;
+
+            uint32_t flagMask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_T | Flag_D | Flag_O | Flag_NT | Flag_R;
+            if(cpl <= iopl)
+                flagMask |= Flag_I;
+            if(cpl == 0)
+                flagMask |= Flag_IOPL;
+            updateFlags(newFlags, flagMask, operandSize32);
+
+            setSegmentReg(Reg16::CS, newCS, false);
+            setIP(newIP);
+        }
+    }
 }
 
 // LES/LDS/...
