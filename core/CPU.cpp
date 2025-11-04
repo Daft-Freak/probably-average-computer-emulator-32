@@ -4513,7 +4513,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                     if(!readRM16(modRM, tmp, addr + 1))
                         return;
 
-                    reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0xF) | (tmp & 0xF);
+                    reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0x1E) | (tmp & 0x1F);
                     reg(Reg32::EIP) += 2;
                     break;
                 }
