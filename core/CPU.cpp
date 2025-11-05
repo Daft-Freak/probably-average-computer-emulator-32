@@ -4887,7 +4887,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 return;
 
             auto r = (modRM >> 3) & 0x7;
-            int bit;
+            int32_t bit;
             bool value;
 
             if(operandSize32)
@@ -4895,17 +4895,17 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 bit = reg(static_cast<Reg32>(r));
 
                 uint32_t data;
-                if(!readRM32(modRM, data, addr + 1, (bit / 32) * 4))
+                if(!readRM32(modRM, data, addr + 1, (bit >> 5) * 4))
                     break;
 
                 value = data & (1 << (bit & 31));
             }
             else
             {
-                bit = reg(static_cast<Reg16>(r));
+                bit = static_cast<int16_t>(reg(static_cast<Reg16>(r)));
 
                 uint16_t data;
-                if(!readRM16(modRM, data, addr + 1, (bit / 16) * 2))
+                if(!readRM16(modRM, data, addr + 1, (bit >> 4) * 2))
                     break;
 
                 value = data & (1 << (bit & 15));
@@ -5013,14 +5013,14 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 return;
 
             auto r = (modRM >> 3) & 0x7;
-            int bit;
+            int32_t bit;
             bool value;
 
             if(operandSize32)
             {
                 bit = reg(static_cast<Reg32>(r));
 
-                int off = (bit / 32) * 4;
+                int off = (bit >> 5) * 4;
                 bit &= 31;
 
                 uint32_t data;
@@ -5033,9 +5033,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
             }
             else
             {
-                bit = reg(static_cast<Reg16>(r));
+                bit = static_cast<int16_t>(reg(static_cast<Reg16>(r)));
 
-                int off = (bit / 16) * 2;
+                int off = (bit >> 4) * 2;
                 bit &= 15;
 
                 uint16_t data;
@@ -5168,14 +5168,14 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 return;
 
             auto r = (modRM >> 3) & 0x7;
-            int bit;
+            int32_t bit;
             bool value;
 
             if(operandSize32)
             {
                 bit = reg(static_cast<Reg32>(r));
 
-                int off = (bit / 32) * 4;
+                int off = (bit >> 5) * 4;
                 bit &= 31;
 
                 uint32_t data;
@@ -5188,9 +5188,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
             }
             else
             {
-                bit = reg(static_cast<Reg16>(r));
+                bit = static_cast<int16_t>(reg(static_cast<Reg16>(r)));
 
-                int off = (bit / 16) * 2;
+                int off = (bit >> 4) * 2;
                 bit &= 15;
 
                 uint16_t data;
@@ -5353,14 +5353,14 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
                 return;
 
             auto r = (modRM >> 3) & 0x7;
-            int bit;
+            int32_t bit;
             bool value;
 
             if(operandSize32)
             {
                 bit = reg(static_cast<Reg32>(r));
 
-                int off = (bit / 32) * 4;
+                int off = (bit >> 5) * 4;
                 bit &= 31;
 
                 uint32_t data;
@@ -5373,9 +5373,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
             }
             else
             {
-                bit = reg(static_cast<Reg16>(r));
+                bit = static_cast<int16_t>(reg(static_cast<Reg16>(r)));
 
-                int off = (bit / 16) * 2;
+                int off = (bit >> 4) * 2;
                 bit &= 15;
 
                 uint16_t data;
