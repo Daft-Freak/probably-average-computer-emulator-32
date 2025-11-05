@@ -7253,7 +7253,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                 return;
 
             // push CS
-            doPush(reg(Reg16::CS), operandSize32, stackAddress32, true);
+            doPush(reg(Reg16::CS), operandSize32, stackAddress32);
 
             // push IP
             doPush(retAddr, operandSize32, stackAddress32);
@@ -7366,7 +7366,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                         }
 
                         // push CS
-                        doPush(reg(Reg16::CS), is32, stackAddress32, true);
+                        doPush(reg(Reg16::CS), is32, stackAddress32);
 
                         // push IP
                         doPush(retAddr, is32, stackAddress32);
@@ -7384,7 +7384,7 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
                             return;
                             
                         // push CS
-                        doPush(reg(Reg16::CS), is32, stackAddress32, true);
+                        doPush(reg(Reg16::CS), is32, stackAddress32);
 
                         // push IP
                         doPush(retAddr, is32, stackAddress32);
@@ -7432,7 +7432,8 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
     {
         // real/virtual 8086 mode
         // push CS
-        doPush(reg(Reg16::CS), operandSize32, stackAddress32, true);
+        // we do want to zero the high bits here (unlike PUSH)
+        doPush(reg(Reg16::CS), operandSize32, stackAddress32);
 
         // push IP
         doPush(retAddr, operandSize32, stackAddress32);
