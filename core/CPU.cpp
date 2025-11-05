@@ -446,7 +446,7 @@ static T doDoubleShiftRight(T dest, T src, int count, uint32_t &flags)
           | (res & signBit<T>() ? Flag_S : 0);
 
     // "undefined" for shift counts other than 1
-    flags = (flags & ~Flag_O) | (((res & (signBit<T>() >> 1)) != (res & signBit<T>())) ? Flag_O : 0);
+    flags = (flags & ~Flag_O) | ((res & signBit<T>()) != (res << 1 & signBit<T>()) ? Flag_O : 0);
 
     return res;
 }
