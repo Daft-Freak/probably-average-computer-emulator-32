@@ -7057,7 +7057,7 @@ bool CPU::doINS16(uint32_t si, Reg16 srcSeg, uint32_t di)
 
 bool CPU::doINS32(uint32_t si, Reg16 srcSeg, uint32_t di)
 {
-    auto v = sys.readIOPort16(reg(Reg16::DX)) | sys.readIOPort16(reg(Reg16::DX) + 2);
+    auto v = sys.readIOPort16(reg(Reg16::DX)) | sys.readIOPort16(reg(Reg16::DX) + 2) << 16;
     return writeMem32(di, Reg16::ES, v);
 }
 
