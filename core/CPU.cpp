@@ -843,7 +843,7 @@ void CPU::executeInstruction()
             auto r = static_cast<Reg16>(((opcode >> 3) & 7) + static_cast<int>(Reg16::ES));
 
             uint32_t v;
-            if(!pop(operandSize32, v))
+            if(!doPop(v, operandSize32, stackAddrSize32, true))
                 break;
 
             setSegmentReg(r, v);
@@ -4887,7 +4887,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
         case 0xA1: // POP FS
         {
             uint32_t v;
-            if(!doPop(v, operandSize32, stackAddrSize32))
+            if(!doPop(v, operandSize32, stackAddrSize32, true))
                 break;
 
             if(setSegmentReg(Reg16::FS, v))
@@ -5012,7 +5012,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
         case 0xA9: // POP GS
         {
             uint32_t v;
-            if(!doPop(v, operandSize32, stackAddrSize32))
+            if(!doPop(v, operandSize32, stackAddrSize32, true))
                 break;
 
             if(setSegmentReg(Reg16::GS, v))
@@ -7167,11 +7167,11 @@ bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
     return true;
 }
 
-bool CPU::doPop(uint32_t &val, bool op32, bool addr32)
+bool CPU::doPop(uint32_t &val, bool op32, bool addr32, bool isSegmentReg)
 {
     uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
-    if(op32)
+    if(op32 && !isSegmentReg)
     {
         if(!readMem32(sp, Reg16::SS, val))
             return false;
