@@ -33,8 +33,8 @@ public:
     
     virtual bool isATAPI(int drive) override;
 
-    bool read(int drive, uint8_t *buf, uint32_t lba) override;
-    bool write(int drive, const uint8_t *buf, uint32_t lba) override;
+    bool read(ATAController *controller, int drive, uint8_t *buf, uint32_t lba) override;
+    bool write(ATAController *controller, int drive, const uint8_t *buf, uint32_t lba) override;
 
     void openDisk(int drive, std::string path);
 

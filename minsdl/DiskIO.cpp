@@ -88,7 +88,7 @@ bool FileATAIO::isATAPI(int drive)
     return isCD[drive];
 }
 
-bool FileATAIO::read(int drive, uint8_t *buf, uint32_t lba)
+bool FileATAIO::read(ATAController *controller, int drive, uint8_t *buf, uint32_t lba)
 {
     if(drive >= maxDrives)
         return false;
@@ -96,17 +96,25 @@ bool FileATAIO::read(int drive, uint8_t *buf, uint32_t lba)
     file[drive].clear();
 
     int sectorSize = isCD[drive] ? 2048 : 512;
-    return file[drive].seekg(lba * sectorSize).read(reinterpret_cast<char *>(buf), sectorSize).gcount() == sectorSize;
+    bool success = file[drive].seekg(lba * sectorSize).read(reinterpret_cast<char *>(buf), sectorSize).gcount() == sectorSize;
+
+    controller->ioComplete(drive, success, false);
+
+    return success;
 }
 
-bool FileATAIO::write(int drive, const uint8_t *buf, uint32_t lba)
+bool FileATAIO::write(ATAController *controller, int drive, const uint8_t *buf, uint32_t lba)
 {
     if(drive >= maxDrives || isCD[drive])
         return false;
 
     file[drive].clear();
 
-    return file[drive].seekp(lba * 512).write(reinterpret_cast<const char *>(buf), 512).good();
+    bool success = file[drive].seekp(lba * 512).write(reinterpret_cast<const char *>(buf), 512).good();
+
+    controller->ioComplete(drive, success, true);
+
+    return success;
 }
 
 void FileATAIO::openDisk(int drive, std::string path)

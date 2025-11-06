@@ -82,7 +82,7 @@ bool FileATAIO::isATAPI(int unit)
     return isCD[unit];
 }
 
-bool FileATAIO::read(int unit, uint8_t *buf, uint32_t lba)
+bool FileATAIO::read(ATAController *controller, int unit, uint8_t *buf, uint32_t lba)
 {
     if(unit >= maxDrives)
         return false;
@@ -92,10 +92,12 @@ bool FileATAIO::read(int unit, uint8_t *buf, uint32_t lba)
     UINT read = 0;
     auto res = f_read(&file[unit], buf, 512, &read);
 
+    controller->ioComplete(unit, res == FR_OK && read == 512, false);
+
     return res == FR_OK && read == 512;
 }
 
-bool FileATAIO::write(int unit, const uint8_t *buf, uint32_t lba)
+bool FileATAIO::write(ATAController *controller, int unit, const uint8_t *buf, uint32_t lba)
 {
     if(unit >= maxDrives)
         return false;
@@ -104,6 +106,8 @@ bool FileATAIO::write(int unit, const uint8_t *buf, uint32_t lba)
 
     UINT written = 0;
     auto res = f_write(&file[unit], buf, 512, &written);
+
+    controller->ioComplete(unit, res == FR_OK && written == 512, true);
 
     return res == FR_OK && written == 512;
 }

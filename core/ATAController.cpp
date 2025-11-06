@@ -131,8 +131,14 @@ uint16_t ATAController::read16(uint16_t addr)
 
                         int dev = (deviceHead >> 4) & 1;
 
-                        if(!io || !io->read(dev, sectorBuf, curLBA))
+                        status &= ~Status_DRQ;
+                        status |= Status_BSY;
+
+                        if(!io || !io->read(this, dev, sectorBuf, curLBA))
+                        {
+                            status &= ~Status_BSY;
                             status |= Status_ERR;
+                        }
 
                         bufOffset = 0;
                     }
@@ -149,9 +155,9 @@ uint16_t ATAController::read16(uint16_t addr)
 
                         // clear data request
                         status &= ~Status_DRQ;
-                    }
 
-                    flagIRQ();
+                        flagIRQ();
+                    }
                 }
 
                 return ret;
@@ -245,9 +251,14 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         printf("ATA dev %i read %i sectors C %u H %u S %u LBA %u\n", dev, sectorCount, cylinder, head, lbaLowSector, lba);
                     }
 
+                    status |= Status_BSY;
+
                     // try to read
-                    if(!io || !io->read(dev, sectorBuf, lba))
+                    if(!io || !io->read(this, dev, sectorBuf, lba))
+                    {
+                        status &= ~Status_BSY;
                         status |= Status_ERR;
+                    }
                     else
                     {
                         curLBA = lba;
@@ -256,9 +267,7 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         pioReadSectors = sectorCount;
                         bufOffset = 0;
 
-                        status |= Status_DRQ | Status_DSC;
-
-                        flagIRQ();
+                        status |= Status_DSC;
                     }
                     break;
                 }
@@ -414,34 +423,38 @@ void ATAController::write16(uint16_t addr, uint16_t data)
                     int dev = (deviceHead >> 4) & 1;
                     bool isATAPICommand = pioWriteLen == 12;
 
+                    // clear data request
+                    status &= ~Status_DRQ;
+                    
+                    pioWriteSectors--;
+
                     // write to disk if this was a sector write
                     if(!isATAPICommand)
                     {
-                        if(!io || !io->write(dev, sectorBuf, curLBA))
+                        status |= Status_BSY;
+
+                        if(!io || !io->write(this, dev, sectorBuf, curLBA))
                             status |= Status_ERR;
                     }
 
-                    if(pioWriteSectors > 1)
+                    if(pioWriteSectors > 0)
                     {
                         // prepare for next sector
                         curLBA++;
-                        pioWriteSectors--;
+                        
                         bufOffset = 0;
                     }
                     else
                     {
                         pioWriteLen = 0;
-                        pioWriteSectors = 0;
 
-                        // clear data request
-                        status &= ~Status_DRQ;
+                        if(!isATAPICommand)
+                            flagIRQ();
                     }
 
                     // handle the command if needed
                     if(isATAPICommand)
                         doATAPICommand(dev);
-                    else
-                        flagIRQ();
                 }
             }
 
@@ -450,6 +463,23 @@ void ATAController::write16(uint16_t addr, uint16_t data)
 
         default:
             printf("ATA W16 %04X = %04X\n", addr, data);
+    }
+}
+
+void ATAController::ioComplete(int device, bool success, bool write)
+{
+    if(success)
+    {
+        status &= ~Status_BSY;
+
+        if(!write || pioWriteSectors)
+            status |= Status_DRQ;
+
+        flagIRQ();
+    }
+    else
+    {
+        status |= Status_ERR;
     }
 }
 
@@ -688,23 +718,22 @@ void ATAController::doATAPICommand(int device)
             lbaMidCylinderLow = 0;
             lbaHighCylinderHigh = 2048 >> 8;
 
-            if(io && io->read(device, sectorBuf, lba))
+            status |= Status_BSY;
+
+            if(io && io->read(this, device, sectorBuf, lba))
             {
                 pioReadLen = 2048;
                 pioReadSectors = numSectors;
                 bufOffset = 0;
                 curLBA = lba;
 
-                status |= Status_DRQ;
-
                 sectorCount = (0 << 0)  // data
                             | (1 << 1); // to host
-
-                flagIRQ();
             }
             else
             {
                 // error
+                status &= ~Status_BSY;
                 status |= Status_ERR; // ATAPI CHK bit
 
                 sectorCount = (1 << 0)  // command
