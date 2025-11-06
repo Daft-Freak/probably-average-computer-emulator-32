@@ -571,6 +571,8 @@ void Chipset::updateDMA()
 
         auto addr = (dma.highAddr[i] << 16) + dma.currentAddress[i];
 
+        auto dev = dma.requestedDev[i];
+
         switch(dir)
         {
             case 0: // verify
@@ -579,16 +581,16 @@ void Chipset::updateDMA()
             case 1: // write
             {
                 uint8_t data = 0xFF;
-                if(dma.requestedDev[i])
-                    data = dma.requestedDev[i]->dmaRead(i);
+                if(dev)
+                    data = dev->dmaRead(i);
 
                 sys.writeMem(addr, data);
                 break;
             }
 
             case 2: // read
-                if(dma.requestedDev[i])
-                    dma.requestedDev[i]->dmaWrite(i, sys.readMem(addr));
+                if(dev)
+                    dev->dmaWrite(i, sys.readMem(addr));
                 
                 break;
         }
@@ -607,8 +609,8 @@ void Chipset::updateDMA()
             // complete
             dma.status |= 1 << i;
 
-            if(dma.requestedDev[i])
-                dma.requestedDev[i]->dmaComplete(i);
+            if(dev)
+                dev->dmaComplete(i);
 
             // auto-init
             if(dma.mode[i] & (1 << 4))
