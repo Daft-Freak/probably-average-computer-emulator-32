@@ -1,6 +1,5 @@
 // SPI SD card storage interface
 // "borrowed" from 32blit-pico
-// only change is replacing blit::debugf -> printf
 
 #include <cstdio>
 #include <cmath>
@@ -10,6 +9,7 @@
 #include "pico/time.h"
 #include "pico/binary_info.h"
 #include "hardware/clocks.h"
+#include "hardware/dma.h"
 
 #include "config.h"
 
@@ -19,46 +19,53 @@
 
 static PIO sd_pio = pio1;
 static int sd_sm = 0;
+
+static int dma_rx_channel, dma_tx_channel;
+
+static uint8_t placeholder_data;
+
 static bool sd_io_initialised = false;
 
 static uint32_t card_size_blocks = 0;
 static bool is_hcs = false;
 
 static void spi_write(const uint8_t *buf, size_t len) {
-  size_t tx_remain = len, rx_remain = len;
-  auto txfifo = (io_rw_8 *) &sd_pio->txf[sd_sm];
-  auto rxfifo = (io_rw_8 *) &sd_pio->rxf[sd_sm];
+  // RX channel shouldn't increment on writes, TX should increment on reads
+  hw_clear_bits(&dma_hw->ch[dma_rx_channel].al1_ctrl, DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS);
+  hw_set_bits(&dma_hw->ch[dma_tx_channel].al1_ctrl, DMA_CH0_CTRL_TRIG_INCR_READ_BITS);
 
-  while (tx_remain || rx_remain) {
-    if (tx_remain && !pio_sm_is_tx_fifo_full(sd_pio, sd_sm)) {
-      *txfifo = *buf++;
-      --tx_remain;
-    }
-    if (rx_remain && !pio_sm_is_rx_fifo_empty(sd_pio, sd_sm)) {
-      (void) *rxfifo;
-      --rx_remain;
-    }
-  }
+  // ignore read data
+  dma_channel_set_write_addr(dma_rx_channel, &placeholder_data, false);
+
+  // TX from buffer
+  dma_channel_set_read_addr(dma_tx_channel, buf, false);
+
+  dma_channel_set_transfer_count(dma_rx_channel, len, false);
+  dma_channel_set_transfer_count(dma_tx_channel, len, false);
+
+  dma_start_channel_mask(1 << dma_rx_channel | 1 << dma_tx_channel);
+
+  dma_channel_wait_for_finish_blocking(dma_rx_channel);
 }
 
 static void spi_read(uint8_t *buf, size_t len) {
-  size_t rx_remain = len;
-  auto txfifo = (io_rw_8 *) &sd_pio->txf[sd_sm];
-  auto rxfifo = (io_rw_8 *) &sd_pio->rxf[sd_sm];
+  // RX channel should increment on writes, TX shouldn't increment on reads
+  hw_set_bits(&dma_hw->ch[dma_rx_channel].al1_ctrl, DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS);
+  hw_clear_bits(&dma_hw->ch[dma_tx_channel].al1_ctrl, DMA_CH0_CTRL_TRIG_INCR_READ_BITS);
 
-  // assume FIFO is empty
-  *txfifo = 0xFF;
-  *txfifo = 0xFF;
-  *txfifo = 0xFF;
-  *txfifo = 0xFF;
+  // RX to buffer
+  dma_channel_set_write_addr(dma_rx_channel, buf, false);
 
-  while(rx_remain) {
-    if (!pio_sm_is_rx_fifo_empty(sd_pio, sd_sm)) {
-      *buf++ = *rxfifo;
-      if(--rx_remain > 3)
-        *txfifo = 0xFF;
-    }
-  }
+  // TX constant FF
+  placeholder_data = 0xFF;
+  dma_channel_set_read_addr(dma_tx_channel, &placeholder_data, false);
+
+  dma_channel_set_transfer_count(dma_rx_channel, len, false);
+  dma_channel_set_transfer_count(dma_tx_channel, len, false);
+
+  dma_start_channel_mask(1 << dma_rx_channel | 1 << dma_tx_channel);
+
+  dma_channel_wait_for_finish_blocking(dma_rx_channel);
 }
 
 static uint8_t spi_transfer_byte(uint8_t b) {
@@ -236,10 +243,7 @@ static uint8_t sd_command_write_block(uint8_t cmd, uint32_t addr, const uint8_t 
 
     spi_transfer_byte(0xFE); // start token (different for CMD25)
 
-    int len = 512;
-
-    for(int i = 0; i < len; i++)
-      spi_transfer_byte(*buffer++);
+    spi_write(buffer, 512);
 
     // crc
     spi_transfer_byte(0xFF);
@@ -305,6 +309,38 @@ bool storage_init() {
     gpio_init(SD_CS);
     gpio_set_dir(SD_CS, GPIO_OUT);
     gpio_put(SD_CS, 1);
+
+    // setup DMA
+    dma_tx_channel = dma_claim_unused_channel(true);
+    dma_rx_channel = dma_claim_unused_channel(true);
+
+    dma_channel_config dma_cfg;
+
+    dma_cfg = dma_channel_get_default_config(dma_rx_channel);
+    channel_config_set_dreq(&dma_cfg, pio_get_dreq(sd_pio, sd_sm, false));
+    channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
+    channel_config_set_read_increment(&dma_cfg, false);
+    channel_config_set_write_increment(&dma_cfg, true);
+    dma_channel_configure(
+        dma_rx_channel,
+        &dma_cfg,
+        nullptr,
+        &sd_pio->rxf[sd_sm],
+        0,
+        false
+    );
+
+    dma_cfg = dma_channel_get_default_config(dma_tx_channel);
+    channel_config_set_dreq(&dma_cfg, pio_get_dreq(sd_pio, sd_sm, true));
+    channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
+    dma_channel_configure(
+        dma_tx_channel,
+        &dma_cfg,
+        &sd_pio->txf[sd_sm],
+        nullptr,
+        0,
+        false
+    );
 
     sd_io_initialised = true;
   }
