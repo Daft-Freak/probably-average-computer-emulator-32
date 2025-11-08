@@ -112,9 +112,23 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         auto charPtr = plane0 + startAddr * 2 + offset * 4 * (line / charHeight);
 
-        auto fontPtr = plane2 + line % charHeight;
+        int charLine = line % charHeight;
+        auto fontPtr = plane2 + charLine;
 
         bool blinkEn = attribMode & (1 << 3);
+
+        // cursor setup
+        bool cursorLine = (frame & 8) && charLine >= (crtcRegs[0xA/*cursor start*/] & 0x1F) && charLine <= (crtcRegs[0xB/*cursor end*/] & 0x1F);
+        uint8_t *cursorPtr = nullptr;
+
+        if(cursorLine)
+        {
+            uint16_t cursorAddr = crtcRegs[0xE] << 8 | crtcRegs[0xF];
+
+            // +2 because we check after incrementing
+            // set to null if not cursor line
+            cursorPtr = plane0 + cursorAddr * 2 + 2;
+        }
 
         for(int i = 0; i < hDispChars; i++)
         {
@@ -139,10 +153,14 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
             if(ch >= 0xC0 && ch < 0xE0 && (attribMode & (1 << 2)/*LGE*/))
                 fontLine |= (fontLine >> 1) & 0x80;
 
-            // TODO: cursor
-
+            // cursor
+            if(charPtr == cursorPtr)
+            {
+                for(int x = 0; x < charWidth; x++)
+                    outputPixel(fgCol);
+            }
             // skip blank chars (also do blink here)
-            if(!fontLine || (blinkEn && attr & 0x80 && !(frame & 16)))
+            else if(!fontLine || (blinkEn && attr & 0x80 && !(frame & 16)))
             {
                 for(int x = 0; x < charWidth; x++)
                     outputPixel(bgCol);
