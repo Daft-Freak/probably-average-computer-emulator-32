@@ -24,6 +24,9 @@
 #define SD_MISO   38
 #define SD_CS     36
 
+#define DISK_IO_LED_PIN 3
+#define DISK_IO_LED_ACTIVE 0
+
 #elif defined(EXTRA_BOARD_VGABOARD)
 #define AUDIO_I2S_PIO 0
 #define AUDIO_I2S_CLOCK_PIN_BASE 27

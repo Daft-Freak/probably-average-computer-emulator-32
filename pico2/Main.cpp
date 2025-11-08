@@ -205,6 +205,13 @@ static bool readConfigFile()
     return true;
 }
 
+static void setDiskLED(bool on)
+{
+#ifdef DISK_IO_LED_PIN
+    gpio_put(DISK_IO_LED_PIN, on == DISK_IO_LED_ACTIVE);
+#endif
+}
+
 int main()
 {
     set_sys_clock_khz(250000, false);
@@ -233,6 +240,13 @@ int main()
     }
 
     init_audio();
+
+    // init blinky disk led
+#ifdef DISK_IO_LED_PIN
+    gpio_set_dir(DISK_IO_LED_PIN, true);
+    gpio_put(DISK_IO_LED_PIN, !DISK_IO_LED_ACTIVE);
+    gpio_set_function(DISK_IO_LED_PIN, GPIO_FUNC_SIO);
+#endif
 
     // emulator init
 
@@ -281,10 +295,14 @@ int main()
             switch(data)
             {
                 case 1: // floppy IO
+                    setDiskLED(true);
                     floppyIO.doCore0IO();
+                    setDiskLED(false);
                     break;
                 case 2: // ATA IO
+                    setDiskLED(true);
                     ataPrimaryIO.doCore0IO();
+                    setDiskLED(false);
                     break;
             }
         }
