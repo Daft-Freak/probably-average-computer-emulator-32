@@ -104,6 +104,17 @@ static void runEmulator(absolute_time_t &time)
     }
 }
 
+static void core1FIFOHandler()
+{
+    switch(multicore_fifo_pop_blocking())
+    {
+        case 2: // ATA IO
+            ataPrimaryIO.ioComplete();
+    }
+
+    multicore_fifo_clear_irq();
+}
+
 static void core1Main()
 {
     // configure clock PIO program
@@ -116,6 +127,11 @@ static void core1Main()
 
     pio_sm_init(pio1, 0, offset, &config);
     pio_sm_set_enabled(pio1, 0, true);
+
+    // setup FIFO irq
+    multicore_fifo_clear_irq();
+    irq_set_exclusive_handler(SIO_FIFO_IRQ_NUM(1), core1FIFOHandler);
+    irq_set_enabled(SIO_FIFO_IRQ_NUM(1), true);
 
     // run
     auto time = get_absolute_time();
@@ -253,6 +269,18 @@ int main()
         auto [width, height] = vga.getOutputResolution();
         set_display_size(width, height);
         update_display();
+
+        // check fifo for any commands from the emulator core
+        uint32_t data;
+        if(multicore_fifo_pop_timeout_us(1000, &data))
+        {
+            switch(data)
+            {
+                case 2: // ATA IO
+                    ataPrimaryIO.doCore0IO();
+                    break;
+            }
+        }
 
         tuh_task();
     }

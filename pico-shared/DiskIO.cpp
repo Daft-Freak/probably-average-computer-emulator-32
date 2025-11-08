@@ -1,5 +1,7 @@
 #include <cstdio>
 
+#include "pico/multicore.h"
+
 #include "Floppy.h"
 
 #include "DiskIO.h"
@@ -87,14 +89,23 @@ bool FileATAIO::read(ATAController *controller, int unit, uint8_t *buf, uint32_t
     if(unit >= maxDrives)
         return false;
 
-    f_lseek(&file[unit], lba * 512);
+    if(lba >= numSectors[unit])
+        return false;
 
-    UINT read = 0;
-    auto res = f_read(&file[unit], buf, 512, &read);
+    if(curAccessController)
+    {
+        printf("ATA IO already in progress! (%c %u -> R %u)\n", curAccessWrite ? 'W' : 'R', curAccessLBA, lba);
+        return false;
+    }
 
-    controller->ioComplete(unit, res == FR_OK && read == 512, false);
+    curAccessController = controller;
+    curAccessDevice = unit;
+    curAccessBuf = buf;
+    curAccessLBA = lba;
+    curAccessWrite = false;
+    multicore_fifo_push_blocking(2);
 
-    return res == FR_OK && read == 512;
+    return true;
 }
 
 bool FileATAIO::write(ATAController *controller, int unit, const uint8_t *buf, uint32_t lba)
@@ -102,14 +113,23 @@ bool FileATAIO::write(ATAController *controller, int unit, const uint8_t *buf, u
     if(unit >= maxDrives)
         return false;
 
-    f_lseek(&file[unit], lba * 512);
+    if(lba >= numSectors[unit])
+        return false;
 
-    UINT written = 0;
-    auto res = f_write(&file[unit], buf, 512, &written);
+    if(curAccessController)
+    {
+        printf("ATA IO already in progress! (%c %u -> W %u)\n", curAccessWrite ? 'W' : 'R', curAccessLBA, lba);
+        return false;
+    }
 
-    controller->ioComplete(unit, res == FR_OK && written == 512, true);
+    curAccessController = controller;
+    curAccessDevice = unit;
+    curAccessBuf = const_cast<uint8_t *>(buf);
+    curAccessLBA = lba;
+    curAccessWrite = true;
+    multicore_fifo_push_blocking(2);
 
-    return res == FR_OK && written == 512;
+    return true;
 }
 
 void FileATAIO::openDisk(int unit, const char *path)
@@ -132,4 +152,20 @@ void FileATAIO::openDisk(int unit, const char *path)
 
     printf("Loaded ATA disk %i: %s (size: %lu)\n", unit, path, numSectors[unit] * sectorSize);
 
+}
+
+void FileATAIO::doCore0IO()
+{
+    f_lseek(&file[curAccessDevice], curAccessLBA * 512);
+
+    UINT accessed;
+    FRESULT res;
+    if(curAccessWrite)
+        res = f_write(&file[curAccessDevice], curAccessBuf, 512, &accessed);
+    else
+        res = f_read(&file[curAccessDevice], curAccessBuf, 512, &accessed);
+
+    curAccessSuccess = res == FR_OK && accessed == 512;
+
+    multicore_fifo_push_blocking(2);
 }

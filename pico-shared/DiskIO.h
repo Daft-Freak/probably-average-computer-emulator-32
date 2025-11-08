@@ -38,6 +38,13 @@ public:
 
     void openDisk(int unit, const char *path);
 
+    void doCore0IO();
+    void ioComplete()
+    {
+        curAccessController->ioComplete(curAccessDevice, curAccessSuccess, curAccessWrite);
+        curAccessController = nullptr;
+    }
+
     static const int maxDrives = 1;
 
 private:
@@ -45,4 +52,12 @@ private:
 
     uint32_t numSectors[maxDrives]{};
     bool isCD[maxDrives]{};
+
+    // saved params for current access
+    ATAController *curAccessController = nullptr;
+    int curAccessDevice;
+    uint8_t *curAccessBuf;
+    uint32_t curAccessLBA;
+    bool curAccessWrite;
+    bool curAccessSuccess;
 };
