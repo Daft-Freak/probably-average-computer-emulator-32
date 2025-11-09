@@ -22,7 +22,6 @@ jobs:
           - os: ubuntu-24.04
             name: Linux
             release-suffix: LIN64
-            apt-packages: libsdl3-dev
 
           - os: windows-latest
             name: Windows
@@ -56,6 +55,12 @@ jobs:
         repository: raspberrypi/pico-sdk
         path: pico-sdk
         submodules: true
+
+    # Linux dependencies
+    - name: Install Linux deps
+      if: ${{runner.os == 'Linux' && matrix.apt-packages}}
+      run: |
+        sudo apt update && sudo apt install ${{matrix.apt-packages}}
 
     - uses: libsdl-org/setup-sdl@main
       if: ${{!matrix.is-pico}}
