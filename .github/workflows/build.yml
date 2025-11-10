@@ -35,6 +35,22 @@ jobs:
             apt-packages: gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
             is-pico: true
 
+          - os: ubuntu-24.04
+            name: Pico Plus 2 with VGA
+            cache-key: pp2-vga
+            release-suffix: PP2_VGA
+            cmake-args: -DPICO_SDK_PATH=$GITHUB_WORKSPACE/pico-sdk -DPICO_BOARD=pimoroni_pico_plus2_rp2350 -DEXTRA_BOARD=vgaboard
+            apt-packages: gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+            is-pico: true
+
+          - os: ubuntu-24.04
+            name: Fruit Jam
+            cache-key: fruitjam
+            release-suffix: FruitJam
+            cmake-args: -DPICO_SDK_PATH=$GITHUB_WORKSPACE/pico-sdk -DPICO_BOARD=adafruit_fruit_jam
+            apt-packages: gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+            is-pico: true
+
     runs-on: ${{matrix.os}}
 
     env:
