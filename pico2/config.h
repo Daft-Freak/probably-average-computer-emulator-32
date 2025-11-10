@@ -8,6 +8,8 @@
 #define PSRAM_CS_PIN PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
 #elif defined(SOLDERPARTY_RP2350_STAMP_XL)
 #define PSRAM_CS_PIN 8
+#elif defined(ADAFRUIT_FRUIT_JAM)
+#define PSRAM_CS_PIN 47
 #elif !defined(DISABLE_PSRAM)
 #error "No PSRAM CS!"
 #endif
@@ -40,6 +42,27 @@
 // until I finish the driver, these are just to make sure the pins are pulled up
 #define SD_DAT1   20
 #define SD_DAT2   21
+
+// so far the only self-contained board
+#elif defined(ADAFRUIT_FRUIT_JAM)
+
+// TODO: when we have sound, though may need some extra config here
+//#define AUDIO_I2S_CLOCK_PIN_BASE ADAFRUIT_FRUIT_JAM_I2S_BCLK_PIN
+//#define AUDIO_I2S_DATA_PIN       ADAFRUIT_FRUIT_JAM_I2S_DIN_PIN
+
+#define DVI_CLK_P ADAFRUIT_FRUIT_JAM_DVI_CKP_PIN
+#define DVI_D0_P  ADAFRUIT_FRUIT_JAM_DVI_D0P_PIN
+#define DVI_D1_P  ADAFRUIT_FRUIT_JAM_DVI_D1P_PIN
+#define DVI_D2_P  ADAFRUIT_FRUIT_JAM_DVI_D2P_PIN
+
+#define SD_SCK    ADAFRUIT_FRUIT_JAM_SD_SCK_PIN
+#define SD_MOSI   ADAFRUIT_FRUIT_JAM_SD_MOSI_PIN
+#define SD_MISO   ADAFRUIT_FRUIT_JAM_SD_MISO_PIN
+#define SD_CS     ADAFRUIT_FRUIT_JAM_SD_CS_PIN
+
+// like the VGA board above, this is a "make sure we pull up"
+#define SD_DAT1   ADAFRUIT_FRUIT_JAM_SDIO_DATA1_PIN
+#define SD_DAT2   ADAFRUIT_FRUIT_JAM_SDIO_DATA2_PIN
 
 #elif defined(PIMORONI_PICO_PLUS2_RP2350)
 // as I was using a mess of jumper wires, there's not really a right answer here
