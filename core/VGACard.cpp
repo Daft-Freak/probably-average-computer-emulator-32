@@ -204,7 +204,46 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
     }
     else if(gfxMode & (1 << 4)) // interleaved
     {
-        // FIXME: this is used by mode 0D
+        int charHeight = (crtcRegs[0x9] & 0x1F) + 1;
+        int offset = crtcRegs[0x13];
+        int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
+
+        uint8_t planeEnable = attribPlaneEnable;
+
+        uint8_t *ptr0 = plane0 + startAddr + offset * 4 * (line / charHeight);
+
+        // remap alternate lines for old modes
+        if((crtcRegs[0x17] & 1) == 0 && (line & 1))
+            ptr0 += 0x2000;
+    
+        auto endPtr0 = ptr0 + outputW / 4;
+
+        // first 4 pixels from plane 0 + 2
+        // next four from plane 1 + 3
+        for(; ptr0 != endPtr0; ptr0 += 2)
+        {
+            uint8_t byte0 = (planeEnable & (1 << 0)) ? ptr0[0x00000] : 0;
+            uint8_t byte2 = (planeEnable & (1 << 2)) ? ptr0[0x20000] : 0;
+            for(int i = 0; i < 4; i++)
+            {
+                int index = byte0 >> 6 | (byte2 >> 6) << 2;
+                byte0 <<= 2;
+                byte2 <<= 2;
+
+                outputPixel(paletteLookup16(index));
+            }
+
+            uint8_t byte1 = (planeEnable & (1 << 1)) ? ptr0[0x10000] : 0;
+            uint8_t byte3 = (planeEnable & (1 << 3)) ? ptr0[0x30000] : 0;
+            for(int i = 0; i < 4; i++)
+            {
+                int index = byte1 >> 6 | (byte3 >> 6) << 2;
+                byte1 <<= 2;
+                byte3 <<= 2;
+
+                outputPixel(paletteLookup16(index));
+            }
+        }
     }
     else // 16 col?
     {
