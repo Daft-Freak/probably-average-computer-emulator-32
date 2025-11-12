@@ -188,6 +188,7 @@ private:
 
     // validation/privilege stuff
     bool checkIOPermission(uint16_t addr);
+    bool checkSegmentLimit(const SegmentDescriptor &desc, uint32_t offset, int width, bool isSS = false);
     bool checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write);
 
     bool checkStackSpace(int words, bool op32, bool addr32);

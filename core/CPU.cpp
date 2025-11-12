@@ -6527,16 +6527,14 @@ bool CPU::checkIOPermission(uint16_t addr)
     return false;
 }
 
-bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write)
+bool CPU::checkSegmentLimit(const SegmentDescriptor &desc, uint32_t offset, int width, bool isSS)
 {
-    auto &desc = getCachedSegmentDescriptor(segment);
-
     if(flags & Flag_VM)
     {
         // v86 mode always has 64k limit?
         if(offset + width - 1 > 0xFFFF)
         {
-            fault(segment == Reg16::SS ? Fault::SS : Fault::GP);
+            fault(isSS ? Fault::SS : Fault::GP);
             return false;
         }
         return true;
@@ -6548,7 +6546,7 @@ bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool wri
         // is overflow check correct here?
         if(offset + width - 1 <= desc.limit || offset > 0xFFFFFFFF - (width - 1))
         {
-            fault(segment == Reg16::SS ? Fault::SS : Fault::GP, 0);
+            fault(isSS ? Fault::SS : Fault::GP, 0);
             return false;
         }
     }
@@ -6557,14 +6555,24 @@ bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool wri
         // check limit (also check for overflow)
         if(offset + width - 1 > desc.limit || offset > 0xFFFFFFFF - (width - 1))
         {
-            fault(segment == Reg16::SS ? Fault::SS : Fault::GP, 0);
+            fault(isSS ? Fault::SS : Fault::GP, 0);
             return false;
         }
     }
 
+    return true;
+}
+
+bool CPU::checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write)
+{
+    auto &desc = getCachedSegmentDescriptor(segment);
+
+    if(!checkSegmentLimit(desc, offset, width, segment == Reg16::SS))
+        return false;
+
     // nothing else to check in real mode
     // or if this is SS, as it can't be loaded with null or a read-only segment
-    if(!isProtectedMode() || segment == Reg16::SS)
+    if((flags & Flag_VM) || !isProtectedMode() || segment == Reg16::SS)
         return true;
 
     // corner case null descriptor check (we zero the limit, but a byte access at offset 0 might still get through)
