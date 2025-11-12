@@ -231,30 +231,30 @@ private:
     void doALU32AImm(uint32_t addr);
 
     // string ops
-    using StringOp = bool (CPU::*)(uint32_t si, Reg16 srcSeg, uint32_t di);
+    using StringOp = bool (CPU::*)(uint32_t si, uint32_t di);
 
     template<StringOp op, bool useSI, bool useDI, int wordSize>
     void doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep);
 
-    bool doINS8(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doINS16(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doINS32(uint32_t si, Reg16 srcSeg, uint32_t di);
+    bool doINS8(uint32_t si, uint32_t di);
+    bool doINS16(uint32_t si, uint32_t di);
+    bool doINS32(uint32_t si, uint32_t di);
 
-    bool doOUTS8(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doOUTS16(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doOUTS32(uint32_t si, Reg16 srcSeg, uint32_t di);
+    bool doOUTS8(uint32_t si, uint32_t di);
+    bool doOUTS16(uint32_t si, uint32_t di);
+    bool doOUTS32(uint32_t si, uint32_t di);
 
-    bool doMOVS8(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doMOVS16(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doMOVS32(uint32_t si, Reg16 srcSeg, uint32_t di);
+    bool doMOVS8(uint32_t si, uint32_t di);
+    bool doMOVS16(uint32_t si, uint32_t di);
+    bool doMOVS32(uint32_t si, uint32_t di);
 
-    bool doSTOS8(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doSTOS16(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doSTOS32(uint32_t si, Reg16 srcSeg, uint32_t di);
+    bool doSTOS8(uint32_t si, uint32_t di);
+    bool doSTOS16(uint32_t si, uint32_t di);
+    bool doSTOS32(uint32_t si, uint32_t di);
 
-    bool doLODS8(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doLODS16(uint32_t si, Reg16 srcSeg, uint32_t di);
-    bool doLODS32(uint32_t si, Reg16 srcSeg, uint32_t di);
+    bool doLODS8(uint32_t si, uint32_t di);
+    bool doLODS16(uint32_t si, uint32_t di);
+    bool doLODS32(uint32_t si, uint32_t di);
 
     // misc op helpers
     bool doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg = false);

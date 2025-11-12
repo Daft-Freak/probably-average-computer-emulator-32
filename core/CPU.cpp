@@ -7005,14 +7005,38 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
         if(useDI) di = reg(Reg16::DI);
     }
 
+    uint32_t count = addressSize32 ? reg(Reg32::ECX) : reg(Reg16::CX);
+
+    // repeat zero times == do nothing
+    if(rep && !count)
+        return;
+
+    // check segments early
+    // then we only need to check limit for REP x
+    if(useSI && !checkSegmentAccess(segment, si, wordSize, false))
+        return;
+
+    if(useDI && !checkSegmentAccess(Reg16::ES, di, wordSize, true))
+        return;
+
+    SegmentDescriptor srcSeg, dstSeg;
+
+    if(useSI) srcSeg = getCachedSegmentDescriptor(segment);
+    if(useDI) dstSeg = getCachedSegmentDescriptor(Reg16::ES);
+
     if(rep)
     {
-        uint32_t count = addressSize32 ? reg(Reg32::ECX) : reg(Reg16::CX);
-
         while(count)
         {
+            // check limits
+            if(useSI && !checkSegmentLimit(srcSeg, si, wordSize, segment == Reg16::SS))
+                break;
+
+            if(useDI && !checkSegmentLimit(dstSeg, di, wordSize))
+                break;
+
             // TODO: interrupt
-            if(!(this->*op)(si, segment, di))
+            if(!(this->*op)(si + srcSeg.base, di + dstSeg.base))
                 break;
 
             if(useSI) si += step;
@@ -7034,7 +7058,8 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
     }
     else
     {
-        if(!(this->*op)(si, segment, di))
+        // the only fault we can get from the op is a page fault
+        if(!(this->*op)(si + srcSeg.base, di + dstSeg.base))
             return;
 
         if(useSI) si += step;
@@ -7054,36 +7079,36 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
 }
 
 // maybe could reduce these with even more templates, but...
-bool CPU::doINS8(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doINS8(uint32_t si, uint32_t di)
 {
-    return writeMem8(di, Reg16::ES, sys.readIOPort(reg(Reg16::DX)));
+    return writeMem8(di, sys.readIOPort(reg(Reg16::DX)));
 }
 
-bool CPU::doINS16(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doINS16(uint32_t si, uint32_t di)
 {
-    return writeMem16(di, Reg16::ES, sys.readIOPort16(reg(Reg16::DX)));
+    return writeMem16(di, sys.readIOPort16(reg(Reg16::DX)));
 }
 
-bool CPU::doINS32(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doINS32(uint32_t si, uint32_t di)
 {
     auto v = sys.readIOPort16(reg(Reg16::DX)) | sys.readIOPort16(reg(Reg16::DX) + 2) << 16;
-    return writeMem32(di, Reg16::ES, v);
+    return writeMem32(di, v);
 }
 
-bool CPU::doOUTS8(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doOUTS8(uint32_t si, uint32_t di)
 {
     uint8_t v;
-    if(!readMem8(si, srcSeg, v))
+    if(!readMem8(si, v))
         return false;
 
     sys.writeIOPort(reg(Reg16::DX), v);
     return true;
 }
 
-bool CPU::doOUTS16(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doOUTS16(uint32_t si, uint32_t di)
 {
     uint16_t v;
-    if(!readMem16(si, srcSeg, v))
+    if(!readMem16(si, v))
         return false;
 
     sys.writeIOPort16(reg(Reg16::DX), v);
@@ -7091,10 +7116,10 @@ bool CPU::doOUTS16(uint32_t si, Reg16 srcSeg, uint32_t di)
     return true;
 }
 
-bool CPU::doOUTS32(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doOUTS32(uint32_t si, uint32_t di)
 {
     uint32_t v;
-    if(!readMem32(si, srcSeg, v))
+    if(!readMem32(si, v))
         return false;
 
     sys.writeIOPort16(reg(Reg16::DX), v);
@@ -7103,52 +7128,52 @@ bool CPU::doOUTS32(uint32_t si, Reg16 srcSeg, uint32_t di)
     return true;
 }
 
-bool CPU::doMOVS8(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doMOVS8(uint32_t si, uint32_t di)
 {
     uint8_t v;
-    return readMem8(si, srcSeg, v) && writeMem8(di, Reg16::ES, v);
+    return readMem8(si, v) && writeMem8(di, v);
 }
 
-bool CPU::doMOVS16(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doMOVS16(uint32_t si, uint32_t di)
 {
     uint16_t v;
-    return readMem16(si, srcSeg, v) && writeMem16(di, Reg16::ES, v);
+    return readMem16(si, v) && writeMem16(di, v);
 }
 
-bool CPU::doMOVS32(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doMOVS32(uint32_t si, uint32_t di)
 {
     uint32_t v;
-    return readMem32(si, srcSeg, v) && writeMem32(di, Reg16::ES, v);
+    return readMem32(si, v) && writeMem32(di, v);
 }
 
-bool CPU::doSTOS8(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doSTOS8(uint32_t si, uint32_t di)
 {
-    return writeMem8(di, Reg16::ES, reg(Reg8::AL));
+    return writeMem8(di, reg(Reg8::AL));
 }
 
-bool CPU::doSTOS16(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doSTOS16(uint32_t si, uint32_t di)
 {
-    return writeMem16(di, Reg16::ES, reg(Reg16::AX));
+    return writeMem16(di, reg(Reg16::AX));
 }
 
-bool CPU::doSTOS32(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doSTOS32(uint32_t si, uint32_t di)
 {
-    return writeMem32(di, Reg16::ES, reg(Reg32::EAX));
+    return writeMem32(di, reg(Reg32::EAX));
 }
 
-bool CPU::doLODS8(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doLODS8(uint32_t si, uint32_t di)
 {
-    return readMem8(si, srcSeg, reg(Reg8::AL));
+    return readMem8(si, reg(Reg8::AL));
 }
 
-bool CPU::doLODS16(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doLODS16(uint32_t si, uint32_t di)
 {
-    return readMem16(si, srcSeg, reg(Reg16::AX));
+    return readMem16(si, reg(Reg16::AX));
 }
 
-bool CPU::doLODS32(uint32_t si, Reg16 srcSeg, uint32_t di)
+bool CPU::doLODS32(uint32_t si, uint32_t di)
 {
-    return readMem32(si, srcSeg, reg(Reg32::EAX));
+    return readMem32(si, reg(Reg32::EAX));
 }
 
 bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
