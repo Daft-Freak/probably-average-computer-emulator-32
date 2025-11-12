@@ -17,6 +17,8 @@ VGACard::VGACard(System &sys) : sys(sys)
 
 void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 {
+    inDraw = true;
+
     // if clock rate is halved, double the pixels
     // but make sure we don't do it too early
     const bool isHalfClock = seqClockMode & (1 << 3) && crtcRegs[1] < 40;
@@ -330,6 +332,8 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 #endif
         }
     }
+
+    inDraw = false;
 }
 
 std::tuple<int, int> VGACard::getOutputResolution()
@@ -354,7 +358,8 @@ uint8_t VGACard::read(uint16_t addr)
             attributeIsData = false; // resets here
 
             // claim we're in vblank between drawing last line and going back to first
-            return lastOutputLine == outputH - 1 ? 0x9 : 0;
+            return lastOutputLine == outputH - 1 ? (1 << 3) : 0 |
+                   inDraw ? 0 : 1;
 
         case 0x3C0: // attribute address
             return attributeIndex;

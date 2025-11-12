@@ -85,6 +85,7 @@ private:
     int outputW = 0, outputH = 0;
     int lastOutputLine = 0;
     unsigned frame = 0;
+    bool inDraw = false;
 
 #ifdef VGA_RGB565
     uint16_t rgb565pal16[16];
