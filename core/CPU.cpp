@@ -6840,7 +6840,7 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
                 break;
 
             // TODO: interrupt
-            if(!(this->*op)(si + srcSeg.base, di + dstSeg.base))
+            if(!(this->*op)(useSI ? si + srcSeg.base : 0, useDI ? di + dstSeg.base : 0))
                 break;
 
             if(useSI) si += step;
@@ -6863,7 +6863,7 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
     else
     {
         // the only fault we can get from the op is a page fault
-        if(!(this->*op)(si + srcSeg.base, di + dstSeg.base))
+        if(!(this->*op)(useSI ? si + srcSeg.base : 0, useDI ? di + dstSeg.base : 0))
             return;
 
         if(useSI) si += step;
