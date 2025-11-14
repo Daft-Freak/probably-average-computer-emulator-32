@@ -3101,11 +3101,14 @@ void CPU::executeInstruction()
 
             uint32_t newIP, newCS;
 
+            // "pop" CS:IP
+            if(!peek(operandSize32, 0, newIP) || !peek(operandSize32, 1, newCS))
+                break;
+
             // need to validate CS (and SS) BEFORE popping anything...
             if(isProtectedMode() && !(flags & Flag_VM))
             {
-                // peek might fault first
-                if(!peek(operandSize32, 1, newCS) || !checkSegmentSelector(Reg16::CS, newCS, (newCS & 3)))
+                if(!checkSegmentSelector(Reg16::CS, newCS, (newCS & 3)))
                     break;
 
                 // validate new SS if return to outer
@@ -3120,22 +3123,24 @@ void CPU::executeInstruction()
                     fault(Fault::GP, newCS & ~3);
                     break;
                 }
+
+                // FIXME: check IP against new CS limit
             }
-            else if(!peek(operandSize32, 1, newCS)) // get it anyway to force any faults to happen early
-                break;
-
-            // pop IP/VS
-            popPreChecked(operandSize32, newIP);
-            popPreChecked(operandSize32, newCS);
-
-            if(opcode == 0xCA)
+            else
             {
-                // add imm to SP
-                if(stackAddrSize32)
-                    reg(Reg32::ESP) += imm;
-                else
-                    reg(Reg16::SP) += imm;
+                // check IP against limit
+                if(newIP > 0xFFFF)
+                {
+                    fault(Fault::GP, 0);
+                    break;
+                }
             }
+
+            // update SP
+            if(stackAddrSize32)
+                reg(Reg32::ESP) += imm + (operandSize32 ? 8 : 4);
+            else
+                reg(Reg16::SP) += imm + (operandSize32 ? 8 : 4);
 
             if(isProtectedMode() && !(flags & Flag_VM))
             {
