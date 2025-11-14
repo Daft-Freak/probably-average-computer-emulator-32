@@ -1372,6 +1372,12 @@ void CPU::executeInstruction()
             if(!rm.isValid())
                 return;
 
+            if(rm.isReg())
+            {
+                fault(Fault::UD);
+                break;
+            }
+
             int32_t index, lower, upper;
 
             if(operandSize32)
@@ -2032,6 +2038,12 @@ void CPU::executeInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
+
+            if(rm.isReg())
+            {
+                fault(Fault::UD);
+                break;
+            }
 
             if(operandSize32)
                 reg(rm.reg32()) = rm.offset;
@@ -4107,7 +4119,11 @@ void CPU::executeInstruction()
                 }
                 case 3: // CALL far indirect
                 {
-                    assert(!rm.isReg());
+                    if(rm.isReg())
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
 
                     uint16_t newCS;
                     if(readMem16(rm.offset + (operandSize32 ? 4 : 2), rm.rmBase, newCS))
@@ -4121,7 +4137,11 @@ void CPU::executeInstruction()
                 }
                 case 5: // JMP far indirect
                 {
-                    assert(!rm.isReg());
+                    if(rm.isReg())
+                    {
+                        fault(Fault::UD);
+                        break;
+                    }
 
                     uint16_t newCS;
                     readMem16(rm.offset + (operandSize32 ? 4 : 2), rm.rmBase, newCS);
@@ -7553,7 +7573,11 @@ void CPU::loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32)
     if(!rm.isValid())
         return;
 
-    assert(!rm.isReg());
+    if(rm.isReg())
+    {
+        fault(Fault::UD);
+        return;
+    }
 
     if(operandSize32)
     {
