@@ -90,6 +90,8 @@ public:
     void setFlags(uint16_t flags) {this->flags = flags;}
     void updateFlags(uint32_t newFlags, uint32_t mask, bool is32);
 
+    void updateSegmentDescriptorCache();
+
     void executeInstruction();
     void executeInstruction0F(uint32_t addr, bool operandSize32, bool lock);
 

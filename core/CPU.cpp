@@ -680,6 +680,17 @@ void CPU::updateFlags(uint32_t newFlags, uint32_t mask, bool is32)
     flags = (flags & ~mask) | (newFlags & mask);
 }
 
+// for tests, syncs the cached descriptor info with the registers
+void CPU::updateSegmentDescriptorCache()
+{
+    setSegmentReg(CPU::Reg16::ES, reg(CPU::Reg16::ES));
+    setSegmentReg(CPU::Reg16::CS, reg(CPU::Reg16::CS));
+    setSegmentReg(CPU::Reg16::SS, reg(CPU::Reg16::SS));
+    setSegmentReg(CPU::Reg16::DS, reg(CPU::Reg16::DS));
+    setSegmentReg(CPU::Reg16::FS, reg(CPU::Reg16::FS));
+    setSegmentReg(CPU::Reg16::GS, reg(CPU::Reg16::GS));
+}
+
 void CPU::executeInstruction()
 {
     faultIP = reg(Reg32::EIP);
