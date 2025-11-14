@@ -2885,16 +2885,23 @@ void CPU::executeInstruction()
             // pop from stack
             uint32_t newIP;
 
-            if(!pop(operandSize32, newIP))
+            if(!peek(operandSize32, 0, newIP))
                 break;
+
+            // check IP against limit
+            if(newIP > getCachedSegmentDescriptor(Reg16::CS).limit)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
 
             // add imm to SP
             if(stackAddrSize32)
-                reg(Reg32::ESP) += imm;
+                reg(Reg32::ESP) += imm + (operandSize32 ? 4 : 2);
             else
-                reg(Reg16::SP) += imm;
+                reg(Reg16::SP) += imm + (operandSize32 ? 4 : 2);
 
-            setIP(newIP);
+            reg(Reg32::EIP) = newIP;
             break;
         }
         case 0xC3: // RET near
@@ -2902,10 +2909,23 @@ void CPU::executeInstruction()
             // pop from stack
             uint32_t newIP;
 
-            if(!pop(operandSize32, newIP))
+            if(!peek(operandSize32, 0, newIP))
                 break;
 
-            setIP(newIP);
+            // check IP against limit
+            if(newIP > getCachedSegmentDescriptor(Reg16::CS).limit)
+            {
+                fault(Fault::GP, 0);
+                break;
+            }
+
+            // update SP
+            if(stackAddrSize32)
+                reg(Reg32::ESP) += (operandSize32 ? 4 : 2);
+            else
+                reg(Reg16::SP) += (operandSize32 ? 4 : 2);
+
+            reg(Reg32::EIP) = newIP;
             break;
         }
 
