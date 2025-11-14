@@ -4181,7 +4181,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
     if(lock)
     {
         // only bit testing ops
-        if(opcode2 != 0xA3 && opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
+        if(opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
         {
             fault(Fault::UD);
             return;
@@ -4191,6 +4191,13 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
         uint8_t modRM;
         if(!readMemIP8(addr + 2, modRM))
             return; // give up if we faulted early
+
+        // don't allow BT (doesn't write)
+        if(opcode2 == 0xBA && ((modRM >> 3) & 7) == 4)
+        {
+            fault(Fault::UD);
+            return;
+        }
 
         // not a memory operand, can't lock a register
         if((modRM >> 6) == 3)
@@ -6550,10 +6557,10 @@ bool CPU::validateLOCKPrefix(uint8_t opcode, uint32_t addr)
 {
     if(opcode == 0x0F)
     {} // check it when we have the 2nd opcode byte
-    // allow x0-x3,x8-xB for ALU ops
+    // allow x0-x1,x8-x9 for ALU ops
     else if(opcode < 0x34)
     {
-        if(opcode & 4)
+        if(opcode & 6)
         {
             fault(Fault::UD);
             return false;
