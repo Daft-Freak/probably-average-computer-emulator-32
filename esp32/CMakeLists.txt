@@ -1,4 +1,6 @@
 
+include(bios.cmake)
+
 add_executable(PACE_ESP32 Main.cpp)
 
 target_link_libraries(PACE_ESP32 PUBLIC
@@ -10,6 +12,9 @@ target_link_libraries(PACE_ESP32 PUBLIC
     idf::esp_wifi
     idf::usb
     idf::usb_host_hid
+
+    PACECore
+    PACE_BIOS
 )
 
 if(ESP_TARGET STREQUAL "esp32p4")
