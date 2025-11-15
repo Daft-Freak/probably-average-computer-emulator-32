@@ -3,6 +3,8 @@ include(bios.cmake)
 
 add_executable(PACE_ESP32 Main.cpp)
 
+target_compile_definitions(PACE_ESP32 PRIVATE ESP_BUILD)
+
 target_link_libraries(PACE_ESP32 PUBLIC
     idf::newlib
     idf::fatfs

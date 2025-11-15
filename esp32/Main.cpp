@@ -1,3 +1,5 @@
+#include "driver/gptimer.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -9,6 +11,8 @@
 #include "Scancode.h"
 #include "System.h"
 #include "VGACard.h"
+
+gptimer_handle_t sysTimer = nullptr;
 
 static System sys;
 
@@ -28,6 +32,19 @@ static void runEmulator()
 
 extern "C" void app_main()
 {
+    // create and start timer
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,                // count up
+        .resolution_hz = System::getClockSpeed() / 4, // at emulated system freq (/4)
+        .intr_priority = 0,
+        .flags = {}
+    };
+
+    ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &sysTimer));
+    ESP_ERROR_CHECK(gptimer_enable(sysTimer));
+    ESP_ERROR_CHECK(gptimer_start(sysTimer));
+
     // display/fs init
 
     // emulator init

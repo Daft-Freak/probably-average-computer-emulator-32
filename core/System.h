@@ -10,6 +10,9 @@
 #ifdef PICO_BUILD
 #include "hardware/pio.h"
 #endif
+#ifdef ESP_BUILD
+#include "driver/gptimer.h"
+#endif
 
 class System;
 
@@ -209,6 +212,11 @@ public:
 #ifdef PICO_BUILD
         // sync the timer from the PIO program
         return pio1->rxf_putget[0][0];
+#elif defined(ESP_BUILD)
+        extern gptimer_handle_t sysTimer;
+        uint64_t count;
+        gptimer_get_raw_count(sysTimer, &count);
+        return count << 2;
 #else
         return cycleCount;
 #endif
