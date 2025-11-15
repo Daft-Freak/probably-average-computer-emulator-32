@@ -221,8 +221,16 @@ static void setDiskLED(bool on)
 
 int main()
 {
+#ifdef OVERCLOCK_500
+    // this is tested on two of my boards
+    vreg_disable_voltage_limit();
+    vreg_set_voltage(VREG_VOLTAGE_1_60);
+    sleep_ms(10);
+    set_sys_clock_khz(504000, true);
+#else
     // PIO USB wants a multiple of 12, HSTX wants a multiple of ~125 (25.175 * 10 / 2)
     set_sys_clock_khz(252000, false);
+#endif
 
 // with all the display handling here, there isn't enough CPU time on core0 for PIO USB
 // also adjust the clock a bit

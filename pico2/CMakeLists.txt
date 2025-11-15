@@ -97,3 +97,12 @@ pico_add_extra_outputs(PACEPico2)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/PACEPico2.uf2
 	DESTINATION bin
 )
+
+# overclock to ~500Mhz at 1.6v
+if(COOK_MY_CHIPS)
+    pico_define_boot_stage2(flash_clkdiv4 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+    target_compile_definitions(flash_clkdiv4 PRIVATE PICO_FLASH_SPI_CLKDIV=4 PICO_FLASH_SPI_RXDELAY=4)
+
+    pico_set_boot_stage2(PACEPico2 flash_clkdiv4)
+    target_compile_definitions(PACEPico2 PRIVATE OVERCLOCK_500)
+endif()
