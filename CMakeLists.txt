@@ -20,6 +20,10 @@ if(PICO_SDK_PATH) # set by import file
   endif()
 endif()
 
+if(ESP_TARGET)
+  include(esp32/setup.cmake)
+  set(IS_ESP32 true)
+endif()
 
 if(MSVC)
   add_compile_options("/W4" "/wd4244" "/wd4324" "/wd4458" "/wd4100")
@@ -29,8 +33,9 @@ endif()
 
 
 include(CMakeDependentOption)
-cmake_dependent_option(BUILD_SDL "Build minimal SDL UI" ON "NOT IS_PICO" OFF)
+cmake_dependent_option(BUILD_SDL "Build minimal SDL UI" ON "NOT IS_PICO AND NOT IS_ESP32" OFF)
 cmake_dependent_option(BUILD_PICO2 "Build Pico 2 UI" ON "IS_PICO2" OFF)
+cmake_dependent_option(BUILD_ESP32 "Build ESP32 UI" ON "IS_ESP32" OFF)
 
 add_subdirectory(core)
 
@@ -44,6 +49,10 @@ endif()
 
 if(BUILD_PICO2)
   add_subdirectory(pico2)
+endif()
+
+if(BUILD_ESP32)
+  add_subdirectory(esp32)
 endif()
 
 # setup release packages
