@@ -5,6 +5,7 @@
 #include "freertos/idf_additions.h"
 
 #include "BIOS.h"
+#include "Display.h"
 
 #include "ATAController.h"
 #include "FloppyController.h"
@@ -24,6 +25,12 @@ static VGACard vga(sys);
 
 // static FileATAIO ataPrimaryIO;
 // static FileFloppyIO floppyIO;
+
+void display_draw_line(void *, int line, uint16_t *buf)
+{
+    // may need to be more careful here as this is coming from an interrupt...
+    vga.drawScanline(line, reinterpret_cast<uint8_t *>(buf));
+}
 
 static void runEmulator(void * arg)
 {
@@ -52,6 +59,7 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(gptimer_start(sysTimer));
 
     // display/fs init
+    init_display();
 
     // emulator init
     auto ramSize = 8 * 1024 * 1024; // can go up to 16 (core limit)
@@ -72,6 +80,6 @@ extern "C" void app_main()
 
     while(true)
     {
-        vTaskDelay(1); // let idle task run
+        vTaskDelay(1);
     }
 }

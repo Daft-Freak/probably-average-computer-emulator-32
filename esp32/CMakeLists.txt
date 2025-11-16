@@ -1,9 +1,12 @@
 
 include(bios.cmake)
 
-add_executable(PACE_ESP32 Main.cpp)
+add_executable(PACE_ESP32
+    Display.cpp
+    Main.cpp
+)
 
-target_compile_definitions(PACE_ESP32 PRIVATE ESP_BUILD)
+target_compile_definitions(PACE_ESP32 PRIVATE ESP_BUILD VGA_RGB565)
 
 target_link_libraries(PACE_ESP32 PUBLIC
     idf::newlib

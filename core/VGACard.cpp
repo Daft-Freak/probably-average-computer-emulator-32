@@ -128,7 +128,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         int offset = crtcRegs[0x13];
         int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
 
-#ifdef PICO_BUILD
+#if defined(PICO_BUILD) || defined(ESP_BUILD)
         charWidth = 8; // HACK: we don't support 720 wide modes yet
 #endif
 
