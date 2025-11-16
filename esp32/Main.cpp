@@ -6,6 +6,7 @@
 
 #include "BIOS.h"
 #include "Display.h"
+#include "Storage.h"
 
 #include "ATAController.h"
 #include "FloppyController.h"
@@ -60,6 +61,7 @@ extern "C" void app_main()
 
     // display/fs init
     init_display();
+    init_storage();
 
     // emulator init
     auto ramSize = 8 * 1024 * 1024; // can go up to 16 (core limit)
