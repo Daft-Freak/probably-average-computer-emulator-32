@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-#define LL_TIMER // hack to significantly reduce overhead
+#define LL_TIMER // hacks to significantly reduce overhead
+
 #include "driver/gptimer.h"
 
 #ifdef LL_TIMER
@@ -18,8 +19,11 @@ inline uint32_t getTimer()
     uint64_t count;
 #ifdef LL_TIMER
     auto context = &sysTimer->hal;
-    timer_ll_trigger_soft_capture(context->dev, context->timer_id);
-    count = timer_ll_get_counter_value(context->dev, context->timer_id);
+    // assume that because we created this timer as early as possible, it is the first one
+    timer_ll_trigger_soft_capture(context->dev, 0);
+    //count = timer_ll_get_counter_value(context->dev, context->timer_id);
+    // avoid reading high half
+    count = context->dev->hw_timer[0].lo.tx_lo;
 #else
     gptimer_get_raw_count(sysTimer, &count);
 #endif
