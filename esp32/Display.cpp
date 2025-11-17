@@ -104,17 +104,35 @@ static void display_task(void *arg)
             {
                 cur_mode_h = new_mode_h;
 
-                if(new_mode_h == 480)
+                if(DISPLAY_HEIGHT == 240)
                 {
-                    // 480:240 == 2:1 
-                    in_lines = 2;
-                    out_lines = 1;
+                    if(new_mode_h == 480)
+                    {
+                        // 480:240 == 2:1 
+                        in_lines = 2;
+                        out_lines = 1;
+                    }
+                    else if(new_mode_h == 400)
+                    {
+                        // 400:240 == 5:3
+                        in_lines = 5;
+                        out_lines = 3;
+                    }
                 }
-                else if(new_mode_h == 400)
+                else if(DISPLAY_HEIGHT == 320)
                 {
-                    // 400:240 == 5:3
-                    in_lines = 5;
-                    out_lines = 3;
+                    if(new_mode_h == 480)
+                    {
+                        // 480:320 == 3:2
+                        in_lines = 3;
+                        out_lines = 2;
+                    }
+                    else if(new_mode_h == 400)
+                    {
+                        // 400:320 == 5:4
+                        in_lines = 5;
+                        out_lines = 4;
+                    }
                 }
 
                 copy_out_step = out_lines;
@@ -243,7 +261,50 @@ void init_display()
     panel_config.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
     panel_config.bits_per_pixel = 16;
 
-#ifdef LCD_ST7789
+#ifdef LCD_ILI9488
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
+
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+
+    esp_lcd_panel_invert_color(panel_handle, false);
+    esp_lcd_panel_set_gap(panel_handle, 0, 0);
+    esp_lcd_panel_swap_xy(panel_handle, true);
+    esp_lcd_panel_mirror(panel_handle, true, true);
+
+    if(DISPLAY_WIDTH == 480 && DISPLAY_HEIGHT == 320)
+    {
+        // TODO: I don't even know if this is correct for the display I have.
+        esp_lcd_panel_io_tx_param(io_handle, 0xC0/*PWCTRL1*/, (uint8_t[]) {
+            0x17, 0x12
+        }, 2);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xC1/*PWCTRL2*/, (uint8_t[]) {
+            0x41
+        }, 1);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xC5/*VMCTRL*/, (uint8_t[]) {
+            0x00, 0x12, 0x80
+        }, 3);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xB1/*FRMCTR1*/, (uint8_t[]) {
+            0xA0
+        }, 1);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xB7/*ETMOD*/, (uint8_t[]) {
+            0x86
+        }, 1);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xE0/*PGAMCTRL*/, (uint8_t[]) {
+            0x00, 0x03, 0x09, 0x08, 0x16, 0x0A, 0x3F, 0x78, 0x4C, 0x09, 0x0A, 0x08, 0x16, 0x1A, 0x0F
+        }, 15);
+
+        esp_lcd_panel_io_tx_param(io_handle, 0xE1/*NGAMCTRL*/, (uint8_t[]) {
+            0x00, 0x16, 0x19, 0x03, 0x0F, 0x05, 0x32, 0x45, 0x46, 0x04, 0x0E, 0x0D, 0x35, 0x37, 0x0F
+        }, 15);
+    }
+
+#elif defined(LCD_ST7789)
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle));
 
     esp_lcd_panel_reset(panel_handle);
