@@ -167,9 +167,10 @@ extern "C" void app_main()
     init_usb();
 
     // emulator init
-    auto ramSize = 8 * 1024 * 1024; // can go up to 16 (core limit)
+    auto ramSize = 16 * 1024 * 1024; // can go up to 16 (core limit)
     auto ram = new uint8_t[ramSize];
     sys.addMemory(0, ramSize, ram);
+    sys.getChipset().setTotalMemory(ramSize);
 
     // load BIOS
     auto bios = _binary_bios_bin_start;
