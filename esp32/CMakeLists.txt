@@ -9,6 +9,8 @@ add_executable(PACE_ESP32
     USB.cpp
 )
 
+set_target_properties(PACE_ESP32 PROPERTIES CXX_EXTENSIONS ON)
+
 target_compile_definitions(PACE_ESP32 PRIVATE ESP_BUILD VGA_RGB565)
 
 target_link_libraries(PACE_ESP32 PUBLIC
