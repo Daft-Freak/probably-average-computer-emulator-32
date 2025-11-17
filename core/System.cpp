@@ -852,6 +852,18 @@ void Chipset::setFixedDiskPresent(int index, bool present)
         cmosRam[0x12] &= ~(0xF0 >> (index * 8));
 }
 
+void Chipset::setTotalMemory(uint32_t size)
+{
+    // convert to kB, remove first MB
+    uint32_t extMemKB = size / 1024 - 1024;
+
+    cmosRam[0x17] = extMemKB & 0xFF;
+    cmosRam[0x18] = extMemKB >> 8;
+
+    cmosRam[0x30] = extMemKB & 0xFF;
+    cmosRam[0x31] = extMemKB >> 8;
+}
+
 uint8_t Chipset::PIC::read(int index)
 {
     if(index == 0) // OCW3

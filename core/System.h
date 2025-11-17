@@ -83,6 +83,7 @@ public:
 
     // misc
     void setFixedDiskPresent(int index, bool present);
+    void setTotalMemory(uint32_t size);
 
 private:
     struct DMA
