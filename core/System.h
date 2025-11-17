@@ -7,18 +7,9 @@
 #include "FIFO.h"
 #include "Scancode.h"
 
-#ifdef PICO_BUILD
-#include "hardware/pio.h"
-#endif
-#ifdef ESP_BUILD
-#define LL_TIMER // hack to significantly reduce overhead
-#include "driver/gptimer.h"
-
-#ifdef LL_TIMER
-#define _Atomic
-#include "../src/gptimer_priv.h" // gptimer_t
-#include "hal/timer_ll.h"
-#endif
+#if defined(PICO_BUILD) || defined(ESP_BUILD)
+#include "PortTimer.h"
+#define USE_PORT_TIMER
 #endif
 
 class System;
@@ -216,20 +207,8 @@ public:
 
     uint32_t getCycleCount() const
     {
-#ifdef PICO_BUILD
-        // sync the timer from the PIO program
-        return pio1->rxf_putget[0][0];
-#elif defined(ESP_BUILD)
-        extern gptimer_handle_t sysTimer;
-        uint64_t count;
-#ifdef LL_TIMER
-        auto context = &sysTimer->hal;
-        timer_ll_trigger_soft_capture(context->dev, context->timer_id);
-        count = timer_ll_get_counter_value(context->dev, context->timer_id);
-#else
-        gptimer_get_raw_count(sysTimer, &count);
-#endif
-        return count << 2;
+#ifdef USE_PORT_TIMER
+        return getTimer();
 #else
         return cycleCount;
 #endif
@@ -268,7 +247,7 @@ public:
 
     void addCPUCycles(int cycles)
     {
-#ifndef PICO_BUILD
+#ifndef USE_PORT_TIMER
         cycleCount += cycles * cpuClkDiv;
 #endif
     }
@@ -302,7 +281,7 @@ private:
 
     CPU cpu;
 
-#ifndef PICO_BUILD
+#ifndef USE_PORT_TIMER
     uint32_t cycleCount = 0;
 #endif
 
