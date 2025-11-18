@@ -96,6 +96,10 @@
 #define PICO_DEFAULT_PIO_USB_VBUSEN_PIN   ADAFRUIT_FRUIT_JAM_USB_HOST_5V_POWER_PIN
 #define PICO_DEFAULT_PIO_USB_VBUSEN_STATE 1
 
+// default LED, but inverted
+#define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
+#define DISK_IO_LED_ACTIVE 0
+
 #elif defined(PIMORONI_PICO_PLUS2_RP2350)
 // as I was using a mess of jumper wires, there's not really a right answer here
 #define DVI_CLK_P 14
