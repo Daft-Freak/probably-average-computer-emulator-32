@@ -24,7 +24,7 @@ public:
         curAccessController = nullptr;
     }
 
-    static const int maxDrives = 1;
+    static const int maxDrives = 2;
 
 private:
     FIL file[maxDrives];
@@ -61,7 +61,7 @@ public:
         curAccessController = nullptr;
     }
 
-    static const int maxDrives = 1;
+    static const int maxDrives = 2;
 
 private:
     FIL file[maxDrives];
