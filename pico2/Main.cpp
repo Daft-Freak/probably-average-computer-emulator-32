@@ -76,6 +76,11 @@ void __not_in_flash_func(display_draw_line)(void *, int line, uint16_t *buf)
     vga.drawScanline(line, reinterpret_cast<uint8_t *>(buf));
 }
 
+static void vgaResolutionCallback(int w, int h)
+{
+    set_display_size(w, h);
+}
+
 static void runEmulator(absolute_time_t &time)
 {
     sys.getCPU().run(10);
@@ -287,6 +292,7 @@ int main()
     qemuCfg.setVGABIOS(reinterpret_cast<const uint8_t *>(_binary_vgabios_bin_start));
 
     vga.setTextWidthHack(true); // none of the display drivers handle 720 wide modes yet
+    vga.setResolutionChangeCallback(vgaResolutionCallback);
 
     // disk setup
     ataPrimary.setIOInterface(&ataPrimaryIO);
@@ -309,9 +315,6 @@ int main()
 
     while(true)
     {
-        // TODO: callback from VGA? kinda hard to know when a mode change is done
-        auto [width, height] = vga.getOutputResolution();
-        set_display_size(width, height);
         update_display();
 
         // check fifo for any commands from the emulator core
