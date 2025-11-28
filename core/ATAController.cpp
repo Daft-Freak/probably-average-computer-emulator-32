@@ -335,8 +335,6 @@ void ATAController::write(uint16_t addr, uint8_t data)
                         // for packet commands, this is the interrupt reason
                         sectorCount = (1 << 0)  // command
                                     | (0 << 1); // to device
-
-                        flagIRQ();
                     }
                     else
                         status |= Status_ERR;
