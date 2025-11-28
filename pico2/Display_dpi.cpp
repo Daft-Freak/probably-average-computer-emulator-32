@@ -144,7 +144,7 @@ static uint32_t vblank_line_timings[4];
 static uint32_t vsync_line_timings[4];
 
 // framebuffer/palette
-static uint16_t temp_buffer[720 * DPI_NUM_DMA_CHANNELS];
+static uint16_t temp_buffer[std::max(720, DPI_MODE_H_ACTIVE_PIXELS) * DPI_NUM_DMA_CHANNELS];
 
 static void pio_timing_irq_handler();
 

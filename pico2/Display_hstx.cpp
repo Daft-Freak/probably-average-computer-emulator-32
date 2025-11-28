@@ -132,7 +132,7 @@ static volatile bool need_mode_change = false;
 
 // temp buffer for expanding lines (pixel double)
 // two scanlines + include the cmdlist(s) so we can avoid an irq
-static uint32_t scanline_buffer[(720 * sizeof(uint16_t) + sizeof(vactive_line)) / sizeof(uint32_t) * HSTX_NUM_LINE_BUFFERS];
+static uint32_t scanline_buffer[(std::max(720, HSTX_MODE_H_ACTIVE_PIXELS) * sizeof(uint16_t) + sizeof(vactive_line)) / sizeof(uint32_t) * HSTX_NUM_LINE_BUFFERS];
 
 static void __scratch_x("") dma_irq_handler() {
     // cur_dma_ch indicates the channel that just finished, which is the one
