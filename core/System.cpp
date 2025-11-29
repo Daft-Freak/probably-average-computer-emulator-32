@@ -153,6 +153,9 @@ uint8_t Chipset::read(uint16_t addr)
             return cmosIndex | (nmiEnabled ? 0 : 0x80);
 
         case 0x71: // CMOS data
+            if(cmosIndex == 0xA)
+                cmosRam[cmosIndex] ^= 0x80; // flip the "update in progress" bit every read
+
             return cmosRam[cmosIndex];
 
         case 0x80: // not actually channel 0 high addr
