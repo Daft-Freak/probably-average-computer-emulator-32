@@ -630,11 +630,11 @@ void VGACard::updateOutputResolution()
     int hDispChars = crtcRegs[1] + 1;
     int vDisp = (crtcRegs[0x12] | (crtcRegs[0x7] & (1 << 1)) << 7 | (crtcRegs[0x7] & (1 << 6)) << 3) + 1;
 
-    outputW = charWidth * hDispChars;
-    outputH = vDisp;
-
     if(textWidthHack)
         charWidth = 8;
+
+    outputW = charWidth * hDispChars;
+    outputH = vDisp;
 
     // double width (or un-half) if DCR set
     if(seqClockMode & (1 << 3))
