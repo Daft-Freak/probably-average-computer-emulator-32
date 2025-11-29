@@ -123,6 +123,8 @@ static PIO pio = pio0;
 static uint8_t timing_sm, data_sm;
 static uint8_t data_program_offset;
 
+static uint8_t line_margin = 0;
+
 // pixel/line repeat
 static uint16_t line_width = 0;
 static uint16_t new_line_width = 0;
@@ -145,14 +147,15 @@ static uint32_t vblank_line_timings[4];
 static uint32_t vsync_line_timings[4];
 
 // framebuffer/palette
-static uint16_t temp_buffer[std::max(720, DPI_MODE_H_ACTIVE_PIXELS) * DPI_NUM_DMA_CHANNELS];
+static constexpr int buffer_line_size = std::max(720, DPI_MODE_H_ACTIVE_PIXELS);
+static uint16_t temp_buffer[buffer_line_size * DPI_NUM_DMA_CHANNELS];
 
 static void pio_timing_irq_handler();
 
 // assumes data SM is idle
 static inline void update_h_repeat() {
     // update Y register
-    pio_sm_put(pio, data_sm, line_width - 1);
+    pio_sm_put(pio, data_sm, line_width + line_margin - 1);
     pio_sm_exec(pio, data_sm, pio_encode_out(pio_y, 32));
 
     // patch loop delay for repeat
@@ -203,6 +206,10 @@ static void __not_in_flash_func(dma_irq_handler)() {
             in_scanline_step = new_scanline_step;
             line_width = new_line_width;
 
+            // add extra (blank) pixels to the left side to center
+            if(DPI_MODE_H_ACTIVE_PIXELS > 720)
+                line_margin = (DPI_MODE_H_ACTIVE_PIXELS - line_width) / 2;
+
             need_mode_change = false;
         }
     } else if(reconfigure_data_pio) {
@@ -223,20 +230,21 @@ static void __not_in_flash_func(dma_irq_handler)() {
     auto display_line = in_scanline >> 16;
     in_scanline += in_scanline_step;
 
+    // shift data to end of line if mode is larger than emulator output
+    int line_offset = std::max(0, DPI_MODE_H_ACTIVE_PIXELS - 720);
+
     int palette_buf_idx = display_line % DPI_NUM_DMA_CHANNELS;
-    auto w = line_width;
+    auto line_buffer = temp_buffer + palette_buf_idx * buffer_line_size + line_offset;
     bool first = display_line != last_in_scanline;
     last_in_scanline = display_line;
 
-    ch->read_addr = uintptr_t(temp_buffer + palette_buf_idx * w);
-    ch->transfer_count = w / 2;
+    ch->read_addr = uintptr_t(line_buffer - line_margin); // minus margin as the blank pixels are before the data
+    ch->transfer_count = (line_width + line_margin) / 2;
 
     ch->al1_ctrl |= DMA_CH0_CTRL_TRIG_INCR_READ_BITS;
 
     if(first)
-        //*(temp_buffer + palette_buf_idx * w) = 0x1F;
-        display_draw_line(nullptr, display_line, temp_buffer + palette_buf_idx * w);
-        //convert_paletted(cur_display_buffer + display_line * w, temp_buffer + palette_buf_idx * w, w);
+        display_draw_line(nullptr, display_line, line_buffer);
 
     data_scanline++;
 }
@@ -588,11 +596,16 @@ void set_display_size(int w, int h) {
     line_width = new_line_width;
     in_scanline_step = new_scanline_step;
 
+    // add extra (blank) pixels to the left side to center
+    if(DPI_MODE_H_ACTIVE_PIXELS > 720)
+        line_margin = (DPI_MODE_H_ACTIVE_PIXELS - line_width) / 2;
+
+
     update_h_repeat();
 
     // reconfigure DMA channels
     // FIXME: update addr for 2nd+ line
     for(int i = 0; i < DPI_NUM_DMA_CHANNELS; i++)
-        dma_channel_set_trans_count(DPI_DMA_CH_BASE + i, line_width / 2, false);
+        dma_channel_set_trans_count(DPI_DMA_CH_BASE + i, (line_width + line_margin) / 2, false);
 }
 
