@@ -408,11 +408,21 @@ static int cpuThreadFunc(void *data)
 
     // FIXME: probably should lock around doing inputs
 
+    auto lastTime = time(nullptr);
+
     while(!quit)
     {
         cpu.run(1);
 
         sys.getChipset().updateForDisplay(); // this just tries to make sure the PIT doesn't get too far behind
+
+        // update RTC
+        auto newTime = time(nullptr);
+        if(newTime != lastTime)
+        {
+            lastTime = newTime;
+            sys.getChipset().updateRTC();
+        }
     }
     return 0;
 }
@@ -542,6 +552,11 @@ int main(int argc, char *argv[])
     ataPrimary.setIOInterface(&ataPrimaryIO);
 
     sys.reset();
+
+    // set the clock
+    auto t = time(nullptr);
+    auto tmbuf = gmtime(&t);
+    sys.getChipset().setRTC(tmbuf->tm_sec, tmbuf->tm_min, tmbuf->tm_hour, tmbuf->tm_mday, tmbuf->tm_mon + 1, tmbuf->tm_year % 100);
 
     // SDL init
     if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
