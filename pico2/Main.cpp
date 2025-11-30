@@ -49,6 +49,8 @@ static VGACard vga(sys);
 static FileATAIO ataPrimaryIO;
 static FileFloppyIO floppyIO;
 
+static int rtcSeconds = 0;
+
 static void speakerCallback(int8_t sample)
 {
     int16_t sample16 = sample << 4;
@@ -96,6 +98,12 @@ static void core1FIFOHandler()
     multicore_fifo_clear_irq();
 }
 
+static bool rtcTimerCallback(repeating_timer *t)
+{
+    rtcSeconds++;
+    return true;
+}
+
 static void core1Main()
 {
     // configure clock PIO program
@@ -113,6 +121,10 @@ static void core1Main()
     multicore_fifo_clear_irq();
     irq_set_exclusive_handler(SIO_FIFO_IRQ_NUM(1), core1FIFOHandler);
     irq_set_enabled(SIO_FIFO_IRQ_NUM(1), true);
+
+    // setup timer for RTC
+    repeating_timer timer;
+    add_repeating_timer_ms(1000, rtcTimerCallback, nullptr, &timer);
 
     // configure PIO USB host here
 #ifdef PIO_USB_HOST
@@ -142,6 +154,12 @@ static void core1Main()
     {
         sys.getCPU().run(10);
         sys.getChipset().updateForDisplay();
+
+        if(rtcSeconds)
+        {
+            rtcSeconds--; // probably overkill as we shouldn't get stuck in the CPU for a second...
+            sys.getChipset().updateRTC();
+        }
     }
 }
 
@@ -302,6 +320,9 @@ int main()
     }
 
     sys.reset();
+
+    // set an initial time
+    sys.getChipset().setRTC(28, 21, 14, 11, 9, 2025);
 
     // FIXME: mode changes
     set_display_size(640, 480);
