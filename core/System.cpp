@@ -884,7 +884,9 @@ void Chipset::setRTC(int seconds, int minutes, int hours, int days, int month, i
     setRTCVal(4, hours);
     setRTCVal(7, days);
     setRTCVal(8, month);
-    setRTCVal(9, year);
+    setRTCVal(9, year % 100);
+    // century
+    setRTCVal(0x32, year / 100);
 }
 
 // should be called every second
