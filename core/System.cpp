@@ -1223,24 +1223,50 @@ void Chipset::updateSpeaker(uint32_t target)
     lastSpeakerUpdateCycle = target;
 
     assert(elapsed < 0xFFFFFF);
+    elapsed <<= fracBits;
 
-    speakerSampleTimer += elapsed << fracBits;
+    int toNext = divider - speakerSampleTimer;
+
+    speakerSampleTimer += elapsed;
 
     bool gate = (systemControlB & 1);
     bool ppiData = (systemControlB & 2);
     bool pitData = pit.outState & (1 << 2);
 
     // gate low makes timer output high
-    // FIXME: that should be handled in the PIT... and gate should also stop timer counting
+    // FIXME: that should be handled in the PIT...
     bool value = !((pitData || !gate) && ppiData);
+    
+    // update sample counter
+    if(speakerSampleTimer < divider)
+    {
+        speakerValue += value ? elapsed : 0;
+        return;
+    }
+
+    speakerValue += value ? toNext : 0;
 
     while(speakerSampleTimer >= divider)
     {
         speakerSampleTimer -= divider;
 
+        int sample = 0;
+
+        if(ppiData && gate) // output actual silence if gated
+            sample = (speakerValue << 8) / divider - 128; 
+
+        if(sample > 127)
+            sample = 127;
+
+        // if we're doing multiple samples the next one will either be fully on or off
+        speakerValue = value ? divider : 0;
+
         if(speakerCb)
-            speakerCb(value ? 127 : -128);
+            speakerCb(sample);
     }
+
+    // prepare for next
+    speakerValue = value ? speakerSampleTimer : 0;
 }
 
 // port 64

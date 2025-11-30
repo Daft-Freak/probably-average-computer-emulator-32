@@ -195,6 +195,7 @@ private:
 
     uint32_t lastSpeakerUpdateCycle = 0;
     uint32_t speakerSampleTimer = 0;
+    unsigned speakerValue = 0;
     SpeakerAudioCallback speakerCb = nullptr;
 };
 
