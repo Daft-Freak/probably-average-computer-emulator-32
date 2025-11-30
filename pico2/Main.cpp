@@ -81,12 +81,6 @@ static void vgaResolutionCallback(int w, int h)
     set_display_size(w, h);
 }
 
-static void runEmulator(absolute_time_t &time)
-{
-    sys.getCPU().run(10);
-    sys.getChipset().updateForDisplay();
-}
-
 static void core1FIFOHandler()
 {
     switch(multicore_fifo_pop_blocking())
@@ -144,9 +138,11 @@ static void core1Main()
 #endif
 
     // run
-    auto time = get_absolute_time();
     while(true)
-        runEmulator(time);
+    {
+        sys.getCPU().run(10);
+        sys.getChipset().updateForDisplay();
+    }
 }
 
 static bool readConfigFile()
