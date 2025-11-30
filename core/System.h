@@ -85,6 +85,8 @@ public:
     void setFixedDiskPresent(int index, bool present);
     void setTotalMemory(uint32_t size);
 
+    void updateRTC();
+
 private:
     struct DMA
     {

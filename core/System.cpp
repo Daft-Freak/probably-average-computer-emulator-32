@@ -867,6 +867,103 @@ void Chipset::setTotalMemory(uint32_t size)
     cmosRam[0x31] = extMemKB >> 8;
 }
 
+// should be called every second
+void Chipset::updateRTC()
+{
+    // halted
+    if(cmosRam[0xB] & (1 << 7))
+        return;
+
+    bool bcd = !(cmosRam[0xB] & (1 << 2));
+    auto getRTCVal = [this, bcd](int index)
+    {
+        uint8_t ret = cmosRam[index];
+
+        if(bcd)
+            ret = (ret & 0xF) + (ret >> 4) * 10;
+
+        return ret;
+    };
+
+    auto setRTCVal = [this, bcd](int index, int value)
+    {
+        if(bcd)
+            value = (value % 10) | (value / 10) << 4;
+
+        cmosRam[index] = value;
+    };
+
+    int seconds = getRTCVal(0) + 1;
+
+    if(seconds > 59)
+    {
+        seconds = 0;
+        // cascade
+        do
+        {
+            // minutes
+            int minutes = getRTCVal(2) + 1;
+            if(minutes < 60)
+            {
+                setRTCVal(2, minutes);
+                break;
+            }
+
+            setRTCVal(2, 0);
+
+            // hours
+            int hours = getRTCVal(4) + 1;
+            if(minutes < 24) // TODO: assuming 24hour time
+            {
+                setRTCVal(4, hours);
+                break;
+            }
+
+            setRTCVal(4, 0);
+
+            // days
+            int day = getRTCVal(7) + 1;
+            int month = getRTCVal(8);
+            int year = getRTCVal(9);
+
+            static const int daysInMonth[]{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+            if(day - 1 < daysInMonth[month - 1]) // FIXME: leap years (though this is only a problem if you have the emulator running at midnight...)
+            {
+                setRTCVal(7, day);
+                break;
+            }
+
+            setRTCVal(7, 1);
+
+            // month
+            month++;
+
+            if(month <= 12)
+            {
+                setRTCVal(8, month);
+                break;
+            }
+
+            setRTCVal(8, 1);
+
+            // year
+            setRTCVal(9, year + 1);
+        }
+        while(false);
+    }
+
+    setRTCVal(0, seconds);
+
+    // update ended interrupt
+    if(cmosRam[0xB] & (1 << 4))
+    {
+        cmosRam[0xA] &= ~0x80; // make sure in progress is clear
+        cmosRam[0xC] |= 1 << 4;
+        flagPICInterrupt(8);
+    }
+}
+
 uint8_t Chipset::PIC::read(int index)
 {
     if(index == 0) // OCW3
