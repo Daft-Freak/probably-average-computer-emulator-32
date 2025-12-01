@@ -1140,6 +1140,9 @@ void Chipset::updatePIT()
 
             if(mode == 0 && pit.counter[i] == 0 && !(pit.outState & (1 << i)))
             {
+                if(i == 2)
+                    updateSpeaker(pit.lastUpdateCycle + step * System::getPITClockDiv());
+
                 // go high
                 pit.outState |= 1 << i;
             
