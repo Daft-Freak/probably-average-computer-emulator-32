@@ -771,7 +771,7 @@ uint8_t VGACard::readMem(uint32_t addr)
             {
                 int v = (colourCompare >> i) & 1;
                 // mask out any bit that doesn't match the value for this plane
-                res &= (v * 0xFF) ^ latch[plane];
+                res &= ~((v * 0xFF) ^ latch[i]);
             }
         }
 
