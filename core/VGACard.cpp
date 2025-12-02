@@ -728,6 +728,7 @@ void VGACard::updatePalette256(int index)
 uint8_t VGACard::readMem(uint32_t addr)
 {
     bool chain = gfxMisc & (1 << 1);
+    bool chain4 = seqMemMode & (1 << 3);
     int map = (gfxMisc >> 2) & 3;
     bool oddEven = gfxMode & (1 << 4);
     int readMode = (gfxMode >> 3) & 1;
@@ -741,15 +742,18 @@ uint8_t VGACard::readMem(uint32_t addr)
 
     auto mappedAddr = planeAddr;
 
-    // remap low bit for chaining
-    if(chain && map == 0)
+    // remap low bits for chaining
+    if(chain4)
+        mappedAddr = (mappedAddr & ~3);
+    else if(chain && map == 0)
         mappedAddr = (mappedAddr & ~1) | ((addr >> 16) & 1);
     else if(chain)
         mappedAddr = (mappedAddr & ~1);
 
-    // ?? this at least makes scrolling work
-    if(oddEven)
-        plane |= (addr & 1);
+    if(chain4)
+        plane = addr & 3;
+    else if(oddEven)
+        plane |= (addr & 1);    // ?? this at least makes scrolling work
 
     //printf("VGA R %05X (%04X, sel %i)\n", addr, mappedAddr, gfxReadSel);
 
