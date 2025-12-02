@@ -125,10 +125,18 @@ uint8_t Chipset::read(uint16_t addr)
 
         case 0x60: // 8042 "keyboard controller" data
         {
+            // some software reads the value, checks it, then falls back to the default handler
+            // which will then try to read the value again
+            // FIXME: this is an incomplete hack, the proper fix probably involves a delay before returning the next value/irq
+            // it's also broken for extended keys
+            static uint8_t lastVal = 0xFF;
+
             if(i8042Queue.empty())
-                return 0xFF;
+                return lastVal;
 
             uint16_t ret = i8042Queue.pop();
+
+            lastVal = ret;
 
             update8042Interrupt();
             return ret & 0xFF;
