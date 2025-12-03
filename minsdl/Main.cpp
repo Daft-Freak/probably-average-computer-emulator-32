@@ -7,6 +7,7 @@
 
 #include "ATAController.h"
 #include "FloppyController.h"
+#include "GamePort.h"
 #include "QEMUConfig.h"
 #include "Scancode.h"
 #include "System.h"
@@ -22,6 +23,7 @@ static System sys;
 
 static ATAController ataPrimary(sys);
 static FloppyController fdc(sys);
+static GamePort gamePort(sys);
 static QEMUConfig qemuCfg(sys);
 static VGACard vgaCard(sys);
 
