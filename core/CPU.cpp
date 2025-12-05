@@ -657,9 +657,9 @@ void CPU::run(int ms)
         if(chipset.needDMAUpdate())
             chipset.updateDMA();
 
-        if(flags & Flag_I)
+        if(chipset.hasInterrupt())
         {
-            if(!delayInterrupt && chipset.hasInterrupt())
+            if((flags & Flag_I) && !delayInterrupt)
                 serviceInterrupt(chipset.acknowledgeInterrupt());
         }
 
