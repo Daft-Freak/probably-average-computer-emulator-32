@@ -699,7 +699,8 @@ void CPU::updateSegmentDescriptorCache()
     setSegmentReg(CPU::Reg16::GS, reg(CPU::Reg16::GS));
 }
 
-void CPU::executeInstruction()
+[[gnu::always_inline]] // outside of tests this has exactly one caller
+inline void CPU::executeInstruction()
 {
     faultIP = reg(Reg32::EIP);
     auto addr = getSegmentOffset(Reg16::CS) + (reg(Reg32::EIP)++);
