@@ -279,11 +279,11 @@ private:
     static constexpr int periphClkDiv = 6; // 2.38637MHz
     static constexpr int pitClkDiv = periphClkDiv * 2; // 1.19318MHz
 
-    CPU cpu;
-
 #ifndef USE_PORT_TIMER
     uint32_t cycleCount = 0;
 #endif
+
+    uint32_t nextInterruptCycle = 0;
 
     static const int maxAddress = 1 << 24;
     static const int blockSize = 16 * 1024;
@@ -299,5 +299,5 @@ private:
 
     std::vector<IORange> ioDevices;
 
-    uint32_t nextInterruptCycle = 0;
+    CPU cpu;
 };

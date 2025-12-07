@@ -1501,7 +1501,7 @@ void Chipset::update8042Interrupt()
     }
 }
 
-System::System() : cpu(*this), chipset(*this)
+System::System() : chipset(*this), cpu(*this)
 {
     addIODevice(0xFF00, 0, 1 << 0 | 1 << 1, &chipset);
 }
