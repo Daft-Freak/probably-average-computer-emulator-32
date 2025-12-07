@@ -160,12 +160,14 @@ private:
 
     void update8042Interrupt();
 
+    // frequently checked from CPU
+    uint16_t maskedPICRequest = 0;
+
     System &sys;
 
     DMA dma;
 
     PIC pic[2];
-    uint16_t maskedPICRequest = 0;
 
     PIT pit;
 
