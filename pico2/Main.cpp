@@ -183,10 +183,7 @@ static bool readConfigFile()
 
     FIL configFile;
 
-    //return false;
-
-    // config-95 config-386bench
-    if(f_open(&configFile, "config-games.txt", FA_READ | FA_OPEN_EXISTING) != FR_OK)
+    if(f_open(&configFile, "config.txt", FA_READ | FA_OPEN_EXISTING) != FR_OK)
         return false;
 
     size_t off = 0;
@@ -255,224 +252,6 @@ static void setDiskLED(bool on)
 #endif
 }
 
-#include <cmath>
-#include "hardware/structs/coresight_trace.h"
-
-void enableCPUSample()
-{
-    int uartBaud = 3000000;
-    gpio_set_function(0, GPIO_FUNC_UART);
-    uart_init(uart0, uartBaud);
-
-    // configure TPIU for 8 bit port
-    *(uint32_t *)(CORESIGHT_TPIU_BASE + 4) = 1 << 7; // CSPSR
-
-    *(uint32_t *)(CORESIGHT_TPIU_BASE + 0x304) = 1 << 8; // FFCR = TrigIn
-
-    // disable all funnel inputs
-    hw_clear_bits((uint32_t *)(CORESIGHT_ATB_FUNNEL_BASE + 0), 0xFF);
-
-    // enable DWT+ITM
-    m33_hw->demcr = M33_DEMCR_TRCENA_BITS;
-
-    // enable ITM and forwarding from DWT
-    m33_hw->itm_tcr = 1 << M33_ITM_TCR_TRACEBUSID_LSB | M33_ITM_TCR_TXENA_BITS | M33_ITM_TCR_ITMENA_BITS;
-
-    // enable DMA access
-    hw_set_bits(&accessctrl_hw->coresight_trace, 0xACCE0000 | ACCESSCTRL_CORESIGHT_TRACE_DMA_BITS);
-
-    // flush/hold FIFO
-    hw_set_bits(&coresight_trace_hw->ctrl_status, CORESIGHT_TRACE_CTRL_STATUS_TRACE_CAPTURE_FIFO_FLUSH_BITS);
-
-    // dma from FIFO
-    int dmaChannel = dma_claim_unused_channel(true);
-    auto config = dma_channel_get_default_config(dmaChannel);
-    channel_config_set_dreq(&config, DREQ_CORESIGHT);
-    channel_config_set_read_increment(&config, false);
-    channel_config_set_transfer_data_size(&config, DMA_SIZE_8);
-
-    dma_channel_configure(dmaChannel, &config, &uart0_hw->dr, &coresight_trace_hw->trace_capture_fifo, 0xF0000001, false);
-    dma_channel_start(dmaChannel);
-
-    // enable FIFO
-    hw_clear_bits(&coresight_trace_hw->ctrl_status, CORESIGHT_TRACE_CTRL_STATUS_TRACE_CAPTURE_FIFO_FLUSH_BITS);
-
-    // enable cycle counter and pc sampling
-    int dataRate = ceil((clock_get_hz(clk_sys) / 1024.0f/* CYCTAP=1 */) * 5 /*event is 5 bytes*/); 
-    int uartRate = uartBaud / 10;
-    int div = std::ceil(float(dataRate) / uartRate);
-    m33_hw->dwt_ctrl = M33_DWT_CTRL_PCSAMPLENA_BITS | M33_DWT_CTRL_CYCTAP_BITS | div << M33_DWT_CTRL_POSTPRESET_LSB | M33_DWT_CTRL_CYCCNTENA_BITS;
-
-    // enable receiver 0 in FUNNELCONTROL
-    *(uint32_t *)(CORESIGHT_ATB_FUNNEL_BASE + 0) |= 0x1;
-}
-
-//
-#include "hardware/spi.h"
-
-class SPIATAIO final : public ATADiskIO
-{
-public:
-
-    void init()
-    {
-        spi_init(spi1, 2000000);
-        gpio_set_function(28, GPIO_FUNC_SPI);
-        gpio_set_function(30, GPIO_FUNC_SPI);
-        gpio_set_function(31, GPIO_FUNC_SPI);
-        gpio_set_function(45, GPIO_FUNC_SPI);
-
-        for(int i = 0; i < maxDrives; i++)
-        {
-            // get info
-            uint8_t cmd = 0x00 | i << 7;
-            spi_write_blocking(spi1, &cmd, 1);
-
-            while(true)
-            {
-                uint8_t res;
-                spi_read_blocking(spi1, 0xFF, &res, 1);
-
-                if(res == 0xEE)
-                {
-                    // failed
-                    numSectors[i] = 0;
-                    isCD[i] = false;
-                    break;
-                }
-                else if(res == 0xAA)
-                {
-                    // success
-                    uint8_t buf[5];
-                    spi_read_blocking(spi1, 0xFF, buf, 5);
-
-                    isCD[i] = buf[0];
-                    numSectors[i] = buf[1] | buf[2] << 8 | buf[3] << 16 | buf[4] << 24;
-
-                    printf("SPI ATA %i %lu sectors\n", i, numSectors[i]);
-                    break;
-                }
-            }
-        }
-    }
-
-    uint32_t getNumSectors(int device) override
-    {
-        if(device >= maxDrives)
-            return 0;
-        return numSectors[device];
-    }
-
-    bool isATAPI(int device) override
-    {
-        if(device >= maxDrives)
-            return 0;
-        return isCD[device];
-    }
-
-    bool read(ATAController *controller, int device, uint8_t *buf, uint32_t lba) override
-    {
-        if(device >= maxDrives)
-            return false;
-
-        uint8_t cmdBuf[5];
-
-        cmdBuf[0] = 0x01 | device << 7, // read
-        cmdBuf[1] = (lba >>  0) & 0xFF;
-        cmdBuf[2] = (lba >>  8) & 0xFF;
-        cmdBuf[3] = (lba >> 16) & 0xFF;
-        cmdBuf[4] = (lba >> 24) & 0xFF;
-
-        spi_write_blocking(spi1, cmdBuf, sizeof(cmdBuf));
-
-        while(true)
-        {
-            uint8_t res;
-            spi_read_blocking(spi1, 0xFF, &res, 1);
-
-            if(res == 0xEE)
-            {
-                // failed
-                return false;
-            }
-            else if(res == 0xAA)
-            {
-                spi_read_blocking(spi1, 0xFF, buf, 512);
-                controller->ioComplete(device, true, false);
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    bool write(ATAController *controller, int device, const uint8_t *buf, uint32_t lba) override
-    {
-        if(device >= maxDrives)
-            return false;
-
-        uint8_t cmdBuf[5];
-
-        cmdBuf[0] = 0x02 | device << 7, // write
-        cmdBuf[1] = (lba >>  0) & 0xFF;
-        cmdBuf[2] = (lba >>  8) & 0xFF;
-        cmdBuf[3] = (lba >> 16) & 0xFF;
-        cmdBuf[4] = (lba >> 24) & 0xFF;
-
-        spi_write_blocking(spi1, cmdBuf, sizeof(cmdBuf));
-
-        while(true)
-        {
-            uint8_t res;
-            spi_read_blocking(spi1, 0xFF, &res, 1);
-
-            if(res == 0xEE)
-            {
-                // failed
-                return false;
-            }
-            else if(res == 0xAA)
-                break;
-        }
-
-        //
-        sleep_us(10);
-
-        // do write
-        spi_write_blocking(spi1, buf, 512);
-
-        while(true)
-        {
-            uint8_t res;
-            spi_read_blocking(spi1, 0xFF, &res, 1);
-
-            if(res == 0xEE)
-            {
-                // failed
-                return false;
-            }
-            else if(res == 0xAA)
-            {
-                controller->ioComplete(device, true, true);
-                return true;
-            }
-        }
-
-
-        return false;
-    }
-
-    static const int maxDrives = 2;
-
-private:
-    uint32_t numSectors[maxDrives]{};
-    bool isCD[maxDrives]{};
-};
-
-static SPIATAIO spiIO;
-//
-
 int main()
 {
 #ifdef OVERCLOCK_500
@@ -519,10 +298,6 @@ int main()
 
     init_audio();
 
-    //
-    //enableCPUSample();
-    //
-
     // init blinky disk led
 #ifdef DISK_IO_LED_PIN
     gpio_set_dir(DISK_IO_LED_PIN, true);
@@ -549,17 +324,14 @@ int main()
 
     // disk setup
     ataPrimary.setIOInterface(&ataPrimaryIO);
-    //ataPrimary.setIOInterface(&spiIO);
     fdc.setIOInterface(&floppyIO);
 
     if(!readConfigFile())
     {
         // load a default image
-        ataPrimaryIO.openDisk(0, "hd-win3.0-vga.img");
+        ataPrimaryIO.openDisk(0, "hd0.img");
         sys.getChipset().setFixedDiskPresent(0, ataPrimaryIO.getNumSectors(0) && !ataPrimaryIO.isATAPI(0));
     }
-
-    //spiIO.init();
 
     sys.reset();
 
