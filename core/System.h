@@ -288,7 +288,7 @@ private:
     uint32_t nextInterruptCycle = 0;
 
     static const int maxAddress = 1 << 24;
-    static const int blockSize = 16 * 1024;
+    static const int blockSize = 128 * 1024;
 
     uint8_t *memMap[maxAddress / blockSize];
 
