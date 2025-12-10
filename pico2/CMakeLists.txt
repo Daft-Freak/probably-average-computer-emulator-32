@@ -45,6 +45,11 @@ if(EXTRA_BOARD STREQUAL "vgaboard")
     set(DISPLAY_DRIVER "dpi")
 endif()
 
+# standalone boards
+if(PICO_BOARD STREQUAL "adafruit_fruit_jam")
+    set(DISPLAY_DRIVER "hstx")
+endif()
+
 # select HSTX anyway, but complain about it
 if(NOT DISPLAY_DRIVER)
     set(DISPLAY_DRIVER "hstx")
