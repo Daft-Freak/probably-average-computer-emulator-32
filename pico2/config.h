@@ -125,3 +125,29 @@
 #define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
 #define DISK_IO_LED_ACTIVE 1
 #endif
+
+// more disk LED defaults
+// merge down to one per controller, then just one LED
+// because we can't have two SD card accesses going at once this doesn't result in any conflicts
+
+#ifndef DISK_IO_FD_LED_PIN
+#define DISK_IO_FD_LED_PIN DISK_IO_LED_PIN
+#endif
+
+#ifndef DISK_IO_ATA_PRI_LED_PIN
+#define DISK_IO_ATA_PRI_LED_PIN DISK_IO_LED_PIN
+#endif
+
+#ifndef DISK_IO_FD0_LED_PIN
+#define DISK_IO_FD0_LED_PIN DISK_IO_FD_LED_PIN
+#endif
+#ifndef DISK_IO_FD1_LED_PIN
+#define DISK_IO_FD1_LED_PIN DISK_IO_FD_LED_PIN
+#endif
+
+#ifndef DISK_IO_ATA_PRI0_LED_PIN
+#define DISK_IO_ATA_PRI0_LED_PIN DISK_IO_ATA_PRI_LED_PIN
+#endif
+#ifndef DISK_IO_ATA_PRI1_LED_PIN
+#define DISK_IO_ATA_PRI1_LED_PIN DISK_IO_ATA_PRI_LED_PIN
+#endif

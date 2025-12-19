@@ -251,7 +251,15 @@ static bool readConfigFile()
 static void setDiskLED(int controller, int device, bool on)
 {
 #ifdef DISK_IO_LED_PIN
-    gpio_put(DISK_IO_LED_PIN, on == DISK_IO_LED_ACTIVE);
+    static const int ledPins[]
+    {
+        DISK_IO_FD0_LED_PIN,
+        DISK_IO_FD1_LED_PIN,
+        DISK_IO_ATA_PRI0_LED_PIN,
+        DISK_IO_ATA_PRI1_LED_PIN
+    };
+
+    gpio_put(ledPins[controller * 2 + device], on == DISK_IO_LED_ACTIVE);
 #endif
 }
 
