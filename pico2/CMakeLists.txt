@@ -4,6 +4,8 @@ add_executable(PACEPico2
     Main.cpp
 
     psram.c
+
+    i2c/seesaw.cpp
 )
 
 # some additional target-specific options

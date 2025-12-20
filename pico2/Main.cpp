@@ -31,6 +31,8 @@
 #include "DiskIO.h"
 #include "Display.h"
 
+#include "i2c/seesaw.h"
+
 #include "ATAController.h"
 #include "FloppyController.h"
 #include "GamePort.h"
@@ -82,6 +84,17 @@ void update_gamepad_state(uint8_t axis[2], uint8_t hat, uint32_t buttons)
     gamePort.setAxis(1, axis[1] / 255.0f * 3.0f);
 
     // TODO: button mapping
+    for(int i = 0; i < 4; i++)
+        gamePort.setButton(i, buttons & (1 << i));
+}
+
+// very similar to above...
+void update_i2c_joystick_state(uint16_t axis[4], uint8_t buttons)
+{
+    // HACK: the values seem a bit low, so scale them up
+    for(int i = 0; i < 4; i++)
+        gamePort.setAxis(i, axis[i] / 65535.0f * 3.0f);
+
     for(int i = 0; i < 4; i++)
         gamePort.setButton(i, buttons & (1 << i));
 }
@@ -305,6 +318,9 @@ static void initHardware()
     i2c_init(i2c_default, DEFAULT_I2C_CLOCK);
     gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+
+    // TODO: put these in a list (when there's more than one driver)
+    seesaw_init();
 #endif
 
     init_display();
@@ -404,6 +420,11 @@ int main()
                 }
             }
         }
+
+#ifdef DEFAULT_I2C_CLOCK
+        // TODO: put these in a list (when there's more than one driver)
+        seesaw_update();
+#endif
 
         tuh_task();
     }
