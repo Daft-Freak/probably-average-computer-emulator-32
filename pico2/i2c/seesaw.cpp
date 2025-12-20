@@ -236,6 +236,23 @@ void seesaw_init()
 
         analogMax = 1023;
     }
+    else if(product == 5753) // pc joystick
+    {
+        // this is untested, but should be the right IOs
+        // will need a SEESAW_ADDR override due to different default address
+        buttonIO[0] = 3;
+        buttonIO[1] = 13;
+        buttonIO[2] = 2;
+        buttonIO[3] = 14;
+
+        analogIO[0] = 1;
+        analogIO[1] = 15;
+        analogIO[2] = 0;
+        analogIO[3] = 16;
+
+        // TODO: likely will need adjusting
+        analogMax = 1023;
+    }
     else
         return;
 
