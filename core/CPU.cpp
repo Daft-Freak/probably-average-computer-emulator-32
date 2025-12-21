@@ -7092,14 +7092,23 @@ bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
     else
         sp -= op32 ? 4 : 2;
 
+    auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+
     // pushing a segment register with a 32bit operand size only writes 16 bits
     if(op32 && !isSegmentReg)
     {
-        if(!writeMem32(sp, Reg16::SS, val))
+        if(!checkSegmentLimit(ssDesc, sp, 4, true))
+            return false;
+        if(!writeMem32(sp + ssDesc.base, val))
             return false;
     }
-    else if(!writeMem16(sp, Reg16::SS, val))
-        return false;
+    else
+    {
+        if(!checkSegmentLimit(ssDesc, sp, 2, true))
+            return false;
+        if(!writeMem16(sp + ssDesc.base, val))
+            return false;
+    }
 
     if(addr32)
         reg(Reg32::ESP) = sp;
@@ -7113,15 +7122,22 @@ bool CPU::doPop(uint32_t &val, bool op32, bool addr32, bool isSegmentReg)
 {
     uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
 
+    auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+
     if(op32 && !isSegmentReg)
     {
-        if(!readMem32(sp, Reg16::SS, val))
+        if(!checkSegmentLimit(ssDesc, sp, 4, true))
+            return false;
+        if(!readMem32(sp + ssDesc.base, val))
             return false;
     }
     else
     {
+        if(!checkSegmentLimit(ssDesc, sp, 2, true))
+            return false;
+
         uint16_t tmp;
-        if(!readMem16(sp, Reg16::SS, tmp))
+        if(!readMem16(sp + ssDesc.base, tmp))
             return false;
         val = tmp;
     }
@@ -7146,13 +7162,23 @@ bool CPU::doPeek(uint32_t &val, bool op32, bool addr32, int offset, int byteOffs
 
     if(!stackAddrSize32)
         sp &= 0xFFFF;
-    
+
+    auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+
     if(op32)
-        return readMem32(sp, Reg16::SS, val);
+    {
+        if(!checkSegmentLimit(ssDesc, sp, 4, true))
+            return false;
+        if(!readMem32(sp + ssDesc.base, val))
+            return false;
+    }
     else
     {
+        if(!checkSegmentLimit(ssDesc, sp, 2, true))
+            return false;
+
         uint16_t tmp;
-        if(!readMem16(sp, Reg16::SS, tmp))
+        if(!readMem16(sp + ssDesc.base, tmp))
             return false;
         val = tmp;
     }
