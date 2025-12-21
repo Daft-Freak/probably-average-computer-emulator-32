@@ -167,7 +167,7 @@ private:
     };
 
     void doExecuteInstruction();
-    void executeInstruction0F(uint32_t addr, bool operandSize32, bool lock);
+    void executeInstruction0F(uint32_t addr, bool operandSize32);
 
     bool readMem8(uint32_t offset, Reg16 segment, uint8_t &data);
     bool readMem16(uint32_t offset, Reg16 segment, uint16_t &data);

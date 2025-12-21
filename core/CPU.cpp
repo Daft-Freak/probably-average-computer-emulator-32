@@ -914,7 +914,7 @@ inline void CPU::doExecuteInstruction()
             break;
 
         case 0x0F:
-            executeInstruction0F(addr, operandSize32, lock);
+            executeInstruction0F(addr, operandSize32);
             break;
 
         case 0x10: // ADC r/m8 r8
@@ -4233,41 +4233,11 @@ inline void CPU::doExecuteInstruction()
     }
 }
 
-void CPU::executeInstruction0F(uint32_t addr, bool operandSize32, bool lock)
+void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
 {
     uint8_t opcode2;
     if(!readMemIP8(addr + 1, opcode2))
         return;
-
-    // LOCK prefix validation, part 2
-    if(lock)
-    {
-        // only bit testing ops
-        if(opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        // now we need to check the r/m
-        uint8_t modRM;
-        if(!readMemIP8(addr + 2, modRM))
-            return; // give up if we faulted early
-
-        // don't allow BT (doesn't write)
-        if(opcode2 == 0xBA && ((modRM >> 3) & 7) == 4)
-        {
-            fault(Fault::UD);
-            return;
-        }
-
-        // not a memory operand, can't lock a register
-        if((modRM >> 6) == 3)
-        {
-            fault(Fault::UD);
-            return;
-        }
-    }
 
     switch(opcode2)
     {
@@ -6629,11 +6599,41 @@ void CPU::validateSegmentsForReturn()
     checkSeg(Reg16::GS);
 }
 
-// main part of validation, 0F prefixed ops handled there
 bool CPU::validateLOCKPrefix(uint8_t opcode, uint32_t addr)
 {
     if(opcode == 0x0F)
-    {} // check it when we have the 2nd opcode byte
+    {
+        // prefixed opcode
+        uint8_t opcode2;
+        if(!readMemIP8(addr + 1, opcode2))
+            return false;
+
+        // only bit testing ops
+        if(opcode2 != 0xAB && opcode2 != 0xB3 && opcode2 != 0xBA && opcode2 != 0xBB)
+        {
+            fault(Fault::UD);
+            return false;
+        }
+
+        // now we need to check the r/m
+        uint8_t modRM;
+        if(!readMemIP8(addr + 2, modRM))
+            return false; // give up if we faulted early
+
+        // don't allow BT (doesn't write)
+        if(opcode2 == 0xBA && ((modRM >> 3) & 7) == 4)
+        {
+            fault(Fault::UD);
+            return false;
+        }
+
+        // not a memory operand, can't lock a register
+        if((modRM >> 6) == 3)
+        {
+            fault(Fault::UD);
+            return false;
+        }
+    }
     // allow x0-x1,x8-x9 for ALU ops
     else if(opcode < 0x34)
     {
