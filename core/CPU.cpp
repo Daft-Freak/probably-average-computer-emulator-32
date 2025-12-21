@@ -3042,11 +3042,12 @@ inline void CPU::doExecuteInstruction()
                 finalSP &= 0xFFFF;
 
             // we need to fault if the new SP value would fault when used
-            if(!checkSegmentAccess(Reg16::SS, finalSP, pushSize, true))
+            auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+            if(!checkSegmentLimit(ssDesc, finalSP, pushSize))
                 break;
 
             uint32_t tempAddr;
-            if(!getPhysicalAddress(finalSP + getSegmentOffset(Reg16::SS), tempAddr, true))
+            if(!getPhysicalAddress(finalSP + ssDesc.base, tempAddr, true))
                 break;
 
             // we can at least handle this one easily...
