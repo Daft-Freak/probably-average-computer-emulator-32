@@ -3544,7 +3544,22 @@ inline void CPU::doExecuteInstruction()
             }
             break;
         }
+        case 0xE7: // OUT AX to imm8
+        {
+            uint8_t port;
 
+            if(readMemIP8(addr + 1, port) && checkIOPermission(port))
+            {
+                reg(Reg32::EIP)++;
+                auto data = operandSize32 ? reg(Reg32::EAX) : reg(Reg16::AX);
+
+                sys.writeIOPort16(port, data);
+
+                if(operandSize32)
+                    sys.writeIOPort16(port + 2, data >> 16);
+            }
+            break;
+        }
         case 0xE8: // CALL
         {
             uint32_t off;
