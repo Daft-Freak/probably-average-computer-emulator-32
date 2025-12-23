@@ -26,6 +26,8 @@ Chipset::Chipset(System &sys) : sys(sys)
     cmosRam[0x07] = 1; // day of month
     cmosRam[0x08] = 1; // month
 
+    cmosRam[0x0D] = 0x80; // RTC powered
+
     cmosRam[0x10] = 0x44; // floppy drive type
 
     cmosRam[0x19] = 47; // fixed disk 0 user defined
