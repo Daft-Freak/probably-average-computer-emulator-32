@@ -234,6 +234,8 @@ void ATAController::write(uint16_t addr, uint8_t data)
                     lbaHighCylinderHigh = 0;
                     deviceHead &= 0xF0;
 
+                    status |= Status_DSC;
+
                     flagIRQ();
                     break;
 
