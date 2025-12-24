@@ -252,8 +252,7 @@ void ATAController::write(uint16_t addr, uint8_t data)
                     {
                         auto cylinder = lbaMidCylinderLow | lbaHighCylinderHigh << 8;
                         int head = deviceHead & 0xF;
-                        lba = (cylinder * numHeads[dev] + head) *sectorsPerTrack[dev] + (lbaLowSector - 1);
-                        printf("ATA dev %i read %i sectors C %u H %u S %u LBA %u\n", dev, sectorCount, cylinder, head, lbaLowSector, lba);
+                        lba = (cylinder * numHeads[dev] + head) * sectorsPerTrack[dev] + (lbaLowSector - 1);
                     }
 
                     status |= Status_BSY;
@@ -288,8 +287,7 @@ void ATAController::write(uint16_t addr, uint8_t data)
                     {
                         auto cylinder = lbaMidCylinderLow | lbaHighCylinderHigh << 8;
                         int head = deviceHead & 0xF;
-                        lba = (cylinder * numHeads[dev] + head) *sectorsPerTrack[dev] + (lbaLowSector - 1);
-                        printf("ATA dev %i write %i sectors C %u H %u S %u LBA %u\n", dev, sectorCount, cylinder, head, lbaLowSector, lba);
+                        lba = (cylinder * numHeads[dev] + head) * sectorsPerTrack[dev] + (lbaLowSector - 1);
                     }
 
                     // setup write
