@@ -101,7 +101,7 @@
 // default LED, but inverted
 #define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
 #define DISK_IO_LED_ACTIVE 0
-// Per TheKitty mini-IBM PC build, pins on the Fruit Jam pin header
+// Per TheKitty mini-IBM PC build, pins on the Fruit Jam pin header for disk io
 #define DISK_IO_FD_LED_PIN  10
 #define DISK_IO_ATA_PRI_LED_PIN 9
 
