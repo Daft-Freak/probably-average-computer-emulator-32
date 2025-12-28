@@ -4,7 +4,7 @@ add_executable(PACEPico2
     Main.cpp
 
     driver/psram.c
-
+    driver/wifi_nina.cpp
     driver/i2c/seesaw.cpp
 )
 
