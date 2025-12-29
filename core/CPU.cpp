@@ -5959,7 +5959,12 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
     auto r = static_cast<Reg16>((modRM >> 3) & 7);
     auto rm = modRM & 7;
 
-    if(mod != 3)
+    if(mod == 3) // direct
+    {
+        endAddr = addr + 1;
+        return {r, static_cast<Reg16>(rm), 0};
+    }
+    else
     {
         uint32_t memAddr = 0;
         Reg16 segBase = Reg16::DS;
@@ -6126,11 +6131,6 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
 
         endAddr = addr;
         return {r, segBase, memAddr};
-    }
-    else
-    {
-        endAddr = addr + 1;
-        return {r, static_cast<Reg16>(rm), 0};
     }
 }
 
