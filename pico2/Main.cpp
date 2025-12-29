@@ -358,6 +358,46 @@ static void initPreBIOSVGA()
     vga.write(0x3C9, 0x1F);
 }
 
+static void vgaPrint(int x, int y, const char *text)
+{
+    auto vgaRAM = vga.getRAM();
+    int offset = x + y * 80;
+
+    size_t len = strlen(text);
+
+    for(size_t i = 0; i < len; i++)
+    {
+        vgaRAM[(offset + i) * 2] = text[i]; // char
+        vgaRAM[0x10000 + (offset + i) * 2] = 1; // attrib (bg=0, fg=1)
+    }
+}
+
+static int vgaPrintf(int x, int y, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    // get length
+    va_list tmp_args;
+    va_copy(tmp_args, args);
+    int len = vsnprintf(nullptr, 0, format, tmp_args) + 1;
+    va_end(tmp_args);
+
+    auto buf = new char[len];
+    int ret = vsnprintf(buf, len, format, args);
+    va_end(args);
+
+    vgaPrint(x, y, buf);
+    // also log it
+    puts(buf);
+
+    delete[] buf;
+
+    update_display();
+
+    return ret;
+}
+
 static void initHardware()
 {
 #ifdef OVERCLOCK_500
