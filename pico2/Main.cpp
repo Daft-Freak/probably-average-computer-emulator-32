@@ -457,14 +457,18 @@ static void initHardware()
 
     size_t psramSize = psram_init(PSRAM_CS_PIN);
 
-    printf("detected %i bytes PSRAM\n", psramSize);
+    vgaPrintf(0, 0, "Detected %i bytes PSRAM", psramSize);
 
     // init storage/filesystem
     auto res = f_mount(&fs, "", 1);
 
     if(res != FR_OK)
     {
-        printf("Failed to mount filesystem! (%i)\n", res);
+        vgaPrintf(0, 1, "Failed to mount filesystem! (error %i)", res);
+
+        if(res == FR_NOT_READY)
+            vgaPrintf(0, 2, "Check that the SD card is inserted correctly.", res);
+
         while(true);
     }
 
