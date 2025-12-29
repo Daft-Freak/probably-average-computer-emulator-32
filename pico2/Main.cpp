@@ -489,17 +489,17 @@ static void initWifi(const char *ssid, const char *pass)
 {
     // TODO: also regular pico w stuff
 #if defined(WIFI_ESP32_NINA)
-    printf("connecting to wifi...\n");
+    vgaPrintf(0, 1, "Connecting to wifi...");
 
     nina_spi_init();
 
     if(!nina_connect_timeout(ssid, pass, 10000))
     {
-        printf("failed to connect\n");
+        vgaPrintf(0, 1, "Failed to connect to wifi!");
         return;
     }
 
-    printf("wifi connected.\n");
+    vgaPrintf(0, 1, "Connected to wifi.   ");
 
     wifiConnected = true;
 #endif
