@@ -98,12 +98,14 @@
 #define PICO_DEFAULT_PIO_USB_VBUSEN_PIN   ADAFRUIT_FRUIT_JAM_USB_HOST_5V_POWER_PIN
 #define PICO_DEFAULT_PIO_USB_VBUSEN_STATE 1
 
-// default LED, but inverted
-#define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
-#define DISK_IO_LED_ACTIVE 1
 // Per TheKitty mini-IBM PC build, pins on the Fruit Jam pin header for disk io
-#define DISK_IO_FD_LED_PIN  7
+#define DISK_IO_LED_ACTIVE 1
+#define DISK_IO_FD_LED_PIN 7
 #define DISK_IO_ATA_PRI_LED_PIN 6
+
+// for the default LED (it's inverted, but PICO_DEFAULT_LED_PIN_INVERTED ins't set)
+//#define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
+//#define DISK_IO_LED_ACTIVE 0
 
 #define DEFAULT_I2C_CLOCK 100000
 
@@ -135,7 +137,7 @@
 // default to using built-in LED for disk activity
 #if !defined(DISK_IO_LED_PIN) && defined(PICO_DEFAULT_LED_PIN)
 #define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
-#define DISK_IO_LED_ACTIVE 1
+#define DISK_IO_LED_ACTIVE !PICO_DEFAULT_LED_PIN_INVERTED
 #endif
 
 // more disk LED defaults
