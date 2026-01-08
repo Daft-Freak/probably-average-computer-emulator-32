@@ -137,6 +137,8 @@
 // default to using built-in LED for disk activity
 #if !defined(DISK_IO_LED_PIN) && defined(PICO_DEFAULT_LED_PIN)
 #define DISK_IO_LED_PIN PICO_DEFAULT_LED_PIN
+#endif
+#if !defined(DISK_IO_LED_ACTIVE)
 #define DISK_IO_LED_ACTIVE !PICO_DEFAULT_LED_PIN_INVERTED
 #endif
 
