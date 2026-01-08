@@ -11,10 +11,6 @@
 #define SEESAW_I2C i2c_default
 #endif
 
-#ifndef SEESAW_ADDR
-#define SEESAW_ADDR 0x50
-#endif
-
 enum class Module : uint8_t {
   Status = 0,
   GPIO = 1,
@@ -80,6 +76,13 @@ enum class SeesawState : uint8_t {
     Done,
 };
 
+static const uint8_t addresses[]
+{
+    0x49, // joystick
+    0x50, 0x51, 0x52, 0x53, // gamepad
+};
+
+static uint8_t detectedAddr = 0xFF;
 static SeesawState state = SeesawState::GPIORead;
 static uint8_t analogIndex = 0;
 static int alarmNum;
@@ -141,7 +144,7 @@ static void seesaw_alarm_callback(uint alarm_num)
             uint8_t cmd[]{uint8_t(Module::GPIO), uint8_t(Function::GPIO_GPIO)};
             auto timeout = make_timeout_time_us(500);
 
-            if(i2c_write_blocking_until(SEESAW_I2C, SEESAW_ADDR, cmd, 2, false, timeout) == 2)
+            if(i2c_write_blocking_until(SEESAW_I2C, detectedAddr, cmd, 2, false, timeout) == 2)
                 state = SeesawState::GPIORead;
 
             hardware_alarm_set_target(alarm_num, make_timeout_time_us(250));
@@ -151,7 +154,7 @@ static void seesaw_alarm_callback(uint alarm_num)
         case SeesawState::GPIORead:
         {
             auto timeout = make_timeout_time_us(1000);
-            i2c_read_blocking_until(SEESAW_I2C, SEESAW_ADDR, (uint8_t *)&gpioState, 4, false, timeout);
+            i2c_read_blocking_until(SEESAW_I2C, detectedAddr, (uint8_t *)&gpioState, 4, false, timeout);
 
             state = SeesawState::AnalogRequest;
             hardware_alarm_set_target(alarm_num, make_timeout_time_us(100));
@@ -164,7 +167,7 @@ static void seesaw_alarm_callback(uint alarm_num)
             uint8_t cmd[]{uint8_t(Module::ADC), func};
             auto timeout = make_timeout_time_us(500);
 
-            if(i2c_write_blocking_until(SEESAW_I2C, SEESAW_ADDR, cmd, 2, false, timeout) == 2)
+            if(i2c_write_blocking_until(SEESAW_I2C, detectedAddr, cmd, 2, false, timeout) == 2)
                 state = SeesawState::AnalogRead;
 
             hardware_alarm_set_target(alarm_num, make_timeout_time_us(500));
@@ -174,7 +177,7 @@ static void seesaw_alarm_callback(uint alarm_num)
         case SeesawState::AnalogRead:
         {
             auto timeout = make_timeout_time_us(1000);
-            i2c_read_blocking_until(SEESAW_I2C, SEESAW_ADDR, (uint8_t *)&analogState[analogIndex], 2, false, timeout);
+            i2c_read_blocking_until(SEESAW_I2C, detectedAddr, (uint8_t *)&analogState[analogIndex], 2, false, timeout);
 
             // stop if last axis, otherwise move to the next one
             if(++analogIndex == 4 || analogIO[analogIndex] == -1)
@@ -205,19 +208,28 @@ void seesaw_init()
 
     // get product id
     uint8_t version[4]{};
+    int product;
 
-    if(!seesaw_read(SEESAW_ADDR, Module::Status, Function::Status_VERSION, version, 4, 5))
+    for(auto &addr : addresses)
+    {
+        if(!seesaw_read(addr, Module::Status, Function::Status_VERSION, version, 4, 5))
+            continue;
+
+        if(version[1] == 0xFF && version[2] == 0xFF && version[3] == 0xFF)
+            continue;
+
+        product = version[0] << 8 | version[1];
+        int day = version[2] >> 3;
+        int month = (version[2] & 7) << 1 | version[3] >> 7;
+        int year = version[3] & 0x7F;
+
+        printf("Seesaw addr %02X product %i date 20%02i-%02i-%02i\n", addr, product, year, month, day);
+        detectedAddr = addr;
+    }
+
+    // no device found
+    if(detectedAddr == 0xFF)
         return;
-
-    if(version[1] == 0xFF && version[2] == 0xFF && version[3] == 0xFF)
-        return;
-
-    int product = version[0] << 8 | version[1]; // should check that this is 5743
-    int day = version[2] >> 3;
-    int month = (version[2] & 7) << 1 | version[3] >> 7;
-    int year = version[3] & 0x7F;
-
-    printf("Seesaw addr %02X product %i date 20%02i-%02i-%02i\n", SEESAW_ADDR, product, year, month, day);
 
     if(product == 5743) // gamepad
     {
@@ -239,7 +251,6 @@ void seesaw_init()
     else if(product == 5753) // pc joystick
     {
         // this is untested, but should be the right IOs
-        // will need a SEESAW_ADDR override due to different default address
         buttonIO[0] = 3;
         buttonIO[1] = 13;
         buttonIO[2] = 2;
@@ -262,11 +273,11 @@ void seesaw_init()
     ioMask = __builtin_bswap32(ioMask); // seesaw is msb first
 
     // set inputs
-    seesaw_write(SEESAW_ADDR, Module::GPIO, Function::GPIO_DIRCLR, (uint8_t *)&ioMask, 4);
+    seesaw_write(detectedAddr, Module::GPIO, Function::GPIO_DIRCLR, (uint8_t *)&ioMask, 4);
 
     // enable pullups
-    seesaw_write(SEESAW_ADDR, Module::GPIO, Function::GPIO_PULLENSET, (uint8_t *)&ioMask, 4);
-    seesaw_write(SEESAW_ADDR, Module::GPIO, Function::GPIO_SET, (uint8_t *)&ioMask, 4);
+    seesaw_write(detectedAddr, Module::GPIO, Function::GPIO_PULLENSET, (uint8_t *)&ioMask, 4);
+    seesaw_write(detectedAddr, Module::GPIO, Function::GPIO_SET, (uint8_t *)&ioMask, 4);
 
     // setup an alarm for async polling
     alarmNum = hardware_alarm_claim_unused(true);
