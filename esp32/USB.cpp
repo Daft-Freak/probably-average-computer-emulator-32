@@ -216,7 +216,9 @@ static void usb_host_task(void *arg)
         .skip_phy_setup = false,
         .root_port_unpowered = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
-        .enum_filter_cb = nullptr
+        .enum_filter_cb = nullptr,
+        .fifo_settings_custom = {},
+        .peripheral_map = 0
     };
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
