@@ -41,4 +41,6 @@
     # for some reason (there aren't any generator expressions in SOURCES)
     add_executable(i-am-a-workaround ${CMAKE_CURRENT_LIST_DIR}/stub.c)
     target_link_libraries(i-am-a-workaround idf::newlib)
-    idf_build_executable(i-am-a-workaround)
+    #idf_build_executable(i-am-a-workaround)
+    # we don't need it to work, we just need it to not fail
+    target_link_options(i-am-a-workaround PRIVATE -Wl,--unresolved-symbols=ignore-all)
