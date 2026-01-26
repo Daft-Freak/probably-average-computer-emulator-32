@@ -2,6 +2,7 @@ enable_language(ASM)
 
 add_executable(PACEPico2
     Main.cpp
+    RemoteIO.cpp
 
     driver/psram.c
     driver/wifi_nina.cpp
