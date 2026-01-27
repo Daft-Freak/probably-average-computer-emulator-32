@@ -11,6 +11,8 @@ enum class RemoteIOCommand
     WriteIO8     ,
     ReadIO16     ,
     WriteIO16    ,
+    ReadMem8     ,
+    WriteMem8    ,
 };
 
 // IODevice to forward to remote
@@ -37,6 +39,18 @@ public:
 
 private:
     bool awaitResponse();
+
+    uint8_t readMem(uint32_t addr);
+    void writeMem(uint32_t addr, uint8_t data);
+
+    static uint8_t readMem(uint32_t addr, void *userData)
+    {
+        return reinterpret_cast<RemoteIO *>(userData)->readMem(addr);
+    }
+    static void writeMem(uint32_t addr, uint8_t data, void *userData)
+    {
+        reinterpret_cast<RemoteIO *>(userData)->writeMem(addr, data);
+    }
 
     System &sys;
 

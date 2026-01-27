@@ -19,6 +19,10 @@ void RemoteIO::init()
 
     // this is not in the constructor as we always want this device listed last
     sys.addIODevice(0, 0, 0, this);
+
+    // redirect RAM used for VGA
+    sys.addMemory(0xA0000, 0x20000, nullptr);
+    sys.setMemAccessCallbacks(0xA0000, 0x20000, &readMem, &writeMem, this);
 }
 
 uint8_t RemoteIO::read(uint16_t addr)
@@ -109,6 +113,44 @@ bool RemoteIO::awaitResponse()
     return false;
 }
 
+uint8_t RemoteIO::readMem(uint32_t addr)
+{
+    uint8_t command[4];
+
+    command[0] = uint8_t(RemoteIOCommand::ReadMem8);
+    command[1] = addr & 0xFF;
+    command[2] = addr >> 8;
+    command[3] = addr >> 16;
+
+    spi_write_blocking(spi, command, sizeof(command));
+
+    // wait for response
+    if(!awaitResponse())
+        return 0xFF;
+
+    // read data
+    uint8_t b;
+    spi_read_blocking(spi, 0xFF, &b, 1);
+
+    return b;
+}
+
+void RemoteIO::writeMem(uint32_t addr, uint8_t data)
+{
+    uint8_t command[5];
+
+    command[0] = uint8_t(RemoteIOCommand::WriteMem8);
+    command[1] = addr & 0xFF;
+    command[2] = addr >> 8;
+    command[3] = addr >> 16;
+    command[4] = data;
+
+    spi_write_blocking(spi, command, sizeof(command));
+
+    // wait for response
+    awaitResponse();
+}
+
 RemoteIOHost::RemoteIOHost(System &sys) : sys(sys)
 {
 }
@@ -197,6 +239,40 @@ void RemoteIOHost::update()
 
             // do the read
             sys.writeIOPort16(addr, data);
+
+            // reply
+            buf[0] = 0xAA; // ack
+            spi_write_blocking(spi, buf, 1);
+            break;
+        }
+
+        case RemoteIOCommand::ReadMem8:
+        {
+            // read addr
+            uint8_t buf[3];
+            spi_read_blocking(spi, 0xFF, buf, 3);
+            uint32_t addr = buf[0] | buf[1] << 8 | buf[2] << 16;
+
+            // do the read
+            auto data = sys.readMem(addr);
+
+            // reply
+            buf[0] = 0xAA; // ack
+            buf[1] = data;
+            spi_write_blocking(spi, buf, 2);
+            break;
+        }
+
+        case RemoteIOCommand::WriteMem8:
+        {
+            // read addr/data
+            uint8_t buf[4];
+            spi_read_blocking(spi, 0xFF, buf, 4);
+            uint32_t addr = buf[0] | buf[1] << 8 | buf[2] << 16;
+            uint8_t data = buf[3];
+
+            // do the read
+            sys.writeMem(addr, data);
 
             // reply
             buf[0] = 0xAA; // ack
