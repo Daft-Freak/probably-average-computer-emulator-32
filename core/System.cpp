@@ -693,6 +693,30 @@ void Chipset::setPICInput(int index, bool state)
 #endif
 }
 
+uint16_t Chipset::getPICInputs()
+{
+    return pic[0].inputs | pic[1].inputs << 8;
+}
+
+void Chipset::setPICInputs(uint16_t inputs)
+{
+#ifdef PICO_BUILD
+    auto interrupts = save_and_disable_interrupts();
+#endif
+
+    pic[0].inputs = inputs & 0xFF;
+    pic[1].inputs = inputs >> 8;
+
+    pic[0].request |= pic[0].inputs & ~pic[0].mask;
+    pic[1].request |= pic[1].inputs & ~pic[1].mask;
+
+    updateMaskedPICRequest();
+
+#ifdef PICO_BUILD
+    restore_interrupts(interrupts);
+#endif
+}
+
 uint8_t RAM_FUNC(Chipset::acknowledgeInterrupt)()
 {
 #ifdef PICO_BUILD

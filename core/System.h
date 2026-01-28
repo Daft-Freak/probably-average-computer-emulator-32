@@ -68,6 +68,9 @@ public:
     void setPICInput(int index, bool state);
     uint8_t acknowledgeInterrupt();
 
+    uint16_t getPICInputs();
+    void setPICInputs(uint16_t inputs);
+
     // 8042
     void sendKey(ATScancode scancode, bool down);
 
