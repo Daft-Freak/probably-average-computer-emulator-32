@@ -13,6 +13,8 @@ enum class RemoteIOCommand
     WriteIO16    ,
     ReadMem8     ,
     WriteMem8    ,
+
+    GetStatus    , // PIC inputs (+DMA?)
 };
 
 // IODevice to forward to remote
@@ -22,6 +24,7 @@ public:
     RemoteIO(System &sys);
 
     void init();
+    void syncStatus();
 
     uint8_t read(uint16_t addr) override;
     uint16_t read16(uint16_t addr) override;
@@ -67,7 +70,12 @@ public:
     void update();
 
 private:
-    System &sys;
+    void setStatusPin(bool status);
 
-    spi_inst_t *spi;
+    System &sys;
+    uint16_t lastPICInputs = 0;
+    bool statusPinActive = false;
+
+    spi_inst_t *spi = nullptr;
+    int statusPin = 0;
 };
