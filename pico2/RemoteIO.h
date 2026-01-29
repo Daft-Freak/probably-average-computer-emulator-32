@@ -19,6 +19,7 @@ enum class RemoteIOCommand
     DMAComplete  ,
 
     GetStatus    , // PIC inputs + DMA requests
+    GetInputs    , // keyboard/mouse
 };
 
 // IODevice to forward to remote
@@ -29,6 +30,7 @@ public:
 
     void init();
     void syncStatus();
+    void syncInputs();
 
     uint8_t read(uint16_t addr) override;
     uint16_t read16(uint16_t addr) override;
@@ -60,6 +62,11 @@ private:
 
     System &sys;
 
+    uint8_t inputData[12];
+    uint8_t lastKeys[6];
+    uint8_t lastKeyMod = 0;
+    bool needInputSync = false;
+
     spi_inst_t *spi;
 };
 
@@ -72,6 +79,9 @@ public:
     void init();
     void update();
 
+    void setKeyboardState(const uint8_t keys[6], uint8_t mods);
+    void updateMouseState(int x, int y, uint8_t buttons);
+
 private:
     void setStatusPin(bool status);
 
@@ -79,6 +89,11 @@ private:
     uint16_t lastPICInputs = 0;
     uint8_t lastDMARequests = 0;
     bool statusPinActive = false;
+
+    uint8_t rawKeyboard[7]; // 6 keys + mods
+    uint8_t mouseButtons = 0;
+    int16_t mouseX = 0, mouseY = 0;
+    bool needInputSync = false;
 
     spi_inst_t *spi = nullptr;
     int statusPin = 0;
