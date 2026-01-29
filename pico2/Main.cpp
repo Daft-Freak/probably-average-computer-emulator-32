@@ -82,6 +82,11 @@ static void speakerCallback(int8_t sample)
     audio_queue_sample(sample16);
 }
 
+void update_raw_key_state(const uint8_t keys[6], uint8_t mods)
+{
+    
+}
+
 void update_key_state(ATScancode code, bool state)
 {
     sys.getChipset().sendKey(code, state);

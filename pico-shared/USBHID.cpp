@@ -198,6 +198,7 @@ static uint16_t gamepadButtonsOffset = 0, gamepadNumButtons = 0;
 static uint16_t gamepadHatOffset = 0xFFFF, gamepadStickOffset = 0;
 
 void update_key_state(ATScancode code, bool state);
+void update_raw_key_state(const uint8_t keys[6], uint8_t mods);
 void update_mouse_state(int8_t x, int8_t y, bool left, bool right);
 void update_gamepad_state(uint8_t axis[2], uint8_t hat, uint32_t buttons);
 
@@ -301,6 +302,8 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
     if(protocol == HID_ITF_PROTOCOL_KEYBOARD)
     {
         auto keyboardReport = (hid_keyboard_report_t const*) report;
+
+        update_raw_key_state(keyboardReport->keycode, keyboardReport->modifier);
 
         // check for new keys down
         for(int i = 0; i < 6 && keyboardReport->keycode[i]; i++)
