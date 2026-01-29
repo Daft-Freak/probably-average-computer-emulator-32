@@ -606,7 +606,7 @@ void Chipset::updateDMA()
             {
                 uint8_t data = 0xFF;
                 if(dev)
-                    data = dev->dmaRead(i);
+                    data = dev->dmaRead(i, dma.currentWordCount[i] == 0);
 
                 sys.writeMem(addr, data);
                 break;

@@ -36,7 +36,7 @@ public:
     int getCyclesToNextInterrupt(uint32_t cycleCount) override {return 0;}
 
     // TODO
-    uint8_t dmaRead(int ch) override {return 0;}
+    uint8_t dmaRead(int ch, bool isLast) override {return 0;}
     void dmaWrite(int ch, uint8_t data) override {}
     void dmaComplete(int ch) override {}
 
