@@ -6,6 +6,7 @@ target_sources(PACEPicoShared INTERFACE
 
     DiskIO.cpp
     Filesystem.cpp
+    KeyMap.cpp
     Storage.cpp
     USBHID.cpp
 )
