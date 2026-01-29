@@ -13,8 +13,12 @@ enum class RemoteIOCommand
     WriteIO16    ,
     ReadMem8     ,
     WriteMem8    ,
+    ReadDMA8     ,
+    WriteDMA8    ,
 
-    GetStatus    , // PIC inputs (+DMA?)
+    DMAComplete  ,
+
+    GetStatus    , // PIC inputs + DMA requests
 };
 
 // IODevice to forward to remote
@@ -35,10 +39,9 @@ public:
     void updateForInterrupts(uint8_t mask) override {}
     int getCyclesToNextInterrupt(uint32_t cycleCount) override {return 0;}
 
-    // TODO
-    uint8_t dmaRead(int ch, bool isLast) override {return 0;}
-    void dmaWrite(int ch, uint8_t data) override {}
-    void dmaComplete(int ch) override {}
+    uint8_t dmaRead(int ch, bool isLast) override;
+    void dmaWrite(int ch, uint8_t data) override;
+    void dmaComplete(int ch) override;
 
 private:
     bool awaitResponse();
@@ -74,6 +77,7 @@ private:
 
     System &sys;
     uint16_t lastPICInputs = 0;
+    uint8_t lastDMARequests = 0;
     bool statusPinActive = false;
 
     spi_inst_t *spi = nullptr;
