@@ -322,12 +322,12 @@ void FloppyController::write(uint16_t addr, uint8_t data)
     }
 }
 
-uint8_t FloppyController::dmaRead(int ch)
+uint8_t FloppyController::dmaRead(int ch, bool isLast)
 {
     uint8_t ret = sectorBuf[sectorBufOffset++];
 
     // if the DMA word count is zero this is the last transfer, so don't read the next sector
-    if(sectorBufOffset == 512 && sys.getChipset().getDMAWordCount(2))
+    if(sectorBufOffset == 512 && !isLast)
     {
         int unit = command[1] & 3;
         auto &cylinder = command[2];

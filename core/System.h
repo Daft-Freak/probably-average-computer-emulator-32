@@ -27,7 +27,7 @@ public:
     virtual int getCyclesToNextInterrupt(uint32_t cycleCount) = 0;
 
     // these are reversed from the DMA controller's perspective...
-    virtual uint8_t dmaRead(int ch) = 0;
+    virtual uint8_t dmaRead(int ch, bool isLast) = 0;
     virtual void dmaWrite(int ch, uint8_t data) = 0;
     virtual void dmaComplete(int ch) = 0;
 };
@@ -48,7 +48,7 @@ public:
     void updateForInterrupts(uint8_t mask) override;
     int getCyclesToNextInterrupt(uint32_t cycleCount) override;
 
-    uint8_t dmaRead(int ch) override {return 0xFF;}
+    uint8_t dmaRead(int ch, bool isLast) override {return 0xFF;}
     void dmaWrite(int ch, uint8_t data) override;
     void dmaComplete(int ch) override {}
 
