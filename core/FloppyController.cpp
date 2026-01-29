@@ -34,7 +34,10 @@ uint8_t FloppyController::read(uint16_t addr)
 
                 // end of result
                 if(resultOff == resultLen)
+                {
+                    sys.getChipset().setPICInput(6, false);
                     resultLen = 0;
+                }
 
                 return ret;
             }
@@ -62,7 +65,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                 // leaving reset
                 // because RDY is high, this generates an interrupt
                 if(data & (1 << 3))
-                    sys.getChipset().flagPICInterrupt(6);
+                    sys.getChipset().setPICInput(6, true);
 
                 readyChanged = 0xF; // all of them
             }
@@ -179,7 +182,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     else
                     {
                         if(digitalOutput & (1 << 3))
-                            sys.getChipset().flagPICInterrupt(6);
+                            sys.getChipset().setPICInput(6, true);
                     }
                 }
                 else if((command[0] & 0x1F) == 0x06) // read
@@ -229,7 +232,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     if(failed)
                     {
                         if(digitalOutput & (1 << 3))
-                            sys.getChipset().flagPICInterrupt(6);
+                            sys.getChipset().setPICInput(6, true);
                     }
                 }
                 else if(command[0] == 0x07) // recalibrate
@@ -247,7 +250,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     }
 
                     if(digitalOutput & (1 << 3))
-                        sys.getChipset().flagPICInterrupt(6);
+                        sys.getChipset().setPICInput(6, true);
                 }
                 else if(command[0] == 0x08) // sense interrupt status
                 {
@@ -289,7 +292,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     result[6] = 2; // ?
 
                     if(digitalOutput & (1 << 3))
-                        sys.getChipset().flagPICInterrupt(6);
+                        sys.getChipset().setPICInput(6, true);
                 }
                 else if(command[0] == 0x0F) // seek
                 {
@@ -310,7 +313,7 @@ void FloppyController::write(uint16_t addr, uint8_t data)
                     }
 
                     if(digitalOutput & (1 << 3))
-                        sys.getChipset().flagPICInterrupt(6);
+                        sys.getChipset().setPICInput(6, true);
                 }
 
                 commandLen = 0;
@@ -402,7 +405,7 @@ void FloppyController::dmaComplete(int ch)
     sys.getChipset().dmaRequest(2, false);
 
     if(digitalOutput & (1 << 3))
-        sys.getChipset().flagPICInterrupt(6);
+        sys.getChipset().setPICInput(6, true);
 }
 
 // called from IO interface when it's done reading/writing
