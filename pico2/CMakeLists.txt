@@ -16,6 +16,8 @@ if(PICO2_CPU_IN_RAM)
     target_compile_definitions(PACEPico2 PRIVATE PICO_CPU_IN_RAM=1)
 endif()
 
+target_compile_definitions(PACEPico2 PRIVATE PICO_CLOCK_ADJUST_PERI_CLOCK_WITH_SYS_CLOCK=1)
+
 
 # "extra" board config (the thing the pico is plugged into)
 if(NOT EXTRA_BOARD)
