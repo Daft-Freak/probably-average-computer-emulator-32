@@ -11,6 +11,7 @@ add_executable(PACEPico2
 # some additional target-specific options
 option(PICO2_CPU_IN_RAM "Move main CPU interpreter+memory access code to RAM" ON)
 option(PICO2_REMOTE_IO "Forward ISA bus over SPI" OFF)
+option(PICO2_REMOTE_IO_HOST "Expose IO over SPI, don't emulate CPU" OFF)
 
 if(PICO2_CPU_IN_RAM)
     target_compile_definitions(PACEPico2 PRIVATE PICO_CPU_IN_RAM=1)
@@ -20,6 +21,10 @@ if(PICO2_REMOTE_IO)
     target_sources(PACEPico2 PRIVATE RemoteMain.cpp)
 else()
     target_sources(PACEPico2 PRIVATE Main.cpp)
+endif()
+
+if(PICO2_REMOTE_IO_HOST)
+    target_compile_definitions(PACEPico2 PRIVATE REMOTE_IO_HOST)
 endif()
 
 target_compile_definitions(PACEPico2 PRIVATE PICO_CLOCK_ADJUST_PERI_CLOCK_WITH_SYS_CLOCK=1)

@@ -32,6 +32,7 @@
 #include "BIOS.h"
 #include "DiskIO.h"
 #include "Display.h"
+#include "RemoteIO.h"
 #include "wifi_nina.h"
 
 #include "i2c/seesaw.h"
@@ -65,6 +66,10 @@ static GamePort gamePort(sys);
 static QEMUConfig qemuCfg(sys);
 static VGACard vga(sys);
 
+#ifdef REMOTE_IO_HOST
+static RemoteIOHost remoteHost(sys);
+#endif
+
 static FileATAIO ataPrimaryIO;
 static FileFloppyIO floppyIO;
 
@@ -84,7 +89,9 @@ static void speakerCallback(int8_t sample)
 
 void update_raw_key_state(const uint8_t keys[6], uint8_t mods)
 {
-    
+#ifdef REMOTE_IO_HOST
+    remoteHost.setKeyboardState(keys, mods);
+#endif
 }
 
 void update_key_state(ATScancode code, bool state)
@@ -94,11 +101,15 @@ void update_key_state(ATScancode code, bool state)
 
 void update_mouse_state(int8_t x, int8_t y, bool left, bool right)
 {
+#ifdef REMOTE_IO_HOST
+    remoteHost.updateMouseState(x, y, (left ? 1 : 0) | (right ? 2 : 0));
+#else
     auto &chipset = sys.getChipset();
     chipset.addMouseMotion(x, y);
     chipset.setMouseButton(0, left);
     chipset.setMouseButton(1, right);
     chipset.syncMouse();
+#endif
 }
 
 void update_gamepad_state(uint8_t axis[2], uint8_t hat, uint32_t buttons)
@@ -202,11 +213,20 @@ static void core1Main()
     tusb_init(BOARD_TUH_RHPORT, &hostInit);
 #endif
 
+#ifdef REMOTE_IO_HOST
+    remoteHost.init();
+#endif
+
     // run
     while(true)
     {
+        // the "IO host" doesn't run the CPU, only the peripherals
+#ifdef REMOTE_IO_HOST
+        remoteHost.update();
+#else
         sys.getCPU().run(10);
         sys.getChipset().updateForDisplay();
+#endif
 
         if(rtcSeconds)
         {
