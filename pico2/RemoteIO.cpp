@@ -514,6 +514,10 @@ void RemoteIOHost::update()
                 auto dev = sys.getChipset().getDMARequestDev(ch);
                 auto data = dev ? dev->dmaRead(ch, isLast) : 0xFF;
 
+                // DMA read may unset request and we need to handle that as quickly as possible
+                if(sys.getChipset().getDMARequests() != lastDMARequests)
+                    setStatusPin(true);
+
                 // reply
                 buf[0] = 0xAA; // ack
                 buf[1] = data;
