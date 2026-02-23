@@ -7,15 +7,74 @@
 #include "driver/ppa.h"
 
 #include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 
 #include "Display.h"
 #include "config.h"
 
-static esp_lcd_panel_io_handle_t io_handle = nullptr;
+#ifdef LCD_RGB
+
+#ifndef LCD_DE_PIN
+#define LCD_DE_PIN -1
+#endif
+
+#ifndef LCD_CLOCK_PIN
+#define LCD_CLOCK_PIN -1
+#endif
+
+// mode (default to 640x480)
+#ifndef DPI_MODE_CLOCK
+#define DPI_MODE_CLOCK 25000000
+#endif
+
+#ifndef DPI_MODE_H_SYNC_POLARITY
+#define DPI_MODE_H_SYNC_POLARITY 0
+#endif
+#ifndef DPI_MODE_H_FRONT_PORCH
+#define DPI_MODE_H_FRONT_PORCH   16
+#endif
+#ifndef DPI_MODE_H_SYNC_WIDTH
+#define DPI_MODE_H_SYNC_WIDTH    96
+#endif
+#ifndef DPI_MODE_H_BACK_PORCH
+#define DPI_MODE_H_BACK_PORCH    48
+#endif
+#ifndef DPI_MODE_H_ACTIVE_PIXELS
+#define DPI_MODE_H_ACTIVE_PIXELS 640
+#endif
+
+#ifndef DPI_MODE_V_SYNC_POLARITY
+#define DPI_MODE_V_SYNC_POLARITY 0
+#endif
+#ifndef DPI_MODE_V_FRONT_PORCH
+#define DPI_MODE_V_FRONT_PORCH   10
+#endif
+#ifndef DPI_MODE_V_SYNC_WIDTH
+#define DPI_MODE_V_SYNC_WIDTH    2
+#endif
+#ifndef DPI_MODE_V_BACK_PORCH
+#define DPI_MODE_V_BACK_PORCH    33
+#endif
+#ifndef DPI_MODE_V_ACTIVE_LINES
+#define DPI_MODE_V_ACTIVE_LINES  480
+#endif
+#endif
+
 static esp_lcd_panel_handle_t panel_handle = nullptr;
 
+static int new_mode_h = 480;
+
+#ifdef LCD_BACKLIGHT_PIN
+static bool backlight_enabled = false;
+#endif
+static bool render_needed = true;
+
+
+#ifdef LCD_I80
+
+static esp_lcd_panel_io_handle_t io_handle = nullptr;
 static uint16_t *line_buffer; // rgb565
 
 static uint16_t temp_scale_buffer[720 * 5];
@@ -23,15 +82,15 @@ static uint16_t temp_scale_buffer[720 * 5];
 static unsigned cur_copy_line = 0;
 static unsigned copy_out_step = 1;
 
-static bool backlight_enabled = false;
-static bool render_needed = true;
-
-static int new_mode_h = 480;
-
 #if SOC_PPA_SUPPORTED
 static ppa_client_handle_t ppa_client = nullptr;
 #endif
+#endif
 
+#ifdef LCD_RGB
+#endif
+
+#ifdef LCD_I80
 static void *alloc_display_buffer(size_t size)
 {
   // this depends on the bus...
@@ -201,6 +260,42 @@ static void display_task(void *arg)
     }
 }
 
+#endif
+
+#ifdef LCD_RGB
+static IRAM_ATTR bool on_bounce_empty(esp_lcd_panel_handle_t panel, void *bounce_buf, int pos_px, int len_bytes, void *user_ctx)
+{
+    auto buf16 = reinterpret_cast<uint16_t *>(bounce_buf);
+    int pos_y = pos_px / DPI_MODE_H_ACTIVE_PIXELS;
+    int out_lines = len_bytes / (DPI_MODE_H_ACTIVE_PIXELS * sizeof(uint16_t));
+
+    int end_y = pos_y + out_lines;
+
+    for(; pos_y < end_y; pos_y++)
+    {
+        display_draw_line(nullptr, pos_y, buf16);
+        buf16 += DPI_MODE_H_ACTIVE_PIXELS;
+    }
+    return false;
+}
+
+static bool on_frame_buf_complete(esp_lcd_panel_handle_t panel, const esp_lcd_rgb_panel_event_data_t *edata, void *user_ctx)
+{
+#ifdef LCD_BACKLIGHT_PIN
+    // enable backlight
+    if(!backlight_enabled)
+    {
+        gpio_set_level(gpio_num_t(LCD_BACKLIGHT_PIN), 1);
+        backlight_enabled = true;
+    }
+#endif
+
+    // update h scale?
+
+    return false;
+}
+#endif
+
 void init_display()
 {
 #ifdef LCD_BACKLIGHT_PIN
@@ -253,7 +348,6 @@ void init_display()
     io_config.flags.swap_color_bytes = 1;
 
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_i80(i80_bus, &io_config, &io_handle));
-#endif
 
     // init panel
     esp_lcd_panel_dev_config_t panel_config = {};
@@ -383,6 +477,77 @@ void init_display()
 #endif
 
     xTaskCreate(display_task, "display", 2048, nullptr, 5, nullptr);
+#endif
+
+#ifdef LCD_RGB
+    // rgb panel init
+    esp_lcd_rgb_panel_config_t panel_config = {
+        .clk_src = LCD_CLK_SRC_DEFAULT,
+        .timings = {
+            .pclk_hz = DPI_MODE_CLOCK,
+            .h_res = DPI_MODE_H_ACTIVE_PIXELS,
+            .v_res = DPI_MODE_V_ACTIVE_LINES,
+            .hsync_pulse_width = DPI_MODE_H_SYNC_WIDTH,
+            .hsync_back_porch = DPI_MODE_H_BACK_PORCH,
+            .hsync_front_porch = DPI_MODE_H_FRONT_PORCH,
+            .vsync_pulse_width = DPI_MODE_V_SYNC_WIDTH,
+            .vsync_back_porch = DPI_MODE_V_BACK_PORCH,
+            .vsync_front_porch = DPI_MODE_V_FRONT_PORCH,
+            .flags = {}
+        },
+        .data_width = 16,
+        .bits_per_pixel = 0,
+        .num_fbs = 0,
+        .bounce_buffer_size_px = 24 * DPI_MODE_H_ACTIVE_PIXELS,
+        .sram_trans_align = 0,
+        .dma_burst_size = 64,
+        .hsync_gpio_num = LCD_HSYNC_PIN,
+        .vsync_gpio_num = LCD_VSYNC_PIN,
+        .de_gpio_num = LCD_DE_PIN,
+        .pclk_gpio_num = LCD_CLOCK_PIN,
+        .disp_gpio_num = -1,
+        .data_gpio_nums = {
+            LCD_DATA0_PIN,
+            LCD_DATA1_PIN,
+            LCD_DATA2_PIN,
+            LCD_DATA3_PIN,
+            LCD_DATA4_PIN,
+            LCD_DATA5_PIN,
+            LCD_DATA6_PIN,
+            LCD_DATA7_PIN,
+            LCD_DATA8_PIN,
+            LCD_DATA9_PIN,
+            LCD_DATA10_PIN,
+            LCD_DATA11_PIN,
+            LCD_DATA12_PIN,
+            LCD_DATA13_PIN,
+            LCD_DATA14_PIN,
+            LCD_DATA15_PIN,
+        },
+
+        .flags = {
+            .disp_active_low = false,
+            .refresh_on_demand = false,
+            .fb_in_psram = false,
+            .double_fb = false,
+            .no_fb = true,
+            .bb_invalidate_cache = false,
+        },
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&panel_config, &panel_handle));
+
+    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
+
+    // setup callbacks
+    esp_lcd_rgb_panel_event_callbacks_t callbacks = {
+        .on_color_trans_done = nullptr,
+        .on_vsync = nullptr,
+        .on_bounce_empty = on_bounce_empty,
+        .on_frame_buf_complete = on_frame_buf_complete,
+    };
+    ESP_ERROR_CHECK(esp_lcd_rgb_panel_register_event_callbacks(panel_handle, &callbacks, nullptr));
+#endif
 }
 
 void set_display_size(int w, int h)
