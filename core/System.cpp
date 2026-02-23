@@ -9,14 +9,9 @@
 #include "hardware/watchdog.h"
 #endif
 
-#ifdef PICO_CPU_IN_RAM
-#include "pico.h"
-#define RAM_FUNC(x) __not_in_flash_func(x)
-#else
-#define RAM_FUNC(x) x
-#endif
-
 #include "System.h"
+
+#include "RAMFunc.h"
 
 Chipset::Chipset(System &sys) : sys(sys)
 {
