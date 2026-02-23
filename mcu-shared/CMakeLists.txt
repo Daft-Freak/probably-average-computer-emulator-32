@@ -43,3 +43,11 @@ function(generate_bios TARGET_NAME OBJCOPY_TARGET OBJCOPY_ARCH)
 
     target_sources(${TARGET_NAME} PRIVATE vga-bios.o)
 endfunction()
+
+add_library(PACEMCUShared INTERFACE)
+
+target_sources(PACEMCUShared INTERFACE
+    KeyMap.cpp
+)
+
+target_include_directories(PACEMCUShared INTERFACE ${CMAKE_CURRENT_LIST_DIR})
