@@ -24,6 +24,7 @@ target_link_libraries(PACE_ESP32 PUBLIC
     idf::usb_host_hid
 
     PACECore
+    PACEMCUShared
     PACE_BIOS
 )
 
