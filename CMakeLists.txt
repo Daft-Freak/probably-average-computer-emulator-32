@@ -43,10 +43,6 @@ if(IS_PICO OR BUILD_ESP32)
   add_subdirectory(mcu-shared)
 endif()
 
-if(IS_PICO)
-  add_subdirectory(pico-shared)
-endif()
-
 if(BUILD_SDL)
   add_subdirectory(minsdl)
 endif()

@@ -1,11 +1,23 @@
 enable_language(ASM)
 
+#embed BIOS
+generate_bios(PACEPicoBIOS elf32-littlearm armv6s-m)
+
 add_executable(PACEPico2
     Main.cpp
+
+    DiskIO.cpp
+    Filesystem.cpp
+    Storage.cpp
+    USBHID.cpp
 
     driver/psram.c
     driver/wifi_nina.cpp
     driver/i2c/seesaw.cpp
+
+    fatfs/ff.c
+    fatfs/ffunicode.c
+
 )
 
 # some additional target-specific options
@@ -86,6 +98,7 @@ pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/driver/dbi-8bit.pio
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/driver/dbi-spi.pio)
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/driver/dpi.pio)
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/driver/i2s.pio)
+pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/spi.pio)
 
 #custom linker script (puts all of CPU.cpp in RAM)
 set_target_properties(PACEPico2 PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
@@ -94,16 +107,19 @@ pico_add_link_depend(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
 # usual setup
 target_link_libraries(PACEPico2
     PACECore
-    PACEPicoShared
+    PACEMCUShared
     PACEPicoBIOS
 
     hardware_dma
     hardware_i2c
+    hardware_pio
     hardware_pwm
     hardware_spi
 
     pico_multicore
     pico_stdlib
+
+    tinyusb_host
 )
 
 # additionally link to pio usb if needed by board
