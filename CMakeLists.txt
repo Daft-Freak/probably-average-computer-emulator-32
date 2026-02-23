@@ -39,6 +39,10 @@ cmake_dependent_option(BUILD_ESP32 "Build ESP32 UI" ON "IS_ESP32" OFF)
 
 add_subdirectory(core)
 
+if(IS_PICO OR BUILD_ESP32)
+  add_subdirectory(mcu-shared)
+endif()
+
 if(IS_PICO)
   add_subdirectory(pico-shared)
 endif()

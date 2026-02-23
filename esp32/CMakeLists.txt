@@ -1,5 +1,5 @@
 
-include(bios.cmake)
+generate_bios(PACE_BIOS elf32-littleriscv riscv)
 
 add_executable(PACE_ESP32
     DiskIO.cpp
