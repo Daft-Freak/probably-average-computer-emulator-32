@@ -69,8 +69,6 @@ static int new_mode_h = 480;
 #ifdef LCD_BACKLIGHT_PIN
 static bool backlight_enabled = false;
 #endif
-static bool render_needed = true;
-
 
 #ifdef LCD_I80
 
@@ -82,12 +80,15 @@ static uint16_t temp_scale_buffer[720 * 5];
 static unsigned cur_copy_line = 0;
 static unsigned copy_out_step = 1;
 
+static bool render_needed = true;
+
 #if SOC_PPA_SUPPORTED
 static ppa_client_handle_t ppa_client = nullptr;
 #endif
 #endif
 
 #ifdef LCD_RGB
+static uint32_t mode_y_scale = 1 << 16;
 #endif
 
 #ifdef LCD_I80
@@ -269,12 +270,21 @@ static IRAM_ATTR bool on_bounce_empty(esp_lcd_panel_handle_t panel, void *bounce
     int pos_y = pos_px / DPI_MODE_H_ACTIVE_PIXELS;
     int out_lines = len_bytes / (DPI_MODE_H_ACTIVE_PIXELS * sizeof(uint16_t));
 
-    int end_y = pos_y + out_lines;
+    pos_y = pos_y * mode_y_scale;
 
-    for(; pos_y < end_y; pos_y++)
+    int last_line = -1;
+
+    for(int y = 0; y < out_lines; y++)
     {
-        display_draw_line(nullptr, pos_y, buf16);
+        int line = pos_y >> 16;
+        if(line != last_line)
+            display_draw_line(nullptr, line, buf16);
+        else // repeat last line
+            memcpy(buf16, buf16 - DPI_MODE_H_ACTIVE_PIXELS, DPI_MODE_H_ACTIVE_PIXELS * sizeof(uint16_t));
+
+        last_line = line;
         buf16 += DPI_MODE_H_ACTIVE_PIXELS;
+        pos_y += mode_y_scale;
     }
     return false;
 }
@@ -290,7 +300,8 @@ static bool on_frame_buf_complete(esp_lcd_panel_handle_t panel, const esp_lcd_rg
     }
 #endif
 
-    // update h scale?
+    // update scale
+    mode_y_scale = (new_mode_h << 16) / DPI_MODE_V_ACTIVE_LINES;
 
     return false;
 }
