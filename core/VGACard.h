@@ -99,6 +99,7 @@ private:
     bool textWidthHack = false; // force text modes to have 8px chars (for display outputs limited to 640x480)
 #ifdef VGA_RGB565
     uint16_t rgb565pal16[16];
+    uint16_t rgb565pal256[256];
 #endif
 
     uint8_t ram[256 * 1024];

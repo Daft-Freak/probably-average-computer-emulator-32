@@ -46,8 +46,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
     auto paletteLookup256 = [this](int index)
     {
-        auto pal256 = dacPalette + index * 3;
-        return pal256[0] >> 1 | pal256[1] << 5 | (pal256[2] >> 1) << 11;
+        return rgb565pal256[index];
     };
 #else
     // RGB888
@@ -701,14 +700,16 @@ void VGACard::updatePalette16(int index)
 {
 #ifdef VGA_RGB565
     uint8_t pal64 = attribPalette[index];
-    auto pal256 = dacPalette + pal64 * 3;
-    rgb565pal16[index] = pal256[0] >> 1 | pal256[1] << 5 | (pal256[2] >> 1) << 11;
+    rgb565pal16[index] = rgb565pal256[pal64];
 #endif
 }
 
 void VGACard::updatePalette256(int index)
 {
 #ifdef VGA_RGB565
+    auto pal256 = dacPalette + index * 3;
+    rgb565pal256[index] = pal256[0] >> 1 | pal256[1] << 5 | (pal256[2] >> 1) << 11;
+
     if(index < 64)
     {
         for(int i = 0; i < 16; i++)
