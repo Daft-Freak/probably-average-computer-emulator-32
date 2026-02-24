@@ -291,19 +291,19 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
-            v0 = (v0 | v0 << 12) & 0x000F000F;
+            v0 = (v0 | v0 << 12);
             v0 = (v0 | v0 <<  6) & 0x03030303;
             v0 = (v0 | v0 <<  3) & 0x11111111;
 
-            v1 = (v1 | v1 << 12) & 0x000F000F;
+            v1 = (v1 | v1 << 12);
             v1 = (v1 | v1 <<  6) & 0x03030303;
             v1 = (v1 | v1 <<  3) & 0x11111111;
 
-            v2 = (v2 | v2 << 12) & 0x000F000F;
+            v2 = (v2 | v2 << 12);
             v2 = (v2 | v2 <<  6) & 0x03030303;
             v2 = (v2 | v2 <<  3) & 0x11111111;
 
-            v3 = (v3 | v3 << 12) & 0x000F000F;
+            v3 = (v3 | v3 << 12);
             v3 = (v3 | v3 <<  6) & 0x03030303;
             v3 = (v3 | v3 <<  3) & 0x11111111;
 
@@ -346,19 +346,19 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
-            v0 = (v0 | v0 << 12) & 0x000F000F;
+            v0 = (v0 | v0 << 12);
             v0 = (v0 | v0 <<  6) & 0x03030303;
             v0 = (v0 | v0 <<  3) & 0x11111111;
 
-            v1 = (v1 | v1 << 12) & 0x000F000F;
+            v1 = (v1 | v1 << 12);
             v1 = (v1 | v1 <<  6) & 0x03030303;
             v1 = (v1 | v1 <<  3) & 0x11111111;
 
-            v2 = (v2 | v2 << 12) & 0x000F000F;
+            v2 = (v2 | v2 << 12);
             v2 = (v2 | v2 <<  6) & 0x03030303;
             v2 = (v2 | v2 <<  3) & 0x11111111;
 
-            v3 = (v3 | v3 << 12) & 0x000F000F;
+            v3 = (v3 | v3 << 12);
             v3 = (v3 | v3 <<  6) & 0x03030303;
             v3 = (v3 | v3 <<  3) & 0x11111111;
 
