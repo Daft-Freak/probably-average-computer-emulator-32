@@ -1,6 +1,10 @@
 #include <string_view>
 
 #include "driver/gptimer.h"
+#include "driver/ledc.h"
+
+#include "soc/interrupts.h"
+#include "soc/ledc_struct.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -20,6 +24,7 @@
 #include "VGACard.h"
 
 gptimer_handle_t sysTimer = nullptr;
+volatile uint32_t timerHigh = 0;
 
 static System sys;
 
@@ -132,8 +137,40 @@ static void vgaResolutionCallback(int w, int h)
     set_display_size(w, h);
 }
 
+#ifdef LEDC_TIMER
+static void IRAM_ATTR ledc_overflow_intr(void *arg)
+{
+    LEDC.int_clr.timer0_ovf_int_clr = 1;
+    timerHigh += 1 << 20;
+}
+
+static void initLEDCTimer()
+{
+    ledc_timer_config_t ledcConfig = {};
+    ledcConfig.speed_mode = LEDC_LOW_SPEED_MODE;
+    ledcConfig.duty_resolution = LEDC_TIMER_1_BIT;
+    ledcConfig.timer_num = LEDC_TIMER_0;
+    ledcConfig.freq_hz = System::getClockSpeed() / 2; // we're only using the timer so we need half the freq
+    ledcConfig.clk_cfg = LEDC_AUTO_CLK;
+    ESP_ERROR_CHECK(ledc_timer_config(&ledcConfig));
+
+    // hack timer resolution to max (making freq actually ~13.6Hz)
+    LEDC.timer_group[0].timer[0].conf.duty_res = 20;
+    LEDC.timer_group[0].timer[0].conf.para_up = 1;
+
+    // overflow interrupt
+    intr_handle_t handle;
+    esp_intr_alloc(ETS_LEDC_INTR_SOURCE, ESP_INTR_FLAG_IRAM, ledc_overflow_intr, nullptr, &handle);
+    LEDC.int_ena.timer0_ovf_int_ena = 1;
+}
+#endif
+
 static void runEmulator(void * arg)
 {
+#ifdef LEDC_TIMER
+    initLEDCTimer();
+#endif
+
     while(true)
     {
         for(int i = 0; i < 100; i++)
@@ -147,6 +184,7 @@ static void runEmulator(void * arg)
 
 extern "C" void app_main()
 {
+#ifndef LEDC_TIMER
     // create and start timer
     gptimer_config_t timer_config = {
         .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -160,6 +198,7 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &sysTimer));
     ESP_ERROR_CHECK(gptimer_enable(sysTimer));
     ESP_ERROR_CHECK(gptimer_start(sysTimer));
+#endif
 
     // hw init
     init_display();

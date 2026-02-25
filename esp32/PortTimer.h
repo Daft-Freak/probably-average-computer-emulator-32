@@ -2,7 +2,8 @@
 
 #include <cstdint>
 
-#define LL_TIMER // hacks to significantly reduce overhead
+//#define LL_TIMER // hacks to significantly reduce overhead
+#define LEDC_TIMER // using LED PWM timer
 
 #include "driver/gptimer.h"
 
@@ -12,10 +13,18 @@
 #include "hal/timer_ll.h"
 #endif
 
+#ifdef LEDC_TIMER
+#include "soc/ledc_struct.h"
+#endif
+
 extern gptimer_handle_t sysTimer;
+extern volatile uint32_t timerHigh;
 
 inline uint32_t getTimer()
 {
+#ifdef LEDC_TIMER
+    return LEDC.timer_group[0].timer[0].value.cnt | timerHigh;
+#else
     uint64_t count;
 #ifdef LL_TIMER
     auto context = &sysTimer->hal;
@@ -28,4 +37,5 @@ inline uint32_t getTimer()
     gptimer_get_raw_count(sysTimer, &count);
 #endif
     return count << 2;
+#endif
 }
