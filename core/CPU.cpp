@@ -69,7 +69,11 @@ enum PageFlags
 
 static constexpr bool parity(uint8_t v)
 {
-    return ~(0x6996 >> ((v ^ (v >> 4)) & 0xF)) & 1;
+#ifdef __riscv // saves 1 instruction
+    return (0x9669000 >> ((v ^ (v >> 4)) & 0xF)) & (1 << 12);
+#else
+    return (0x9669 >> ((v ^ (v >> 4)) & 0xF)) & 1;
+#endif
 };
 
 template<class T>
