@@ -365,6 +365,18 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
 #ifdef VGA_RGB565
             // really need to squeeze out the last few cycles
+
+#ifdef ESP_BUILD
+            // trade some memory for even more speed by looking up two pixels at a time
+            // (the below single-pixel code still isn't fast enough)
+            auto pal = rgb565pal16x2;
+            auto output32 = reinterpret_cast<uint32_t *>(output);
+            *output32++ = pal[(interleaved >> 24) & 0xFF];
+            *output32++ = pal[(interleaved >> 16) & 0xFF];
+            *output32++ = pal[(interleaved >>  8) & 0xFF];
+            *output32++ = pal[(interleaved >>  0) & 0xFF];
+            output = reinterpret_cast<uint8_t *>(output32);
+#else
             auto pal = rgb565pal16;
             auto output32 = reinterpret_cast<uint32_t *>(output);
             *output32++ = pal[(interleaved >> 28) & 0xF] | pal[(interleaved >> 24) & 0xF] << 16;
@@ -372,6 +384,8 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
             *output32++ = pal[(interleaved >> 12) & 0xF] | pal[(interleaved >>  8) & 0xF] << 16;
             *output32++ = pal[(interleaved >>  4) & 0xF] | pal[(interleaved >>  0) & 0xF] << 16;
             output = reinterpret_cast<uint8_t *>(output32);
+#endif
+
 #else
             for(int j = 0; j < 8; j++)
             {
@@ -701,6 +715,16 @@ void VGACard::updatePalette16(int index)
 #ifdef VGA_RGB565
     uint8_t pal64 = attribPalette[index];
     rgb565pal16[index] = rgb565pal256[pal64];
+
+#ifdef ESP_BUILD
+    // build two-pixel lookup
+    for(int i = 0; i < 16; i++)
+    {
+        uint8_t pal64_2 = attribPalette[i];
+        rgb565pal16x2[i * 16 + index] = rgb565pal256[pal64_2] | rgb565pal256[pal64] << 16;
+        rgb565pal16x2[index * 16 + i] = rgb565pal256[pal64] | rgb565pal256[pal64_2] << 16;
+    }
+#endif
 #endif
 }
 

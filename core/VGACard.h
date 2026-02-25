@@ -100,6 +100,9 @@ private:
 #ifdef VGA_RGB565
     uint16_t rgb565pal16[16];
     uint16_t rgb565pal256[256];
+#ifdef ESP_BUILD
+    uint32_t rgb565pal16x2[16 * 16];
+#endif
 #endif
 
     uint8_t ram[256 * 1024];
