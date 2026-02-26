@@ -414,8 +414,7 @@ static T doShiftRight(T dest, int count, uint32_t &flags)
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
-          | (res == 0 ? Flag_Z : 0)
-          | (res & signBit<T>() ? Flag_S : 0);
+          | (res == 0 ? Flag_Z : 0);
 
     // "undefined" for shift counts other than 1
     flags = (flags & ~Flag_O) | ((res & (signBit<T>() >> 1)) ? Flag_O : 0);
