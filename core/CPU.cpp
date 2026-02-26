@@ -135,7 +135,8 @@ static T doAnd(T dest, T src, uint32_t &flags)
 
     // c/o cleared
     // szp set from res
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S | Flag_O))
+    // a is "undefined" (but it would seem, also cleared)
+    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
@@ -195,7 +196,8 @@ static T doOr(T dest, T src, uint32_t &flags)
 
     // c/o cleared
     // szp set from res
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S | Flag_O))
+    // a is "undefined"
+    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
@@ -347,6 +349,7 @@ static T doShiftLeft(T dest, int count, uint32_t &flags)
     flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
+          | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
 
@@ -381,6 +384,7 @@ static T doDoubleShiftLeft(T dest, T src, int count, uint32_t &flags)
     flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
+          | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
 
@@ -409,6 +413,7 @@ static T doShiftRight(T dest, int count, uint32_t &flags)
     flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
+          | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
 
@@ -436,6 +441,7 @@ static T doShiftRightArith(T dest, int count, uint32_t &flags)
     flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
+          | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
 
@@ -470,6 +476,7 @@ static T doDoubleShiftRight(T dest, T src, int count, uint32_t &flags)
     flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
           | (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
+          | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
 
@@ -526,7 +533,8 @@ static T doXor(T dest, T src, uint32_t &flags)
 
     // c/o cleared
     // szp set from res
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S | Flag_O))
+    // a is "undefined"
+    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
