@@ -14,196 +14,10 @@
 #include "usb/hid_usage_keyboard.h"
 #include "usb/hid_usage_mouse.h"
 
-#include "Scancode.h"
+#include "KeyMap.h"
 
 static uint8_t last_keys[HID_KEYBOARD_KEY_MAX]{0, 0, 0, 0, 0};
 static uint8_t last_key_mod = 0;
-
-// TODO: these are duplicated with pico
-static const ATScancode scancode_map[]{
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-
-    ATScancode::A,
-    ATScancode::B,
-    ATScancode::C,
-    ATScancode::D,
-    ATScancode::E,
-    ATScancode::F,
-    ATScancode::G,
-    ATScancode::H,
-    ATScancode::I,
-    ATScancode::J,
-    ATScancode::K,
-    ATScancode::L,
-    ATScancode::M,
-    ATScancode::N,
-    ATScancode::O,
-    ATScancode::P,
-    ATScancode::Q,
-    ATScancode::R,
-    ATScancode::S,
-    ATScancode::T,
-    ATScancode::U,
-    ATScancode::V,
-    ATScancode::W,
-    ATScancode::X,
-    ATScancode::Y,
-    ATScancode::Z,
-    
-    ATScancode::_1,
-    ATScancode::_2,
-    ATScancode::_3,
-    ATScancode::_4,
-    ATScancode::_5,
-    ATScancode::_6,
-    ATScancode::_7,
-    ATScancode::_8,
-    ATScancode::_9,
-    ATScancode::_0,
-
-    ATScancode::Return,
-    ATScancode::Escape,
-    ATScancode::Backspace,
-    ATScancode::Tab,
-    ATScancode::Space,
-
-    ATScancode::Minus,
-    ATScancode::Equals,
-    ATScancode::LeftBracket,
-    ATScancode::RightBracket,
-    ATScancode::Backslash,
-    ATScancode::Backslash, // same key
-    ATScancode::Semicolon,
-    ATScancode::Apostrophe,
-    ATScancode::Grave,
-    ATScancode::Comma,
-    ATScancode::Period,
-    ATScancode::Slash,
-
-    ATScancode::CapsLock,
-
-    ATScancode::F1,
-    ATScancode::F2,
-    ATScancode::F3,
-    ATScancode::F4,
-    ATScancode::F5,
-    ATScancode::F6,
-    ATScancode::F7,
-    ATScancode::F8,
-    ATScancode::F9,
-    ATScancode::F10,
-    ATScancode::F11,
-    ATScancode::F12,
-
-    ATScancode::Invalid, // PrintScreen
-    ATScancode::ScrollLock,
-    ATScancode::Invalid, // Pause
-    ATScancode::Insert,
-    
-    ATScancode::Home,
-    ATScancode::PageUp,
-    ATScancode::Delete,
-    ATScancode::End,
-    ATScancode::PageDown,
-    ATScancode::Right,
-    ATScancode::Left,
-    ATScancode::Down,
-    ATScancode::Up,
-
-    ATScancode::NumLock,
-
-    ATScancode::KPDivide,
-    ATScancode::KPMultiply,
-    ATScancode::KPMinus,
-    ATScancode::KPPlus,
-    ATScancode::KPEnter,
-    ATScancode::KP1,
-    ATScancode::KP2,
-    ATScancode::KP3,
-    ATScancode::KP4,
-    ATScancode::KP5,
-    ATScancode::KP6,
-    ATScancode::KP7,
-    ATScancode::KP8,
-    ATScancode::KP9,
-    ATScancode::KP0,
-    ATScancode::KPPeriod,
-
-    ATScancode::NonUSBackslash,
-
-    ATScancode::Application,
-    ATScancode::Power,
-
-    ATScancode::KPEquals,
-
-    // F13-F24
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-
-    // no mapping
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-    ATScancode::Invalid,
-
-    ATScancode::KPComma,
-    ATScancode::Invalid,
-
-    ATScancode::International1,
-    ATScancode::International2,
-    ATScancode::International3,
-    ATScancode::International4,
-    ATScancode::International5,
-    ATScancode::International6,
-    ATScancode::Invalid, // ...7
-    ATScancode::Invalid, // ...8
-    ATScancode::Invalid, // ...9
-    ATScancode::Lang1,
-    ATScancode::Lang2,
-    ATScancode::Lang3,
-    ATScancode::Lang4,
-    ATScancode::Lang5,
-
-    // ... some media keys
-};
-
-static const ATScancode mod_map[]
-{
-    ATScancode::LeftCtrl,
-    ATScancode::LeftShift,
-    ATScancode::LeftAlt,
-    ATScancode::LeftGUI,
-    ATScancode::RightCtrl,
-    ATScancode::RightShift,
-    ATScancode::RightAlt,
-    ATScancode::RightGUI,
-};
 
 void update_key_state(ATScancode code, bool state);
 void update_mouse_state(int8_t x, int8_t y, bool left, bool right);
@@ -263,8 +77,10 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                     if(found)
                         continue;
 
-                    if(key < std::size(scancode_map) && scancode_map[key] != ATScancode::Invalid)
-                        update_key_state(scancode_map[key], true);
+                    auto mapped = map_hid_key(key);
+
+                    if(mapped != ATScancode::Invalid)
+                        update_key_state(mapped, true);
                 }
 
                 // do the reverse and check for released keys
@@ -278,8 +94,10 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                     if(found)
                         continue;
 
-                    if(key < std::size(scancode_map) && scancode_map[key] != ATScancode::Invalid)
-                        update_key_state(scancode_map[key], false);
+                    auto mapped = map_hid_key(key);
+
+                    if(mapped != ATScancode::Invalid)
+                        update_key_state(mapped, false);
                 }
 
                 // ...and mods
@@ -289,10 +107,14 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                 
                 for(int i = 0; i < 8; i++)
                 {
+                    auto mod = map_hid_mod(i);
+                    if(mod == ATScancode::Invalid)
+                        continue;
+
                     if(pressed_mods & (1 << i))
-                        update_key_state(mod_map[i], true);
+                        update_key_state(mod, true);
                     else if(released_mods & (1 << i))
-                        update_key_state(mod_map[i], false);
+                        update_key_state(mod, false);
                 }
 
                 memcpy(last_keys, keyboard_report->key, HID_KEYBOARD_KEY_MAX);
