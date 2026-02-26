@@ -86,8 +86,8 @@ public:
     uint32_t reg(Reg32 r) const {return regs[static_cast<int>(r)];}
     uint32_t &reg(Reg32 r) {return regs[static_cast<int>(r)];}
 
-    uint16_t getFlags() const {return flags;}
-    void setFlags(uint16_t flags) {this->flags = flags;}
+    uint32_t getFlags() const {return flags;}
+    void setFlags(uint32_t flags) {this->flags = flags;}
     void updateFlags(uint32_t newFlags, uint32_t mask, bool is32);
 
     void updateSegmentDescriptorCache();
