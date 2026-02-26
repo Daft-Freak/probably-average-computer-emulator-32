@@ -752,7 +752,7 @@ inline void CPU::doExecuteInstruction()
     {
         uint32_t physAddr = 0;
         getPhysicalAddress(addr, physAddr); // shouldn't fault, we just read from it
-        trace.addEntry(addr, physAddr, opcode, isOperandSize32(false), regs, flags);
+        trace.addEntry(addr, physAddr, opcode, isOperandSize32(false), regs, getFlags());
     }
 
     // prefixes
@@ -7787,7 +7787,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     if(curTSSType == SD_SysTypeTSS16 || curTSSType == SD_SysTypeBusyTSS16)
     {
         writeMem16(curTSSDesc.base + 0x0e, retAddr, true); // IP
-        writeMem16(curTSSDesc.base + 0x10, flags, true);
+        writeMem16(curTSSDesc.base + 0x10, getFlags(), true);
 
         writeMem16(curTSSDesc.base + 0x12, reg(Reg16::AX), true);
         writeMem16(curTSSDesc.base + 0x14, reg(Reg16::CX), true);
@@ -7837,7 +7837,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     {
         uint16_t tmp;
         readMem16(tssDesc.base + 0x10, tmp, true);
-        flags = (flags & 0xFFFF0000) | tmp;
+        updateFlags(tmp, 0xFFFF, true);
 
         readMem16(tssDesc.base + 0x12, reg(Reg16::AX), true);
         readMem16(tssDesc.base + 0x14, reg(Reg16::CX), true);
@@ -7892,7 +7892,7 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
         doPush(val, is32, stackAddrSize32, true);
     };
 
-    auto tempFlags = flags;
+    auto tempFlags = getFlags();
 
     uint16_t newCS;
     uint32_t newIP;
