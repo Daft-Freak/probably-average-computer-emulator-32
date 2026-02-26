@@ -2266,7 +2266,8 @@ inline void CPU::doExecuteInstruction()
                 }
             }
             // VM/RF are cleared
-            push(getFlags() & ~(Flag_R | Flag_VM), operandSize32);
+            // only storing the low 16 bits is effectively the same
+            push(getFlags() & 0xFFFF, operandSize32);
 
             break;
         }
