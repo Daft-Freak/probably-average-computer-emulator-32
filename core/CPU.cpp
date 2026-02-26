@@ -96,8 +96,7 @@ static T doAdd(T dest, T src, uint32_t &flags)
     bool overflow = ~(dest ^ src) & (src ^ res) & signBit<T>();
     bool carry4 = (dest ^ src ^ res) & 0x10;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (res < dest ? Flag_C : 0) 
+    flags = (res < dest ? Flag_C : 0) 
           | (parity(res) ? Flag_P : 0)
           | (carry4 ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -117,8 +116,7 @@ static T doAddWithCarry(T dest, T src, uint32_t &flags)
     bool overflow = ~(dest ^ src) & (src ^ res) & signBit<T>();
     bool carry4 = (dest ^ src ^ res) & 0x10;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (carry ? Flag_C : 0) 
+    flags = (carry ? Flag_C : 0) 
           | (parity(res) ? Flag_P : 0)
           | (carry4 ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -136,8 +134,7 @@ static T doAnd(T dest, T src, uint32_t &flags)
     // c/o cleared
     // szp set from res
     // a is "undefined" (but it would seem, also cleared)
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (res == 0 ? Flag_Z : 0)
+    flags = (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
 
@@ -149,7 +146,7 @@ static T doDec(T dest, uint32_t &flags)
 {
     T res = dest - 1;
 
-    flags = (flags & ~(Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
+    flags = (flags & Flag_C)
           | (parity(res) ? Flag_P : 0)
           | ((res & 0xF) == 0xF ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -164,7 +161,7 @@ static T doInc(T dest, uint32_t &flags)
 {
     T res = dest + 1;
 
-    flags = (flags & ~(Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
+    flags = (flags & Flag_C)
           | (parity(res) ? Flag_P : 0)
           | ((res & 0xF) == 0 ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -197,8 +194,7 @@ static T doOr(T dest, T src, uint32_t &flags)
     // c/o cleared
     // szp set from res
     // a is "undefined"
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (res == 0 ? Flag_Z : 0)
+    flags = (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
 
@@ -346,15 +342,13 @@ static T doShiftLeft(T dest, int count, uint32_t &flags)
 
     T res = count >= maxBits ? 0 : dest << count;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
-          | (carry ? Flag_C : 0)
+    // overflow is "undefined" for shift counts other than 1
+    flags = (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
           | (res == 0 ? Flag_Z : 0)
-          | (res & signBit<T>() ? Flag_S : 0);
-
-    // "undefined" for shift counts other than 1
-    flags = (flags & ~Flag_O) | (!!(res & signBit<T>()) != carry ? Flag_O : 0); // msb of result != carry flag
+          | (res & signBit<T>() ? Flag_S : 0)
+          | (!!(res & signBit<T>()) != carry ? Flag_O : 0); // msb of result != carry flag
 
     return res;
 }
@@ -381,15 +375,13 @@ static T doDoubleShiftLeft(T dest, T src, int count, uint32_t &flags)
     // shift in from src
     res |= src >> (maxBits - count);
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
-          | (carry ? Flag_C : 0)
+    // overflow is "undefined" for shift counts other than 1
+    flags = (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
           | (res == 0 ? Flag_Z : 0)
-          | (res & signBit<T>() ? Flag_S : 0);
-
-    // "undefined" for shift counts other than 1
-    flags = (flags & ~Flag_O) | (!!(res & signBit<T>()) != carry ? Flag_O : 0); // msb of result != carry flag
+          | (res & signBit<T>() ? Flag_S : 0)
+          | (!!(res & signBit<T>()) != carry ? Flag_O : 0); // msb of result != carry flag
 
     return res;
 }
@@ -410,14 +402,12 @@ static T doShiftRight(T dest, int count, uint32_t &flags)
 
     T res = count >= maxBits ? 0 : dest >> count;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
-          | (carry ? Flag_C : 0)
+    // overflow is "undefined" for shift counts other than 1
+    flags = (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
-          | (res == 0 ? Flag_Z : 0);
-
-    // "undefined" for shift counts other than 1
-    flags = (flags & ~Flag_O) | ((res & (signBit<T>() >> 1)) ? Flag_O : 0);
+          | (res == 0 ? Flag_Z : 0)
+          | ((res & (signBit<T>() >> 1)) ? Flag_O : 0);
 
     return res;
 }
@@ -436,16 +426,13 @@ static T doShiftRightArith(T dest, int count, uint32_t &flags)
     std::make_signed_t<T> sDest = dest;
 
     T res = count >= maxBits ? sDest >> (maxBits - 1) : sDest >> count;
-
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
-          | (carry ? Flag_C : 0)
+    // overflow is "undefined" for shift counts other than 1
+    // but always cleared as the highest two bits will be the same
+    flags = (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
           | (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0);
-
-    // "undefined" for shift counts other than 1
-    flags = flags & ~Flag_O; // always cleared as the highest two bits will be the same
 
     return res;
 }
@@ -472,15 +459,13 @@ static T doDoubleShiftRight(T dest, T src, int count, uint32_t &flags)
     // shift in from src
     res |= src << (maxBits - count);
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_Z | Flag_S))
-          | (carry ? Flag_C : 0)
+    // overflow is "undefined" for shift counts other than 1
+    flags = (carry ? Flag_C : 0)
           | (parity(res) ? Flag_P : 0)
           | Flag_A
           | (res == 0 ? Flag_Z : 0)
-          | (res & signBit<T>() ? Flag_S : 0);
-
-    // "undefined" for shift counts other than 1
-    flags = (flags & ~Flag_O) | ((res & signBit<T>()) != (res << 1 & signBit<T>()) ? Flag_O : 0);
+          | (res & signBit<T>() ? Flag_S : 0)
+          | ((res & signBit<T>()) != (res << 1 & signBit<T>()) ? Flag_O : 0);
 
     return res;
 }
@@ -493,8 +478,7 @@ static T doSub(T dest, T src, uint32_t &flags)
     bool overflow = (dest ^ src) & (dest ^ res) & signBit<T>();
     bool carry4 = (dest ^ src ^ res) & 0x10;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (src > dest ? Flag_C : 0) 
+    flags = (src > dest ? Flag_C : 0) 
           | (parity(res) ? Flag_P : 0)
           | (carry4 ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -514,8 +498,7 @@ static T doSubWithBorrow(T dest, T src, uint32_t &flags)
     bool overflow = (dest ^ src) & (dest ^ res) & signBit<T>();
     bool carry4 = (dest ^ src ^ res) & 0x10;
 
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (carry ? Flag_C : 0) 
+    flags = (carry ? Flag_C : 0) 
           | (parity(res) ? Flag_P : 0)
           | (carry4 ? Flag_A : 0)
           | (res == 0 ? Flag_Z : 0)
@@ -533,8 +516,7 @@ static T doXor(T dest, T src, uint32_t &flags)
     // c/o cleared
     // szp set from res
     // a is "undefined"
-    flags = (flags & ~(Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S | Flag_O))
-          | (res == 0 ? Flag_Z : 0)
+    flags = (res == 0 ? Flag_Z : 0)
           | (res & signBit<T>() ? Flag_S : 0)
           | (parity(res) ? Flag_P : 0);
 
@@ -701,6 +683,8 @@ void CPU::updateFlags(uint32_t newFlags, uint32_t mask, bool is32)
         mask &= 0xFFFF;
 
     flags = (flags & ~mask) | (newFlags & mask);
+    statusFlags = flags & statusMask;
+    flags &= ~statusMask;
 }
 
 // for tests, syncs the cached descriptor info with the registers
@@ -1019,27 +1003,27 @@ inline void CPU::doExecuteInstruction()
         case 0x27: // DAA
         {
             int val = reg(Reg8::AL);
-            bool carry = flags & Flag_C;
+            bool carry = statusFlags & Flag_C;
 
-            if((val & 0xF) > 9 || (flags & Flag_A))
+            if((val & 0xF) > 9 || (statusFlags & Flag_A))
             {
                 reg(Reg8::AL) += 6;
                 // set C?
-                flags |= Flag_A;
+                statusFlags |= Flag_A;
             }
 
             if(val > 0x99 || carry)
             {
                 reg(Reg8::AL) += 0x60;
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             }
 
             val = reg(Reg8::AL);
 
-            flags = (flags & ~(Flag_P | Flag_Z | Flag_S))
-                  | (val == 0 ? Flag_Z : 0)
-                  | (val & 0x80 ? Flag_S : 0)
-                  | (parity(val) ? Flag_P : 0);
+            statusFlags = (statusFlags & (Flag_C | Flag_A | Flag_O))
+                        | (val == 0 ? Flag_Z : 0)
+                        | (val & 0x80 ? Flag_S : 0)
+                        | (parity(val) ? Flag_P : 0);
             break;
         }
 
@@ -1074,34 +1058,34 @@ inline void CPU::doExecuteInstruction()
         case 0x2F: // DAS
         {
             uint8_t val = reg(Reg8::AL);
-            bool carry = flags & Flag_C;
+            bool carry = statusFlags & Flag_C;
             
-            flags &= ~Flag_C;
+            statusFlags &= ~Flag_C;
 
-            if((val & 0xF) > 9 || (flags & Flag_A))
+            if((val & 0xF) > 9 || (statusFlags & Flag_A))
             {
                 if(val < 6)
-                    flags |= Flag_C;
+                    statusFlags |= Flag_C;
 
                 val -= 6;
 
-                flags |= Flag_A;
+                statusFlags |= Flag_A;
             }
             else
-                flags &= ~Flag_A;
+                statusFlags &= ~Flag_A;
 
             if(reg(Reg8::AL) > 0x99 || carry)
             {
                 val -= 0x60;
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             }
 
             reg(Reg8::AL) = val;
 
-            flags = (flags & ~(Flag_P | Flag_Z | Flag_S))
-                  | (val == 0 ? Flag_Z : 0)
-                  | (val & 0x80 ? Flag_S : 0)
-                  | (parity(val) ? Flag_P : 0);
+            statusFlags = (statusFlags & (Flag_C | Flag_A | Flag_O))
+                        | (val == 0 ? Flag_Z : 0)
+                        | (val & 0x80 ? Flag_S : 0)
+                        | (parity(val) ? Flag_P : 0);
             break;
         }
 
@@ -1135,13 +1119,13 @@ inline void CPU::doExecuteInstruction()
 
         case 0x37: // AAA
         {
-            if((reg(Reg8::AL) & 0xF) > 9 || (flags & Flag_A))
+            if((reg(Reg8::AL) & 0xF) > 9 || (statusFlags & Flag_A))
             {
                 reg(Reg16::AX) += 0x106;
-                flags |= Flag_A | Flag_C;
+                statusFlags |= Flag_A | Flag_C;
             }
             else
-                flags &= ~(Flag_A | Flag_C);
+                statusFlags &= ~(Flag_A | Flag_C);
 
             reg(Reg8::AL) &= 0xF;
             break;
@@ -1157,7 +1141,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, dest))
                 break;
 
-            doSub(dest, reg(rm.reg8()), flags);
+            doSub(dest, reg(rm.reg8()), statusFlags);
 
             reg(Reg32::EIP)++;
             break;
@@ -1176,7 +1160,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, dest))
                     break;
 
-                doSub(dest, src, flags);
+                doSub(dest, src, statusFlags);
             }
             else
             {
@@ -1186,7 +1170,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, dest))
                     break;
 
-                doSub(dest, src, flags);
+                doSub(dest, src, statusFlags);
             }
 
             reg(Reg32::EIP)++;
@@ -1202,7 +1186,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, src))
                 break;
 
-            doSub(reg(rm.reg8()), src, flags);
+            doSub(reg(rm.reg8()), src, statusFlags);
 
             reg(Reg32::EIP)++;
             break;
@@ -1219,7 +1203,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, src))
                     break;
 
-                doSub(reg(rm.reg32()), src, flags);
+                doSub(reg(rm.reg32()), src, statusFlags);
             }
             else
             {
@@ -1227,7 +1211,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, src))
                     break;
 
-                doSub(reg(rm.reg16()), src, flags);
+                doSub(reg(rm.reg16()), src, statusFlags);
             }
 
             reg(Reg32::EIP)++;
@@ -1239,7 +1223,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(addr + 1, imm))
                 return;
 
-            doSub(reg(Reg8::AL), imm, flags);
+            doSub(reg(Reg8::AL), imm, statusFlags);
 
             reg(Reg32::EIP) += 1;
             break;
@@ -1252,7 +1236,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP32(addr + 1, imm))
                     return;
 
-                doSub(reg(Reg32::EAX), imm, flags);
+                doSub(reg(Reg32::EAX), imm, statusFlags);
 
                 reg(Reg32::EIP) += 4;
             }
@@ -1262,7 +1246,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP16(addr + 1, imm))
                     return;
 
-                doSub(reg(Reg16::AX), imm, flags);
+                doSub(reg(Reg16::AX), imm, statusFlags);
 
                 reg(Reg32::EIP) += 2;
             }
@@ -1271,15 +1255,15 @@ inline void CPU::doExecuteInstruction()
 
         case 0x3F: // AAS
         {
-            if((reg(Reg8::AL) & 0xF) > 9 || (flags & Flag_A))
+            if((reg(Reg8::AL) & 0xF) > 9 || (statusFlags & Flag_A))
             {
                 reg(Reg16::AX) -= 6;
                 reg(Reg8::AH) -= 1;
 
-                flags |= Flag_A | Flag_C;
+                statusFlags |= Flag_A | Flag_C;
             }
             else
-                flags &= ~(Flag_A | Flag_C);
+                statusFlags &= ~(Flag_A | Flag_C);
 
             reg(Reg8::AL) &= 0xF;
 
@@ -1298,12 +1282,12 @@ inline void CPU::doExecuteInstruction()
             if(operandSize32)
             {
                 auto destReg = static_cast<Reg32>(opcode & 7);
-                reg(destReg) = doInc(reg(destReg), flags);
+                reg(destReg) = doInc(reg(destReg), statusFlags);
             }
             else
             {
                 auto destReg = static_cast<Reg16>(opcode & 7);
-                reg(destReg) = doInc(reg(destReg), flags);
+                reg(destReg) = doInc(reg(destReg), statusFlags);
             }
             break;
         }
@@ -1320,12 +1304,12 @@ inline void CPU::doExecuteInstruction()
             if(operandSize32)
             {
                 auto destReg = static_cast<Reg32>(opcode & 7);
-                reg(destReg) = doDec(reg(destReg), flags);
+                reg(destReg) = doDec(reg(destReg), statusFlags);
             }
             else
             {
                 auto destReg = static_cast<Reg16>(opcode & 7);
-                reg(destReg) = doDec(reg(destReg), flags);
+                reg(destReg) = doDec(reg(destReg), statusFlags);
             }
             break;
         }
@@ -1484,11 +1468,11 @@ inline void CPU::doExecuteInstruction()
 
                 if(destRPL < srcRPL)
                 {
-                    flags |= Flag_Z;
+                    statusFlags |= Flag_Z;
                     writeRM16(rm, (dest & ~3) | srcRPL);
                 }
                 else
-                    flags &= ~Flag_Z;
+                    statusFlags &= ~Flag_Z;
             }
             break;
         }
@@ -1534,7 +1518,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, tmp))
                     break;
 
-                reg(rm.reg32()) = doMultiplySigned(static_cast<int32_t>(tmp), static_cast<int32_t>(imm), flags);
+                reg(rm.reg32()) = doMultiplySigned(static_cast<int32_t>(tmp), static_cast<int32_t>(imm), statusFlags);
 
                 reg(Reg32::EIP) += 5;
             }
@@ -1549,7 +1533,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, tmp))
                     break;
 
-                reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), flags);
+                reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), statusFlags);
 
                 reg(Reg32::EIP) += 3;
             }
@@ -1586,7 +1570,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, tmp))
                     break;
 
-                reg(rm.reg32()) = doMultiplySigned(static_cast<int32_t>(tmp), imm, flags);
+                reg(rm.reg32()) = doMultiplySigned(static_cast<int32_t>(tmp), imm, statusFlags);
             }
             else
             {
@@ -1594,7 +1578,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, tmp))
                     break;
 
-                reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), flags);
+                reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), statusFlags);
             }
 
             reg(Reg32::EIP) += 2;
@@ -1675,7 +1659,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(addr + 1, off))
                 return;
        
-            if(getCondValue(cond, flags))
+            if(getCondValue(cond, statusFlags))
                 setIP(reg(Reg32::EIP) + 1 + off);
             else
                 reg(Reg32::EIP)++;
@@ -1703,28 +1687,28 @@ inline void CPU::doExecuteInstruction()
             switch(rm.op())
             {
                 case 0: // ADD
-                    writeRM8(rm, doAdd(dest, imm, flags));
+                    writeRM8(rm, doAdd(dest, imm, statusFlags));
                     break;
                 case 1: // OR
-                    writeRM8(rm, doOr(dest, imm, flags));
+                    writeRM8(rm, doOr(dest, imm, statusFlags));
                     break;
                 case 2: // ADC
-                    writeRM8(rm, doAddWithCarry(dest, imm, flags));
+                    writeRM8(rm, doAddWithCarry(dest, imm, statusFlags));
                     break;
                 case 3: // SBB
-                    writeRM8(rm, doSubWithBorrow(dest, imm, flags));
+                    writeRM8(rm, doSubWithBorrow(dest, imm, statusFlags));
                     break;
                 case 4: // AND
-                    writeRM8(rm, doAnd(dest, imm, flags));
+                    writeRM8(rm, doAnd(dest, imm, statusFlags));
                     break;
                 case 5: // SUB
-                    writeRM8(rm, doSub(dest, imm, flags));
+                    writeRM8(rm, doSub(dest, imm, statusFlags));
                     break;
                 case 6: // XOR
-                    writeRM8(rm, doXor(dest, imm, flags));
+                    writeRM8(rm, doXor(dest, imm, statusFlags));
                     break;
                 case 7: // CMP
-                    doSub(dest, imm, flags);
+                    doSub(dest, imm, statusFlags);
                     break;
             }
 
@@ -1752,28 +1736,28 @@ inline void CPU::doExecuteInstruction()
                 switch(rm.op())
                 {
                     case 0: // ADD
-                        writeRM32(rm, doAdd(dest, imm, flags));
+                        writeRM32(rm, doAdd(dest, imm, statusFlags));
                         break;
                     case 1: // OR
-                        writeRM32(rm, doOr(dest, imm, flags));
+                        writeRM32(rm, doOr(dest, imm, statusFlags));
                         break;
                     case 2: // ADC
-                        writeRM32(rm, doAddWithCarry(dest, imm, flags));
+                        writeRM32(rm, doAddWithCarry(dest, imm, statusFlags));
                         break;
                     case 3: // SBB
-                        writeRM32(rm, doSubWithBorrow(dest, imm, flags));
+                        writeRM32(rm, doSubWithBorrow(dest, imm, statusFlags));
                         break;
                     case 4: // AND
-                        writeRM32(rm, doAnd(dest, imm, flags));
+                        writeRM32(rm, doAnd(dest, imm, statusFlags));
                         break;
                     case 5: // SUB
-                        writeRM32(rm, doSub(dest, imm, flags));
+                        writeRM32(rm, doSub(dest, imm, statusFlags));
                         break;
                     case 6: // XOR
-                        writeRM32(rm, doXor(dest, imm, flags));
+                        writeRM32(rm, doXor(dest, imm, statusFlags));
                         break;
                     case 7: // CMP
-                        doSub(dest, imm, flags);
+                        doSub(dest, imm, statusFlags);
                         break;
                 }
             }
@@ -1792,28 +1776,28 @@ inline void CPU::doExecuteInstruction()
                 switch(rm.op())
                 {
                     case 0: // ADD
-                        writeRM16(rm, doAdd(dest, imm, flags));
+                        writeRM16(rm, doAdd(dest, imm, statusFlags));
                         break;
                     case 1: // OR
-                        writeRM16(rm, doOr(dest, imm, flags));
+                        writeRM16(rm, doOr(dest, imm, statusFlags));
                         break;
                     case 2: // ADC
-                        writeRM16(rm, doAddWithCarry(dest, imm, flags));
+                        writeRM16(rm, doAddWithCarry(dest, imm, statusFlags));
                         break;
                     case 3: // SBB
-                        writeRM16(rm, doSubWithBorrow(dest, imm, flags));
+                        writeRM16(rm, doSubWithBorrow(dest, imm, statusFlags));
                         break;
                     case 4: // AND
-                        writeRM16(rm, doAnd(dest, imm, flags));
+                        writeRM16(rm, doAnd(dest, imm, statusFlags));
                         break;
                     case 5: // SUB
-                        writeRM16(rm, doSub(dest, imm, flags));
+                        writeRM16(rm, doSub(dest, imm, statusFlags));
                         break;
                     case 6: // XOR
-                        writeRM16(rm, doXor(dest, imm, flags));
+                        writeRM16(rm, doXor(dest, imm, statusFlags));
                         break;
                     case 7: // CMP
-                        doSub(dest, imm, flags);
+                        doSub(dest, imm, statusFlags);
                         break;
                 }
             }
@@ -1845,28 +1829,28 @@ inline void CPU::doExecuteInstruction()
                 switch(rm.op())
                 {
                     case 0: // ADD
-                        writeRM32(rm, doAdd(dest, imm, flags));
+                        writeRM32(rm, doAdd(dest, imm, statusFlags));
                         break;
                     case 1: // OR
-                        writeRM32(rm, doOr(dest, imm, flags));
+                        writeRM32(rm, doOr(dest, imm, statusFlags));
                         break;
                     case 2: // ADC
-                        writeRM32(rm, doAddWithCarry(dest, imm, flags));
+                        writeRM32(rm, doAddWithCarry(dest, imm, statusFlags));
                         break;
                     case 3: // SBB
-                        writeRM32(rm, doSubWithBorrow(dest, imm, flags));
+                        writeRM32(rm, doSubWithBorrow(dest, imm, statusFlags));
                         break;
                     case 4: // AND
-                        writeRM32(rm, doAnd(dest, imm, flags));
+                        writeRM32(rm, doAnd(dest, imm, statusFlags));
                         break;
                     case 5: // SUB
-                        writeRM32(rm, doSub(dest, imm, flags));
+                        writeRM32(rm, doSub(dest, imm, statusFlags));
                         break;
                     case 6: // XOR
-                        writeRM32(rm, doXor(dest, imm, flags));
+                        writeRM32(rm, doXor(dest, imm, statusFlags));
                         break;
                     case 7: // CMP
-                        doSub(dest, imm, flags);
+                        doSub(dest, imm, statusFlags);
                         break;
                 }
             }
@@ -1891,28 +1875,28 @@ inline void CPU::doExecuteInstruction()
                 switch(rm.op())
                 {
                     case 0: // ADD
-                        writeRM16(rm, doAdd(dest, imm, flags));
+                        writeRM16(rm, doAdd(dest, imm, statusFlags));
                         break;
                     case 1: // OR
-                        writeRM16(rm, doOr(dest, imm, flags));
+                        writeRM16(rm, doOr(dest, imm, statusFlags));
                         break;
                     case 2: // ADC
-                        writeRM16(rm, doAddWithCarry(dest, imm, flags));
+                        writeRM16(rm, doAddWithCarry(dest, imm, statusFlags));
                         break;
                     case 3: // SBB
-                        writeRM16(rm, doSubWithBorrow(dest, imm, flags));
+                        writeRM16(rm, doSubWithBorrow(dest, imm, statusFlags));
                         break;
                     case 4: // AND
-                        writeRM16(rm, doAnd(dest, imm, flags));
+                        writeRM16(rm, doAnd(dest, imm, statusFlags));
                         break;
                     case 5: // SUB
-                        writeRM16(rm, doSub(dest, imm, flags));
+                        writeRM16(rm, doSub(dest, imm, statusFlags));
                         break;
                     case 6: // XOR
-                        writeRM16(rm, doXor(dest, imm, flags));
+                        writeRM16(rm, doXor(dest, imm, statusFlags));
                         break;
                     case 7: // CMP
-                        doSub(dest, imm, flags);
+                        doSub(dest, imm, statusFlags);
                         break;
                 }
             }
@@ -1930,7 +1914,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, dest))
                 break;
 
-            doAnd(dest, reg(rm.reg8()), flags);
+            doAnd(dest, reg(rm.reg8()), statusFlags);
 
             reg(Reg32::EIP)++;
             break;
@@ -1948,7 +1932,7 @@ inline void CPU::doExecuteInstruction()
                 uint32_t dest;
                 if(!readRM32(rm, dest))
                     break;
-                doAnd(dest, src, flags);
+                doAnd(dest, src, statusFlags);
             }
             else
             {
@@ -1958,7 +1942,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, dest))
                     break;
 
-                doAnd(dest, src, flags);
+                doAnd(dest, src, statusFlags);
             }
 
             reg(Reg32::EIP)++;
@@ -2282,7 +2266,7 @@ inline void CPU::doExecuteInstruction()
                 }
             }
             // VM/RF are cleared
-            push(flags & ~(Flag_R | Flag_VM), operandSize32);
+            push(getFlags() & ~(Flag_R | Flag_VM), operandSize32);
 
             break;
         }
@@ -2325,13 +2309,13 @@ inline void CPU::doExecuteInstruction()
         case 0x9E: // SAHF
         {
             auto mask = Flag_C | Flag_P | Flag_A | Flag_Z | Flag_S;
-            flags = (flags & ~mask) | (reg(Reg8::AH) & mask);
+            statusFlags = (statusFlags & ~mask) | (reg(Reg8::AH) & mask);
             break;
         }
 
         case 0x9F: // LAHF
         {
-            reg(Reg8::AH) = flags;
+            reg(Reg8::AH) = statusFlags | 2;
             break;
         }
 
@@ -2483,7 +2467,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem8(si, segment, src) || !readMem8(di, Reg16::ES, dest))
                         break;
 
-                    doSub(src, dest, flags);
+                    doSub(src, dest, statusFlags);
 
                     si += step;
                     di += step;
@@ -2496,7 +2480,7 @@ inline void CPU::doExecuteInstruction()
 
                     count--;
 
-                    if(!!(flags & Flag_Z) != repZ)
+                    if(!!(statusFlags & Flag_Z) != repZ)
                         break;
                 }
 
@@ -2511,7 +2495,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMem8(si, segment, src) || !readMem8(di, Reg16::ES, dest))
                     break;
 
-                doSub(src, dest, flags);
+                doSub(src, dest, statusFlags);
 
                 si += step;
                 di += step;
@@ -2568,7 +2552,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMem32(si, segment, src) || !readMem32(di, Reg16::ES, dest))
                             break;
 
-                        doSub(src, dest, flags);
+                        doSub(src, dest, statusFlags);
                     }
                     else
                     {
@@ -2576,7 +2560,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMem16(si, segment, src) || !readMem16(di, Reg16::ES, dest))
                             break;
 
-                        doSub(src, dest, flags);
+                        doSub(src, dest, statusFlags);
                     }
 
                     si += step;
@@ -2590,7 +2574,7 @@ inline void CPU::doExecuteInstruction()
 
                     count--;
 
-                    if(!!(flags & Flag_Z) != repZ)
+                    if(!!(statusFlags & Flag_Z) != repZ)
                         break;
                 }
 
@@ -2607,7 +2591,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem32(si, segment, src) || !readMem32(di, Reg16::ES, dest))
                         break;
 
-                    doSub(src, dest, flags);
+                    doSub(src, dest, statusFlags);
                 }
                 else
                 {
@@ -2615,7 +2599,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem16(si, segment, src) || !readMem16(di, Reg16::ES, dest))
                         break;
 
-                    doSub(src, dest, flags);
+                    doSub(src, dest, statusFlags);
                 }
 
                 si += step;
@@ -2641,7 +2625,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(addr + 1, imm))
                 return;
 
-            doAnd(reg(Reg8::AL), imm, flags);
+            doAnd(reg(Reg8::AL), imm, statusFlags);
 
             reg(Reg32::EIP)++;
             break;
@@ -2654,7 +2638,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP32(addr + 1, imm))
                     return;
 
-                doAnd(reg(Reg32::EAX), imm, flags);
+                doAnd(reg(Reg32::EAX), imm, statusFlags);
                 reg(Reg32::EIP) += 4;
             }
             else
@@ -2663,7 +2647,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP16(addr + 1, imm))
                     return;
 
-                doAnd(reg(Reg16::AX), imm, flags);
+                doAnd(reg(Reg16::AX), imm, statusFlags);
                 reg(Reg32::EIP) += 2;
             }
             break;
@@ -2718,7 +2702,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem8(di, Reg16::ES, rSrc))
                         break;
 
-                    doSub(reg(Reg8::AL), rSrc, flags);
+                    doSub(reg(Reg8::AL), rSrc, statusFlags);
 
                     di += step;
 
@@ -2727,7 +2711,7 @@ inline void CPU::doExecuteInstruction()
 
                     count--;
 
-                    if(!!(flags & Flag_Z) != repZ)
+                    if(!!(statusFlags & Flag_Z) != repZ)
                         break;
                 }
 
@@ -2742,7 +2726,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMem8(di, Reg16::ES, rSrc))
                     break;
 
-                doSub(reg(Reg8::AL), rSrc, flags);
+                doSub(reg(Reg8::AL), rSrc, statusFlags);
 
                 di += step;
             }
@@ -2780,7 +2764,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMem32(di, Reg16::ES, rSrc))
                             break;
 
-                        doSub(reg(Reg32::EAX), rSrc, flags);
+                        doSub(reg(Reg32::EAX), rSrc, statusFlags);
                     }
                     else
                     {
@@ -2788,7 +2772,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMem16(di, Reg16::ES, rSrc))
                             break;
 
-                        doSub(reg(Reg16::AX), rSrc, flags);
+                        doSub(reg(Reg16::AX), rSrc, statusFlags);
                     }
 
                     di += step;
@@ -2798,7 +2782,7 @@ inline void CPU::doExecuteInstruction()
     
                     count--;
 
-                    if(!!(flags & Flag_Z) != repZ)
+                    if(!!(statusFlags & Flag_Z) != repZ)
                         break;
                 }
 
@@ -2815,7 +2799,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem32(di, Reg16::ES, rSrc))
                         break;
 
-                    doSub(reg(Reg32::EAX), rSrc, flags);
+                    doSub(reg(Reg32::EAX), rSrc, statusFlags);
                 }
                 else
                 {
@@ -2823,7 +2807,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMem16(di, Reg16::ES, rSrc))
                         break;
 
-                    doSub(reg(Reg16::AX), rSrc, flags);
+                    doSub(reg(Reg16::AX), rSrc, statusFlags);
                 }
 
                 di += step;
@@ -2892,7 +2876,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, v))
                 break;
 
-            writeRM8(rm, doShift(rm.op(), v, count, flags));
+            writeRM8(rm, doShift(rm.op(), v, count, statusFlags));
             break;
         }
         case 0xC1: // shift r/m16 by imm
@@ -2914,7 +2898,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, v))
                     break;
 
-                writeRM32(rm, doShift(rm.op(), v, count, flags));
+                writeRM32(rm, doShift(rm.op(), v, count, statusFlags));
             }
             else
             {
@@ -2922,7 +2906,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, v))
                     break;
 
-                writeRM16(rm, doShift(rm.op(), v, count, flags));
+                writeRM16(rm, doShift(rm.op(), v, count, statusFlags));
             }
 
             break;
@@ -3252,7 +3236,7 @@ inline void CPU::doExecuteInstruction()
 
         case 0xCE: // INTO
         {
-            if(flags & Flag_O)
+            if(statusFlags & Flag_O)
                 serviceInterrupt(0x4, true); // OF
             break;
         }
@@ -3275,7 +3259,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, v))
                 break;
 
-            writeRM8(rm, doShift(rm.op(), v, count, flags));
+            writeRM8(rm, doShift(rm.op(), v, count, statusFlags));
             break;
         }
         case 0xD1: // shift r/m16 by 1
@@ -3293,14 +3277,14 @@ inline void CPU::doExecuteInstruction()
                 uint32_t v;
                 if(!readRM32(rm, v))
                     break;
-                writeRM32(rm, doShift(rm.op(), v, count, flags));
+                writeRM32(rm, doShift(rm.op(), v, count, statusFlags));
             }
             else
             {
                 uint16_t v;
                 if(!readRM16(rm, v))
                     break;
-                writeRM16(rm, doShift(rm.op(), v, count, flags));
+                writeRM16(rm, doShift(rm.op(), v, count, statusFlags));
             }
 
             break;
@@ -3319,7 +3303,7 @@ inline void CPU::doExecuteInstruction()
             if(!readRM8(rm, v))
                 break;
 
-            writeRM8(rm, doShift(rm.op(), v, count, flags));
+            writeRM8(rm, doShift(rm.op(), v, count, statusFlags));
             break;
         }
         case 0xD3: // shift r/m16 by cl
@@ -3337,14 +3321,14 @@ inline void CPU::doExecuteInstruction()
                 uint32_t v;
                 if(!readRM32(rm, v))
                     break;
-                writeRM32(rm, doShift(rm.op(), v, count, flags));
+                writeRM32(rm, doShift(rm.op(), v, count, statusFlags));
             }
             else
             {
                 uint16_t v;
                 if(!readRM16(rm, v))
                     break;
-                writeRM16(rm, doShift(rm.op(), v, count, flags));
+                writeRM16(rm, doShift(rm.op(), v, count, statusFlags));
             }
 
             break;
@@ -3362,7 +3346,7 @@ inline void CPU::doExecuteInstruction()
     
             if(imm == 0)
             {
-                flags = (flags & ~(Flag_S | Flag_Z)) | Flag_P;
+                statusFlags = (statusFlags & ~(Flag_S | Flag_Z)) | Flag_P;
 
                 fault(Fault::DE);
             }
@@ -3371,10 +3355,10 @@ inline void CPU::doExecuteInstruction()
                 reg(Reg8::AH) = v / imm;
                 auto res = reg(Reg8::AL) = v % imm;
 
-                flags = (flags & ~(Flag_P | Flag_Z | Flag_S))
-                      | (parity(res) ? Flag_P : 0)
-                      | (res == 0 ? Flag_Z : 0)
-                      | (res & 0x80 ? Flag_S : 0);
+                statusFlags = (statusFlags & (Flag_C | Flag_A | Flag_O))
+                            | (parity(res) ? Flag_P : 0)
+                            | (res == 0 ? Flag_Z : 0)
+                            | (res & 0x80 ? Flag_S : 0);
             }
 
             break; 
@@ -3390,10 +3374,10 @@ inline void CPU::doExecuteInstruction()
             reg(Reg8::AL) = res;
             reg(Reg8::AH) = 0;
 
-            flags = (flags & ~(Flag_P | Flag_Z | Flag_S))
-                  | (parity(res) ? Flag_P : 0)
-                  | (res == 0 ? Flag_Z : 0)
-                  | (res & 0x80 ? Flag_S : 0);
+            statusFlags = (statusFlags & (Flag_C | Flag_A | Flag_O))
+                        | (parity(res) ? Flag_P : 0)
+                        | (res == 0 ? Flag_Z : 0)
+                        | (res & 0x80 ? Flag_S : 0);
 
             reg(Reg32::EIP)++;
             break;
@@ -3448,7 +3432,7 @@ inline void CPU::doExecuteInstruction()
             else
                 count = --reg(Reg16::CX);
 
-            if(count == 0 || (flags & Flag_Z))
+            if(count == 0 || (statusFlags & Flag_Z))
             {
                 // done
                 reg(Reg32::EIP)++;
@@ -3470,7 +3454,7 @@ inline void CPU::doExecuteInstruction()
             else
                 count = --reg(Reg16::CX);
 
-            if(count == 0 || !(flags & Flag_Z))
+            if(count == 0 || !(statusFlags & Flag_Z))
             {
                 // done
                 reg(Reg32::EIP)++;
@@ -3721,7 +3705,7 @@ inline void CPU::doExecuteInstruction()
 
         case 0xF5: // CMC
         {
-            flags ^= Flag_C;
+            statusFlags ^= Flag_C;
             break;
         }
 
@@ -3745,7 +3729,7 @@ inline void CPU::doExecuteInstruction()
                     if(!readMemIP8(immAddr, imm))
                         return;
 
-                    doAnd(v, imm, flags);
+                    doAnd(v, imm, statusFlags);
 
                     reg(Reg32::EIP) += 2;
                     break;
@@ -3759,7 +3743,7 @@ inline void CPU::doExecuteInstruction()
                 case 3: // NEG
                 {
                     reg(Reg32::EIP)++;
-                    writeRM8(rm, doSub(uint8_t(0), v, flags));
+                    writeRM8(rm, doSub(uint8_t(0), v, statusFlags));
                     break;
                 }
                 case 4: // MUL
@@ -3769,9 +3753,9 @@ inline void CPU::doExecuteInstruction()
                     reg(Reg16::AX) = res;
 
                     if(res >> 8)
-                        flags |= Flag_C | Flag_O;
+                        statusFlags |= Flag_C | Flag_O;
                     else
-                        flags &= ~(Flag_C | Flag_O);
+                        statusFlags &= ~(Flag_C | Flag_O);
 
                     reg(Reg32::EIP)++;
                     break;
@@ -3785,9 +3769,9 @@ inline void CPU::doExecuteInstruction()
 
                     // check if upper half matches lower half's sign
                     if(res >> 8 != (res & 0x80 ? -1 : 0))
-                        flags |= Flag_C | Flag_O;
+                        statusFlags |= Flag_C | Flag_O;
                     else
-                        flags &= ~(Flag_C | Flag_O);
+                        statusFlags &= ~(Flag_C | Flag_O);
 
                     reg(Reg32::EIP)++;
                     break;
@@ -3808,8 +3792,8 @@ inline void CPU::doExecuteInstruction()
 
                     // "undefined"
                     // this is not entirely correct
-                    flags = (flags & ~(Flag_Z))
-                          | (num && reg(Reg8::AH) == 0 ? Flag_Z : 0);
+                    statusFlags = (statusFlags & ~(Flag_Z))
+                                | (num && reg(Reg8::AH) == 0 ? Flag_Z : 0);
 
                     break;
                 }
@@ -3870,7 +3854,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMemIP32(immAddr, imm))
                             return;
 
-                        doAnd(v, imm, flags);
+                        doAnd(v, imm, statusFlags);
 
                         reg(Reg32::EIP) += 5;
                     }
@@ -3880,7 +3864,7 @@ inline void CPU::doExecuteInstruction()
                         if(!readMemIP16(immAddr, imm))
                             return;
 
-                        doAnd(uint16_t(v), imm, flags);
+                        doAnd(uint16_t(v), imm, statusFlags);
 
                         reg(Reg32::EIP) += 3;
                     }
@@ -3903,9 +3887,9 @@ inline void CPU::doExecuteInstruction()
                     reg(Reg32::EIP)++;
 
                     if(operandSize32)
-                        writeRM32(rm, doSub(uint32_t(0), v, flags));
+                        writeRM32(rm, doSub(uint32_t(0), v, statusFlags));
                     else
-                        writeRM16(rm, doSub(uint16_t(0), uint16_t(v), flags));
+                        writeRM16(rm, doSub(uint16_t(0), uint16_t(v), statusFlags));
 
                     break;
                 }
@@ -3919,9 +3903,9 @@ inline void CPU::doExecuteInstruction()
                         reg(Reg32::EDX) = res >> 32;
 
                         if(res >> 32)
-                            flags |= Flag_C | Flag_O;
+                            statusFlags |= Flag_C | Flag_O;
                         else
-                            flags &= ~(Flag_C | Flag_O);
+                            statusFlags &= ~(Flag_C | Flag_O);
                     }
                     else
                     {
@@ -3931,9 +3915,9 @@ inline void CPU::doExecuteInstruction()
                         reg(Reg16::DX) = res >> 16;
 
                         if(res >> 16)
-                            flags |= Flag_C | Flag_O;
+                            statusFlags |= Flag_C | Flag_O;
                         else
-                            flags &= ~(Flag_C | Flag_O);
+                            statusFlags &= ~(Flag_C | Flag_O);
                     }
                     reg(Reg32::EIP)++;
                     break;
@@ -3950,9 +3934,9 @@ inline void CPU::doExecuteInstruction()
 
                         // check if upper half matches lower half's sign
                         if(res >> 32 != (res & 0x80000000 ? -1 : 0))
-                            flags |= Flag_C | Flag_O;
+                            statusFlags |= Flag_C | Flag_O;
                         else
-                            flags &= ~(Flag_C | Flag_O);
+                            statusFlags &= ~(Flag_C | Flag_O);
                     }
                     else
                     {
@@ -3964,9 +3948,9 @@ inline void CPU::doExecuteInstruction()
 
                         // check if upper half matches lower half's sign
                         if(res >> 16 != (res & 0x8000 ? -1 : 0))
-                            flags |= Flag_C | Flag_O;
+                            statusFlags |= Flag_C | Flag_O;
                         else
-                            flags &= ~(Flag_C | Flag_O);
+                            statusFlags &= ~(Flag_C | Flag_O);
                     }
 
                     reg(Reg32::EIP)++;
@@ -3989,8 +3973,8 @@ inline void CPU::doExecuteInstruction()
                         }
 
                         // "undefined"
-                        flags = (flags & ~(Flag_Z))
-                              | (num && reg(Reg32::EDX) == 0 ? Flag_Z : 0);
+                        statusFlags = (statusFlags & ~(Flag_Z))
+                                    | (num && reg(Reg32::EDX) == 0 ? Flag_Z : 0);
                     }
                     else
                     {
@@ -4007,8 +3991,8 @@ inline void CPU::doExecuteInstruction()
                         }
 
                         // "undefined"
-                        flags = (flags & ~(Flag_Z))
-                              | (num && reg(Reg16::DX) == 0 ? Flag_Z : 0);
+                        statusFlags = (statusFlags & ~(Flag_Z))
+                                    | (num && reg(Reg16::DX) == 0 ? Flag_Z : 0);
                     }
                     break;
                 }
@@ -4058,12 +4042,12 @@ inline void CPU::doExecuteInstruction()
     
         case 0xF8: // CLC
         {
-            flags &= ~Flag_C;
+            statusFlags &= ~Flag_C;
             break;
         }
         case 0xF9: // STC
         {
-            flags |= Flag_C;
+            statusFlags |= Flag_C;
             break;
         }
         case 0xFA: // CLI
@@ -4124,7 +4108,7 @@ inline void CPU::doExecuteInstruction()
                 {
                     reg(Reg32::EIP)++;
 
-                    auto res = doInc(v, flags);
+                    auto res = doInc(v, statusFlags);
                     writeRM8(rm, res);
                     break;
                 }
@@ -4132,7 +4116,7 @@ inline void CPU::doExecuteInstruction()
                 {
                     reg(Reg32::EIP)++;
 
-                    auto res = doDec(v, flags);
+                    auto res = doDec(v, statusFlags);
                     writeRM8(rm, res);
                     break;
                 }
@@ -4174,12 +4158,12 @@ inline void CPU::doExecuteInstruction()
 
                     if(operandSize32)
                     {
-                        auto res = doInc(v, flags);
+                        auto res = doInc(v, statusFlags);
                         writeRM32(rm, res);
                     }
                     else
                     {
-                        auto res = doInc(uint16_t(v), flags);
+                        auto res = doInc(uint16_t(v), statusFlags);
                         writeRM16(rm, res);
                     }
                     break;
@@ -4190,12 +4174,12 @@ inline void CPU::doExecuteInstruction()
 
                     if(operandSize32)
                     {
-                        auto res = doDec(v, flags);
+                        auto res = doDec(v, statusFlags);
                         writeRM32(rm, res);
                     }
                     else
                     {
-                        auto res = doDec(uint16_t(v), flags);
+                        auto res = doDec(uint16_t(v), statusFlags);
                         writeRM16(rm, res);
                     }
 
@@ -4424,9 +4408,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     }
 
                     if(validDesc)
-                        flags |= Flag_Z;
+                        statusFlags |= Flag_Z;
                     else
-                        flags &= ~Flag_Z;
+                        statusFlags &= ~Flag_Z;
 
                     reg(Reg32::EIP) += 2;
                     break;
@@ -4585,7 +4569,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
 
             if(validDesc)
             {
-                flags |= Flag_Z;
+                statusFlags |= Flag_Z;
 
                 // reorder the bits
                 auto access = (desc.flags & 0xFF0000) >> 8 | (desc.flags & 0xF000) << 8;
@@ -4596,7 +4580,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     reg(rm.reg16()) = access;
             }
             else
-                flags &= ~Flag_Z;
+                statusFlags &= ~Flag_Z;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -4656,7 +4640,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
 
             if(validDesc)
             {
-                flags |= Flag_Z;
+                statusFlags |= Flag_Z;
 
                 if(operandSize32)
                     reg(rm.reg32()) = desc.limit;
@@ -4664,7 +4648,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     reg(rm.reg16()) = desc.limit;
             }
             else
-                flags &= ~Flag_Z;
+                statusFlags &= ~Flag_Z;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -4820,7 +4804,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 off = (tmp & 0x8000) ? (0xFFFF0000 | tmp) : tmp;
             }
 
-            if(getCondValue(cond, flags))
+            if(getCondValue(cond, statusFlags))
             {
                 uint32_t newIP = reg(Reg32::EIP) + (operandSize32 ? 5 : 3) + off;
 
@@ -4857,7 +4841,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
 
             reg(Reg32::EIP) += 2;
 
-            writeRM8(rm, getCondValue(cond, flags) ? 1 : 0);
+            writeRM8(rm, getCondValue(cond, statusFlags) ? 1 : 0);
             break;
         }
 
@@ -4914,9 +4898,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(value)
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             else
-                flags &= ~Flag_C;
+                statusFlags &= ~Flag_C;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -4943,7 +4927,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg32());
-                writeRM32(rm, doDoubleShiftLeft(v, src, count, flags));
+                writeRM32(rm, doDoubleShiftLeft(v, src, count, statusFlags));
             }
             else
             {
@@ -4953,7 +4937,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg16());
-                writeRM16(rm, doDoubleShiftLeft(v, src, count, flags));
+                writeRM16(rm, doDoubleShiftLeft(v, src, count, statusFlags));
             }
 
             break;
@@ -4975,7 +4959,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg32());
-                writeRM32(rm, doDoubleShiftLeft(v, src, count, flags));
+                writeRM32(rm, doDoubleShiftLeft(v, src, count, statusFlags));
             }
             else
             {
@@ -4984,7 +4968,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg16());
-                writeRM16(rm, doDoubleShiftLeft(v, src, count, flags));
+                writeRM16(rm, doDoubleShiftLeft(v, src, count, statusFlags));
             }
 
             break;
@@ -5053,9 +5037,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(value)
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             else
-                flags &= ~Flag_C;
+                statusFlags &= ~Flag_C;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -5082,7 +5066,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg32());
-                writeRM32(rm, doDoubleShiftRight(v, src, count, flags));
+                writeRM32(rm, doDoubleShiftRight(v, src, count, statusFlags));
             }
             else
             {
@@ -5091,7 +5075,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg16());
-                writeRM16(rm, doDoubleShiftRight(v, src, count, flags));
+                writeRM16(rm, doDoubleShiftRight(v, src, count, statusFlags));
             }
 
             break;
@@ -5113,7 +5097,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg32());
-                writeRM32(rm, doDoubleShiftRight(v, src, count, flags));
+                writeRM32(rm, doDoubleShiftRight(v, src, count, statusFlags));
             }
             else
             {
@@ -5122,7 +5106,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto src = reg(rm.reg16());
-                writeRM16(rm, doDoubleShiftRight(v, src, count, flags));
+                writeRM16(rm, doDoubleShiftRight(v, src, count, statusFlags));
             }
 
             break;
@@ -5141,7 +5125,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto regVal = static_cast<int32_t>(reg(rm.reg32()));
-                reg(rm.reg32()) = doMultiplySigned(regVal, static_cast<int32_t>(tmp), flags);
+                reg(rm.reg32()) = doMultiplySigned(regVal, static_cast<int32_t>(tmp), statusFlags);
             }
             else
             {
@@ -5150,7 +5134,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     break;
 
                 auto regVal = static_cast<int16_t>(reg(rm.reg16()));
-                reg(rm.reg16()) = doMultiplySigned(regVal, static_cast<int16_t>(tmp), flags);
+                reg(rm.reg16()) = doMultiplySigned(regVal, static_cast<int16_t>(tmp), statusFlags);
             }
 
             reg(Reg32::EIP) += 2;
@@ -5209,9 +5193,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(value)
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             else
-                flags &= ~Flag_C;
+                statusFlags &= ~Flag_C;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -5337,9 +5321,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(value)
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             else
-                flags &= ~Flag_C;
+                statusFlags &= ~Flag_C;
 
             break;
         }
@@ -5391,9 +5375,9 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(value)
-                flags |= Flag_C;
+                statusFlags |= Flag_C;
             else
-                flags &= ~Flag_C;
+                statusFlags &= ~Flag_C;
 
             reg(Reg32::EIP) += 2;
             break;
@@ -5422,10 +5406,10 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             }
 
             if(!val)
-                flags |= Flag_Z;
+                statusFlags |= Flag_Z;
             else
             {
-                flags &= ~Flag_Z;
+                statusFlags &= ~Flag_Z;
 
                 int bit = __builtin_ctz(val);
                 if(operandSize32)
@@ -5459,10 +5443,10 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 val = tmp;
             }
             if(!val)
-                flags |= Flag_Z;
+                statusFlags |= Flag_Z;
             else
             {
-                flags &= ~Flag_Z;
+                statusFlags &= ~Flag_Z;
 
                 int bit = 31 - __builtin_clz(val);
                 if(operandSize32)
@@ -6811,7 +6795,7 @@ void CPU::doALU8(uint32_t addr)
 
         dest = reg(rm.reg8());
 
-        reg(rm.reg8()) = op(dest, src, flags);
+        reg(rm.reg8()) = op(dest, src, statusFlags);
     }
     else
     {
@@ -6820,7 +6804,7 @@ void CPU::doALU8(uint32_t addr)
         if(!readRM8(rm, dest))
             return;
 
-        writeRM8(rm, op(dest, src, flags));
+        writeRM8(rm, op(dest, src, statusFlags));
     }
 }
 
@@ -6842,7 +6826,7 @@ void CPU::doALU16(uint32_t addr)
 
         dest = reg(rm.reg16());
 
-        reg(rm.reg16()) = op(dest, src, flags);
+        reg(rm.reg16()) = op(dest, src, statusFlags);
     }
     else
     {
@@ -6851,7 +6835,7 @@ void CPU::doALU16(uint32_t addr)
         if(!readRM16(rm, dest))
             return;
 
-        writeRM16(rm, op(dest, src, flags));
+        writeRM16(rm, op(dest, src, statusFlags));
     }
 }
 
@@ -6873,7 +6857,7 @@ void CPU::doALU32(uint32_t addr)
 
         dest = reg(rm.reg32());
 
-        reg(rm.reg32()) = op(dest, src, flags);
+        reg(rm.reg32()) = op(dest, src, statusFlags);
     }
     else
     {
@@ -6882,7 +6866,7 @@ void CPU::doALU32(uint32_t addr)
         if(!readRM32(rm, dest))
             return;
 
-        writeRM32(rm, op(dest, src, flags));
+        writeRM32(rm, op(dest, src, statusFlags));
     }
 }
 
@@ -6894,7 +6878,7 @@ void CPU::doALU8AImm(uint32_t addr)
     if(!readMemIP8(addr + 1, imm))
         return;
 
-    reg(Reg8::AL) = op(reg(Reg8::AL), imm, flags);
+    reg(Reg8::AL) = op(reg(Reg8::AL), imm, statusFlags);
 
     reg(Reg32::EIP)++;
 }
@@ -6907,7 +6891,7 @@ void CPU::doALU16AImm(uint32_t addr)
     if(!readMemIP16(addr + 1, imm))
         return;
 
-    reg(Reg16::AX) = op(reg(Reg16::AX), imm, flags);
+    reg(Reg16::AX) = op(reg(Reg16::AX), imm, statusFlags);
 
     reg(Reg32::EIP) += 2;
 }
@@ -6920,7 +6904,7 @@ void CPU::doALU32AImm(uint32_t addr)
     if(!readMemIP32(addr + 1, imm))
         return;
 
-    reg(Reg32::EAX) = op(reg(Reg32::EAX), imm, flags);
+    reg(Reg32::EAX) = op(reg(Reg32::EAX), imm, statusFlags);
 
     reg(Reg32::EIP) += 4;
 }

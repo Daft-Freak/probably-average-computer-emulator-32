@@ -86,8 +86,11 @@ public:
     uint32_t reg(Reg32 r) const {return regs[static_cast<int>(r)];}
     uint32_t &reg(Reg32 r) {return regs[static_cast<int>(r)];}
 
-    uint32_t getFlags() const {return flags;}
-    void setFlags(uint32_t flags) {this->flags = flags;}
+    uint32_t getFlags() const {return flags | statusFlags;}
+    void setFlags(uint32_t flags) {
+        this->flags = flags & ~statusMask;
+        this->statusFlags = flags & statusMask;
+    }
     void updateFlags(uint32_t newFlags, uint32_t mask, bool is32);
 
     void updateSegmentDescriptorCache();
@@ -299,9 +302,12 @@ private:
 
     // internal state
 
+    static constexpr uint32_t statusMask = 0x8D5;
+
     // registers
     uint32_t regs[20]; // segment regs are only 16-bit...
     uint32_t flags;
+    uint32_t statusFlags; // just OSZAPC
 
     SegmentDescriptor segmentDescriptorCache[7];
 
