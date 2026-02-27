@@ -728,8 +728,8 @@ inline void CPU::doExecuteInstruction()
     bool lock = false;
     bool rep = false, repZ = true;
     segmentOverride = Reg16::AX; // not a segment reg, also == 0
-    bool operandSizeOverride = false;
-    bool addressSizeOverride = false;
+
+    bool operandSize32 = addressSize32 = codeSizeBit;
 
     // tracing
     if(trace.isEnabled())
@@ -749,9 +749,9 @@ inline void CPU::doExecuteInstruction()
         else if(opcode == 0x65)
             segmentOverride = Reg16::GS;
         else if(opcode == 0x66) // operand size override
-            operandSizeOverride = true;
+            operandSize32 = !codeSizeBit;
         else if(opcode == 0x67)
-            addressSizeOverride = true;
+            addressSize32 = !codeSizeBit;
         else if(opcode == 0xF0) // LOCK
             lock = true;
         else if(opcode == 0xF2) // REPNE
@@ -773,9 +773,6 @@ inline void CPU::doExecuteInstruction()
     // validate LOCK prefix
     if(lock && !validateLOCKPrefix(opcode, addr))
         return;
-
-    bool operandSize32 = isOperandSize32(operandSizeOverride);
-    addressSize32 = isOperandSize32(addressSizeOverride);
 
     // with 16-bit operands the high bits of IP should be zeroed
     auto setIP = [this, &operandSize32](uint32_t newIP)
