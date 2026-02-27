@@ -1139,8 +1139,6 @@ inline void CPU::doExecuteInstruction()
                 break;
 
             doSub(dest, reg(rm.reg8()), statusFlags);
-
-            reg(Reg32::EIP)++;
             break;
         }
         case 0x39: // CMP r/m16 r16
@@ -1170,7 +1168,6 @@ inline void CPU::doExecuteInstruction()
                 doSub(dest, src, statusFlags);
             }
 
-            reg(Reg32::EIP)++;
             break;
         }
         case 0x3A: // CMP r8 r/m8
@@ -1184,8 +1181,6 @@ inline void CPU::doExecuteInstruction()
                 break;
 
             doSub(reg(rm.reg8()), src, statusFlags);
-
-            reg(Reg32::EIP)++;
             break;
         }
         case 0x3B: // CMP r16 r/m16
@@ -1210,8 +1205,6 @@ inline void CPU::doExecuteInstruction()
 
                 doSub(reg(rm.reg16()), src, statusFlags);
             }
-
-            reg(Reg32::EIP)++;
             break;
         }
         case 0x3C: // CMP AL imm
@@ -1438,8 +1431,7 @@ inline void CPU::doExecuteInstruction()
 
             if(index < lower || index > upper)
                 fault(Fault::BR);
-            else
-                reg(Reg32::EIP)++;
+
             break;
         }
 
@@ -1453,8 +1445,6 @@ inline void CPU::doExecuteInstruction()
                 auto rm = readModRM(addr + 1);
                 if(!rm.isValid())
                     return;
-
-                reg(Reg32::EIP)++;
 
                 uint16_t dest;
                 if(!readRM16(rm, dest))
@@ -1517,7 +1507,7 @@ inline void CPU::doExecuteInstruction()
 
                 reg(rm.reg32()) = doMultiplySigned(static_cast<int32_t>(tmp), static_cast<int32_t>(imm), statusFlags);
 
-                reg(Reg32::EIP) += 5;
+                reg(Reg32::EIP) += 4;
             }
             else
             {
@@ -1532,7 +1522,7 @@ inline void CPU::doExecuteInstruction()
 
                 reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), statusFlags);
 
-                reg(Reg32::EIP) += 3;
+                reg(Reg32::EIP) += 2;
             }
 
             break;
@@ -1578,7 +1568,7 @@ inline void CPU::doExecuteInstruction()
                 reg(rm.reg16()) = doMultiplySigned(static_cast<int16_t>(tmp), static_cast<int16_t>(imm), statusFlags);
             }
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -1679,7 +1669,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(immAddr, imm))
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             switch(rm.op())
             {
@@ -1728,7 +1718,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM32(rm, dest))
                     break;
 
-                reg(Reg32::EIP) += 5;
+                reg(Reg32::EIP) += 4;
 
                 switch(rm.op())
                 {
@@ -1768,7 +1758,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readRM16(rm, dest))
                     break;
 
-                reg(Reg32::EIP) += 3;
+                reg(Reg32::EIP) += 2;
 
                 switch(rm.op())
                 {
@@ -1808,7 +1798,7 @@ inline void CPU::doExecuteInstruction()
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             if(operandSize32)
             {
@@ -1912,8 +1902,6 @@ inline void CPU::doExecuteInstruction()
                 break;
 
             doAnd(dest, reg(rm.reg8()), statusFlags);
-
-            reg(Reg32::EIP)++;
             break;
         }
         case 0x85: // TEST r/m16 r16
@@ -1942,7 +1930,6 @@ inline void CPU::doExecuteInstruction()
                 doAnd(dest, src, statusFlags);
             }
 
-            reg(Reg32::EIP)++;
             break;
         }
 
@@ -1960,7 +1947,6 @@ inline void CPU::doExecuteInstruction()
 
             reg(srcReg) = tmp;
 
-            reg(Reg32::EIP) += 1;
             break;
         }
         case 0x87: // XCHG r/m16 r16
@@ -1990,7 +1976,6 @@ inline void CPU::doExecuteInstruction()
                 reg(srcReg) = tmp;
             }
 
-            reg(Reg32::EIP) += 1;
             break;
         }
         case 0x88: // MOV reg8 -> r/m
@@ -1998,8 +1983,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             writeRM8(rm, reg(rm.reg8()));
             break;
@@ -2009,8 +1992,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             if(operandSize32)
                 writeRM32(rm, reg(rm.reg32()));
@@ -2025,8 +2006,6 @@ inline void CPU::doExecuteInstruction()
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP)++;
-
             readRM8(rm, reg(rm.reg8()));
             break;
         }
@@ -2035,8 +2014,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             if(operandSize32)
                 readRM32(rm, reg(rm.reg32()));
@@ -2050,8 +2027,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             auto srcReg = rm.segReg();
 
@@ -2083,7 +2058,6 @@ inline void CPU::doExecuteInstruction()
             else
                 reg(rm.reg16()) = rm.offset;
 
-            reg(Reg32::EIP)++;
             break;
         }
 
@@ -2092,8 +2066,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             auto destReg = rm.segReg();
 
@@ -2116,8 +2088,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             assert(rm.op() == 0);
 
@@ -2868,7 +2838,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(immAddr, count))
                 return;
     
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             uint8_t v;
             if(!readRM8(rm, v))
@@ -2888,7 +2858,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(immAddr, count))
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             if(operandSize32)
             {
@@ -2983,7 +2953,7 @@ inline void CPU::doExecuteInstruction()
             if(!readMemIP8(immAddr, imm))
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             writeRM8(rm, imm);
 
@@ -3004,7 +2974,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP32(immAddr, imm))
                     return;
 
-                reg(Reg32::EIP) += 5;
+                reg(Reg32::EIP) += 4;
                 writeRM32(rm, imm);
             }
             else
@@ -3013,7 +2983,7 @@ inline void CPU::doExecuteInstruction()
                 if(!readMemIP16(immAddr, imm))
                     return;
 
-                reg(Reg32::EIP) += 3;
+                reg(Reg32::EIP) += 2;
                 writeRM16(rm, imm);
             }
             break;
@@ -3249,8 +3219,6 @@ inline void CPU::doExecuteInstruction()
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP)++;
-
             auto count = 1;
 
             uint8_t v;
@@ -3266,8 +3234,6 @@ inline void CPU::doExecuteInstruction()
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP)++;
-    
             auto count = 1;
     
             if(operandSize32)
@@ -3293,8 +3259,6 @@ inline void CPU::doExecuteInstruction()
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP)++;
-
             auto count = reg(Reg8::CL);
 
             uint8_t v;
@@ -3309,8 +3273,6 @@ inline void CPU::doExecuteInstruction()
             auto rm = readModRM(addr + 1);
             if(!rm.isValid())
                 return;
-
-            reg(Reg32::EIP)++;
 
             auto count = reg(Reg8::CL);
     
@@ -3411,8 +3373,6 @@ inline void CPU::doExecuteInstruction()
                 auto rm = readModRM(addr + 1);
                 if(!rm.isValid())
                     return;
-
-                reg(Reg32::EIP)++;
             }
             break;
         }
@@ -3729,18 +3689,16 @@ inline void CPU::doExecuteInstruction()
 
                     doAnd(v, imm, statusFlags);
 
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
                     break;
                 }
                 case 2: // NOT
                 {
-                    reg(Reg32::EIP)++;
                     writeRM8(rm, ~v);
                     break;
                 }
                 case 3: // NEG
                 {
-                    reg(Reg32::EIP)++;
                     writeRM8(rm, doSub(uint8_t(0), v, statusFlags));
                     break;
                 }
@@ -3755,7 +3713,6 @@ inline void CPU::doExecuteInstruction()
                     else
                         statusFlags &= ~(Flag_C | Flag_O);
 
-                    reg(Reg32::EIP)++;
                     break;
                 }
                 case 5: // IMUL
@@ -3771,7 +3728,6 @@ inline void CPU::doExecuteInstruction()
                     else
                         statusFlags &= ~(Flag_C | Flag_O);
 
-                    reg(Reg32::EIP)++;
                     break;
                 }
                 case 6: // DIV
@@ -3784,8 +3740,6 @@ inline void CPU::doExecuteInstruction()
                     {
                         reg(Reg8::AL) = num / v;
                         reg(Reg8::AH) = num % v;
-
-                        reg(Reg32::EIP)++;
                     }
 
                     // "undefined"
@@ -3808,8 +3762,6 @@ inline void CPU::doExecuteInstruction()
                     {
                         reg(Reg8::AL) = res;
                         reg(Reg8::AH) = num % iv;
-
-                        reg(Reg32::EIP)++;
                     }
                     break;
                 }
@@ -3854,7 +3806,7 @@ inline void CPU::doExecuteInstruction()
 
                         doAnd(v, imm, statusFlags);
 
-                        reg(Reg32::EIP) += 5;
+                        reg(Reg32::EIP) += 4;
                     }
                     else
                     {
@@ -3864,15 +3816,13 @@ inline void CPU::doExecuteInstruction()
 
                         doAnd(uint16_t(v), imm, statusFlags);
 
-                        reg(Reg32::EIP) += 3;
+                        reg(Reg32::EIP) += 2;
                     }
 
                     break;
                 }
                 case 2: // NOT
                 {
-                    reg(Reg32::EIP)++;
-
                     if(operandSize32)
                         writeRM32(rm, ~v);
                     else
@@ -3882,8 +3832,6 @@ inline void CPU::doExecuteInstruction()
                 }
                 case 3: // NEG
                 {
-                    reg(Reg32::EIP)++;
-
                     if(operandSize32)
                         writeRM32(rm, doSub(uint32_t(0), v, statusFlags));
                     else
@@ -3917,7 +3865,7 @@ inline void CPU::doExecuteInstruction()
                         else
                             statusFlags &= ~(Flag_C | Flag_O);
                     }
-                    reg(Reg32::EIP)++;
+
                     break;
                 }
                 case 5: // IMUL
@@ -3951,7 +3899,6 @@ inline void CPU::doExecuteInstruction()
                             statusFlags &= ~(Flag_C | Flag_O);
                     }
 
-                    reg(Reg32::EIP)++;
                     break;
                 }
                 case 6: // DIV
@@ -3966,8 +3913,6 @@ inline void CPU::doExecuteInstruction()
                         {
                             reg(Reg32::EAX) = num / v;
                             reg(Reg32::EDX) = num % v;
-
-                            reg(Reg32::EIP)++;
                         }
 
                         // "undefined"
@@ -3984,8 +3929,6 @@ inline void CPU::doExecuteInstruction()
                         {
                             reg(Reg16::AX) = num / v;
                             reg(Reg16::DX) = num % v;
-
-                            reg(Reg32::EIP)++;
                         }
 
                         // "undefined"
@@ -4009,8 +3952,6 @@ inline void CPU::doExecuteInstruction()
                         {
                             reg(Reg32::EAX) = res;
                             reg(Reg32::EDX) = num % iv;
-
-                            reg(Reg32::EIP)++;
                         }
                     }
                     else
@@ -4026,8 +3967,6 @@ inline void CPU::doExecuteInstruction()
                         {
                             reg(Reg16::AX) = res;
                             reg(Reg16::DX) = num % iv;
-
-                            reg(Reg32::EIP)++;
                         }
                     }
                     break;
@@ -4104,16 +4043,12 @@ inline void CPU::doExecuteInstruction()
             {
                 case 0: // INC
                 {
-                    reg(Reg32::EIP)++;
-
                     auto res = doInc(v, statusFlags);
                     writeRM8(rm, res);
                     break;
                 }
                 case 1: // DEC
                 {
-                    reg(Reg32::EIP)++;
-
                     auto res = doDec(v, statusFlags);
                     writeRM8(rm, res);
                     break;
@@ -4152,8 +4087,6 @@ inline void CPU::doExecuteInstruction()
             {
                 case 0: // INC
                 {
-                    reg(Reg32::EIP)++;
-
                     if(operandSize32)
                     {
                         auto res = doInc(v, statusFlags);
@@ -4168,8 +4101,6 @@ inline void CPU::doExecuteInstruction()
                 }
                 case 1: // DEC
                 {
-                    reg(Reg32::EIP)++;
-
                     if(operandSize32)
                     {
                         auto res = doDec(v, statusFlags);
@@ -4186,7 +4117,7 @@ inline void CPU::doExecuteInstruction()
                 case 2: // CALL near indirect
                 {
                     // push
-                    auto retAddr = reg(Reg32::EIP) + 1;
+                    auto retAddr = reg(Reg32::EIP);
                     if(push(retAddr, operandSize32))
                         setIP(v);
                     break;
@@ -4201,7 +4132,7 @@ inline void CPU::doExecuteInstruction()
 
                     uint16_t newCS;
                     if(readMem16(rm.offset + (operandSize32 ? 4 : 2), rm.rmBase, newCS))
-                        farCall(newCS, v, reg(Reg32::EIP) + 1, operandSize32, stackAddrSize32);
+                        farCall(newCS, v, reg(Reg32::EIP), operandSize32, stackAddrSize32);
                     break;
                 }
                 case 4: // JMP near indirect
@@ -4220,12 +4151,11 @@ inline void CPU::doExecuteInstruction()
                     uint16_t newCS;
                     readMem16(rm.offset + (operandSize32 ? 4 : 2), rm.rmBase, newCS);
 
-                    farJump(newCS, v, reg(Reg32::EIP) + 1);
+                    farJump(newCS, v, reg(Reg32::EIP));
                     break;
                 }
                 case 6: // PUSH
                 {
-                    reg(Reg32::EIP)++;
                     push(v, operandSize32);
 
                     break;
@@ -4270,7 +4200,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                         break;
                     }
                     
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
 
                     // with 32bit operand size writing to mem only writes 16 bits
                     // writing to reg leaves high 16 bits undefined
@@ -4286,7 +4216,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                         break;
                     }
 
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
 
                     // with 32bit operand size writing to mem only writes 16 bits
                     // writing to reg zeroes the high 16 bits
@@ -4309,7 +4239,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     uint16_t selector;
 
                     if(readRM16(rm, selector) && setLDT(selector))
-                        reg(Reg32::EIP) += 2;
+                        reg(Reg32::EIP) += 1;
                     break;
                 }
                 case 0x3: // LTR
@@ -4358,7 +4288,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     auto descAddr = (selector >> 3) * 8 + gdtBase;
                     writeMem8(descAddr + 5, newDesc.flags >> 16, true);
 
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
                     break;
                 }
 
@@ -4410,7 +4340,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     else
                         statusFlags &= ~Flag_Z;
 
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
                     break;
                 }
 
@@ -4433,13 +4363,13 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 case 0x0: // SGDT
                 {
                     if(writeMem16(rm.offset, rm.rmBase, gdtLimit) && writeMem32(rm.offset + 2, rm.rmBase, gdtBase))
-                        reg(Reg32::EIP) += 2;
+                        reg(Reg32::EIP) += 1;
                     break;
                 }
                 case 0x1: // SIDT
                 {
                     if(writeMem16(rm.offset, rm.rmBase, idtLimit) && writeMem32(rm.offset + 2, rm.rmBase, idtBase))
-                        reg(Reg32::EIP) += 2;
+                        reg(Reg32::EIP) += 1;
                     break;
                 }
                 case 0x2: // LGDT
@@ -4454,7 +4384,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     {
                         if(!operandSize32)
                             gdtBase &= 0xFFFFFF;
-                        reg(Reg32::EIP) += 2;
+                        reg(Reg32::EIP) += 1;
                     }
                     break;
                 }
@@ -4471,14 +4401,14 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                         if(!operandSize32)
                             idtBase &= 0xFFFFFF;
 
-                        reg(Reg32::EIP) += 2;
+                        reg(Reg32::EIP) += 1;
                     }
                     break;
                 }
 
                 case 0x4: // SMSW
                 {
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
                     writeRM16(rm, reg(Reg32::CR0));
                     break;
                 }
@@ -4496,7 +4426,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                         return;
 
                     reg(Reg32::CR0) = (reg(Reg32::CR0) & ~0x1E) | (tmp & 0x1F);
-                    reg(Reg32::EIP) += 2;
+                    reg(Reg32::EIP) += 1;
                     break;
                 }
 
@@ -4580,7 +4510,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_Z;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
         case 0x03: // LSL
@@ -4648,7 +4578,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_Z;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -4837,7 +4767,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             writeRM8(rm, getCondValue(cond, statusFlags) ? 1 : 0);
             break;
@@ -4900,7 +4830,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_C;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -4916,7 +4846,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 return;
 
             count &= 0x1F;
-            reg(Reg32::EIP) += 3;
+            reg(Reg32::EIP) += 2;
 
             if(operandSize32)
             {
@@ -4946,7 +4876,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             auto count = reg(Reg8::CL) & 0x1F;
 
@@ -5039,7 +4969,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_C;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5055,7 +4985,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 return;
 
             count &= 0x1F;
-            reg(Reg32::EIP) += 3;
+            reg(Reg32::EIP) += 2;
 
             if(operandSize32)
             {
@@ -5084,7 +5014,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             if(!rm.isValid())
                 return;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
 
             auto count = reg(Reg8::CL) & 0x1F;
 
@@ -5135,7 +5065,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 reg(rm.reg16()) = doMultiplySigned(regVal, static_cast<int16_t>(tmp), statusFlags);
             }
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5195,7 +5125,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_C;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5223,7 +5153,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 reg(rm.reg16()) = v;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
         case 0xB7: // MOVZX 16 -> 16/32
@@ -5241,7 +5171,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 reg(rm.reg16()) = v;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5256,7 +5186,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             if(!readMemIP8(immAddr, bit))
                 return;
 
-            reg(Reg32::EIP) += 3;
+            reg(Reg32::EIP) += 2;
 
             uint32_t data;
             bool value;
@@ -5377,7 +5307,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 statusFlags &= ~Flag_C;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5416,7 +5346,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     reg(rm.reg16()) = bit;
             }
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
         case 0xBD: // BSR
@@ -5453,7 +5383,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                     reg(rm.reg16()) = bit;
             }
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5479,7 +5409,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 reg(rm.reg16()) = v;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
         case 0xBF: // MOVSX 16 -> 16/32
@@ -5504,7 +5434,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
             else
                 reg(rm.reg16()) = v;
 
-            reg(Reg32::EIP) += 2;
+            reg(Reg32::EIP) += 1;
             break;
         }
 
@@ -5947,6 +5877,8 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
     uint8_t modRM;
     if(!readMemIP8(addr, modRM))
         return RM::invalid();
+
+    reg(Reg32::EIP)++;
 
     auto mod = modRM >> 6;
     auto r = static_cast<Reg16>((modRM >> 3) & 7);
@@ -6782,8 +6714,6 @@ void CPU::doALU8(uint32_t addr)
     if(!rm.isValid())
         return;
 
-    reg(Reg32::EIP)++;
-
     uint8_t src, dest;
 
     if(d)
@@ -6813,8 +6743,6 @@ void CPU::doALU16(uint32_t addr)
     if(!rm.isValid())
         return;
 
-    reg(Reg32::EIP)++;
-
     uint16_t src, dest;
 
     if(d)
@@ -6843,8 +6771,6 @@ void CPU::doALU32(uint32_t addr)
     auto rm = readModRM(addr + 1);
     if(!rm.isValid())
         return;
-
-    reg(Reg32::EIP)++;
 
     uint32_t src, dest;
 
@@ -7719,8 +7645,6 @@ void CPU::loadFarPointer(uint32_t addr, Reg16 segmentReg, bool operandSize32)
 
         reg(rm.reg16()) = v;
     }
-    
-    reg(Reg32::EIP) += 1;
 }
 
 bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource source)
