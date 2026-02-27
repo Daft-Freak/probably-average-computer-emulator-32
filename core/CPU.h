@@ -154,6 +154,8 @@ private:
         Reg8  rmBase8 () const {return static_cast<Reg8 >(rmBase);}
         Reg16 rmBase16() const {return rmBase;}
         Reg32 rmBase32() const {return static_cast<Reg32>(rmBase);}
+
+        static RM invalid() {return {Reg16::AX, Reg16::IP, 0};}
     };
 
     struct SegmentDescriptor

@@ -5949,7 +5949,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
 {
     uint8_t modRM;
     if(!readMemIP8(addr, modRM))
-        return {Reg16::AX, Reg16::IP, 0}; // the invalid value
+        return RM::invalid();
 
     auto mod = modRM >> 6;
     auto r = static_cast<Reg16>((modRM >> 3) & 7);
@@ -5985,7 +5985,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                 {
                     uint8_t sib;
                     if(!readMemIP8(addr++, sib))
-                        return {Reg16::AX, Reg16::IP, 0};
+                        return RM::invalid();
 
                     reg(Reg32::EIP)++;
 
@@ -5997,7 +5997,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                     {
                         // disp32 instead of base
                         if(!readMemIP32(addr, memAddr))
-                            return {Reg16::AX, Reg16::IP, 0};
+                            return RM::invalid();
 
                         reg(Reg32::EIP) += 4;
                         addr += 4;
@@ -6021,7 +6021,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                     if(mod == 0) // direct
                     {
                         if(!readMemIP32(addr, memAddr))
-                            return {Reg16::AX, Reg16::IP, 0};
+                            return RM::invalid();
 
                         reg(Reg32::EIP) += 4;
                         addr += 4;
@@ -6063,7 +6063,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                     if(mod == 0) // direct
                     {
                         if(!readMemIP16(addr, memAddr))
-                            return {Reg16::AX, Reg16::IP, 0};
+                            return RM::invalid();
 
                         reg(Reg32::EIP) += 2;
                         addr += 2;
@@ -6086,7 +6086,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
         {
             int32_t disp;
             if(!readMemIP8(addr++, disp))
-                return {Reg16::AX, Reg16::IP, 0};
+                return RM::invalid();
 
             reg(Reg32::EIP)++;
 
@@ -6098,7 +6098,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
             {
                 uint32_t disp;
                 if(!readMemIP32(addr, disp))
-                    return {Reg16::AX, Reg16::IP, 0};
+                    return RM::invalid();
 
                 reg(Reg32::EIP) += 4;
                 addr += 4;
@@ -6109,7 +6109,7 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
             {
                 uint16_t disp;
                 if(!readMemIP16(addr, disp))
-                    return {Reg16::AX, Reg16::IP, 0};
+                    return RM::invalid();
 
                 reg(Reg32::EIP) += 2;
                 addr += 2;
