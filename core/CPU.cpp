@@ -5878,14 +5878,13 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
     if(!readMemIP8(addr, modRM))
         return RM::invalid();
 
-    reg(Reg32::EIP)++;
-
     auto mod = modRM >> 6;
     auto r = static_cast<Reg16>((modRM >> 3) & 7);
     auto rm = modRM & 7;
 
     if(mod == 3) // direct
     {
+        reg(Reg32::EIP)++;
         endAddr = addr + 1;
         return {r, static_cast<Reg16>(rm), 0};
     }
@@ -5894,7 +5893,9 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
         uint32_t memAddr = 0;
         Reg16 segBase = Reg16::DS;
 
-        addr++; // the R/M
+        auto startAddr = addr;
+
+        int offset = 1; // the R/M
 
         if(addressSize32) // r/m meaning is entirely different in 32bit mode
         {
@@ -5913,10 +5914,8 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                 case 4: // SIB
                 {
                     uint8_t sib;
-                    if(!readMemIP8(addr++, sib))
+                    if(!readMemIP8(addr + offset++, sib))
                         return RM::invalid();
-
-                    reg(Reg32::EIP)++;
 
                     int scale = sib >> 6;
                     int index = (sib >> 3) & 7;
@@ -5925,11 +5924,10 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                     if(mod == 0 && base == Reg32::EBP)
                     {
                         // disp32 instead of base
-                        if(!readMemIP32(addr, memAddr))
+                        if(!readMemIP32(addr + offset, memAddr))
                             return RM::invalid();
 
-                        reg(Reg32::EIP) += 4;
-                        addr += 4;
+                        offset += 4;
                     }
                     else
                     {
@@ -5949,11 +5947,10 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                 case 5: // ~the same as 6 for 16-bit
                     if(mod == 0) // direct
                     {
-                        if(!readMemIP32(addr, memAddr))
+                        if(!readMemIP32(addr + offset, memAddr))
                             return RM::invalid();
 
-                        reg(Reg32::EIP) += 4;
-                        addr += 4;
+                        offset += 4;
                     }
                     else
                     {
@@ -5991,11 +5988,10 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
                 case 6:
                     if(mod == 0) // direct
                     {
-                        if(!readMemIP16(addr, memAddr))
+                        if(!readMemIP16(addr + offset, memAddr))
                             return RM::invalid();
 
-                        reg(Reg32::EIP) += 2;
-                        addr += 2;
+                        offset += 2;
                     }
                     else
                     {
@@ -6014,10 +6010,8 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
         if(mod == 1)
         {
             int32_t disp;
-            if(!readMemIP8(addr++, disp))
+            if(!readMemIP8(addr + offset++, disp))
                 return RM::invalid();
-
-            reg(Reg32::EIP)++;
 
             memAddr += disp;
         }
@@ -6026,22 +6020,20 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
             if(addressSize32) // 32bit
             {
                 uint32_t disp;
-                if(!readMemIP32(addr, disp))
+                if(!readMemIP32(addr + offset, disp))
                     return RM::invalid();
 
-                reg(Reg32::EIP) += 4;
-                addr += 4;
+                offset += 4;
 
                 memAddr += disp;
             }
             else //16bit
             {
                 uint16_t disp;
-                if(!readMemIP16(addr, disp))
+                if(!readMemIP16(addr + offset, disp))
                     return RM::invalid();
 
-                reg(Reg32::EIP) += 2;
-                addr += 2;
+                offset += 2;
 
                 memAddr += disp;
             }
@@ -6054,7 +6046,10 @@ CPU::RM CPU::readModRM(uint32_t addr, uint32_t &endAddr)
         if(!addressSize32)
             memAddr &= 0xFFFF;
 
-        endAddr = addr;
+        // adjust IP
+        reg(Reg32::EIP) += offset;
+
+        endAddr = addr + offset;
         return {r, segBase, memAddr};
     }
 }
