@@ -196,6 +196,12 @@ private:
     bool readMemIP16(uint32_t offset, uint32_t &data); // zero extended
     bool readMemIP32(uint32_t offset, uint32_t &data);
 
+    // fast path for stack
+    bool readMemSP16(uint32_t offset, uint16_t &data);
+    bool readMemSP32(uint32_t offset, uint32_t &data);
+    bool writeMemSP16(uint32_t offset, uint16_t data);
+    bool writeMemSP32(uint32_t offset, uint32_t data);
+
     // extra helpers
     // getTSSStackPointer uses this one
     bool readMem16(uint32_t offset, uint32_t &data, bool privileged = false) {uint16_t tmp; if(!readMem16(offset, tmp, privileged)) return false; data = tmp; return true;}
@@ -337,6 +343,10 @@ private:
     uint32_t ipPtrBase = 0; // the top 20 bits of the linear IP that was used to map ipPtr
     uint32_t ipLimit; // CS base+limit
     const uint8_t *ipPtr = nullptr;
+
+    uint32_t spPtrBase = 0;
+    uint8_t *spPtr = nullptr;
+    bool spPtrWrite = false;
 
     // RAM
     System &sys;

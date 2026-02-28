@@ -5733,6 +5733,115 @@ bool CPU::readMemIP32(uint32_t offset, uint32_t &data)
     return true;
 }
 
+bool CPU::readMemSP16(uint32_t offset, uint16_t &data)
+{
+    // split if we cross a page boundary mid-read
+    // no optimised version as I hope this is unlikely
+    if((offset & 0xFFF) > 0xFFE)
+    {
+        uint8_t tmp[2];
+
+        if(!readMem8(offset, tmp[0]) || !readMem8(offset + 1, tmp[1]))
+            return false;
+
+        data = tmp[0] | tmp[1] << 8;
+
+        return true;
+    }
+
+    // usual boundary check
+    if(spPtrBase != offset >> 12)
+    {
+        uint32_t physAddr;
+        if(!getPhysicalAddress(offset, physAddr))
+            return false;
+
+        spPtr = sys.mapAddress(physAddr) - offset;
+        spPtrBase = offset >> 12;
+        spPtrWrite = false;
+    }
+
+    data = *reinterpret_cast<const uint16_t *>(spPtr + offset);
+    return true;
+}
+
+bool CPU::readMemSP32(uint32_t offset, uint32_t &data)
+{
+    // split if we cross a page boundary mid-read
+    if((offset & 0xFFF) > 0xFFC)
+    {
+        // only breaking up to 16 bit here as SP should really be aligned
+        uint16_t tmp[2];
+
+        if(!readMemSP16(offset, tmp[0]) || !readMemSP16(offset + 2, tmp[1]))
+            return false;
+
+        data = tmp[0] | tmp[1] << 16;
+
+        return true;
+    }
+
+    // usual boundary check
+    if(spPtrBase != offset >> 12)
+    {
+        uint32_t physAddr;
+        if(!getPhysicalAddress(offset, physAddr))
+            return false;
+
+        spPtr = sys.mapAddress(physAddr) - offset;
+        spPtrBase = offset >> 12;
+        spPtrWrite = false;
+    }
+
+    data = *reinterpret_cast<const uint32_t *>(spPtr + offset);
+    return true;
+}
+
+bool CPU::writeMemSP16(uint32_t offset, uint16_t data)
+{
+    // split if we cross a page boundary mid-read
+    if((offset & 0xFFF) > 0xFFE)
+        return writeMem8(offset, data & 0xFF) && writeMem8(offset + 1, data >> 8);
+
+    // usual boundary check
+    // if switching from read -> write we need to remap to mark the page dirty
+    if(spPtrBase != offset >> 12 || !spPtrWrite)
+    {
+        uint32_t physAddr;
+        if(!getPhysicalAddress(offset, physAddr, true))
+            return false;
+
+        spPtr = sys.mapAddress(physAddr) - offset;
+        spPtrBase = offset >> 12;
+        spPtrWrite = true;
+    }
+
+    *reinterpret_cast<uint16_t *>(spPtr + offset) = data;
+    return true;
+}
+
+bool CPU::writeMemSP32(uint32_t offset, uint32_t data)
+{
+    // break up access if crossing page boundary
+    if((offset & 0xFFF) > 0xFFC)
+        return writeMemSP16(offset, data & 0xFFFF) && writeMemSP16(offset + 2, data >> 16);
+
+    // usual boundary check
+    if(spPtrBase != offset >> 12 || !spPtrWrite)
+    {
+        uint32_t physAddr;
+        if(!getPhysicalAddress(offset, physAddr, true))
+            return false;
+
+        spPtr = sys.mapAddress(physAddr) - offset;
+        spPtrBase = offset >> 12;
+        spPtrWrite = true;
+    }
+
+    *reinterpret_cast<uint32_t *>(spPtr + offset) = data;
+    return true;
+}
+
 bool CPU::getPhysicalAddress(uint32_t virtAddr, uint32_t &physAddr, bool forWrite, bool privileged)
 {
     // paging not enabled
@@ -7032,14 +7141,14 @@ bool CPU::doPush(uint32_t val, bool op32, bool addr32, bool isSegmentReg)
     {
         if(!checkSegmentLimit(ssDesc, sp, 4, true))
             return false;
-        if(!writeMem32(sp + ssDesc.base, val))
+        if(!writeMemSP32(sp + ssDesc.base, val))
             return false;
     }
     else
     {
         if(!checkSegmentLimit(ssDesc, sp, 2, true))
             return false;
-        if(!writeMem16(sp + ssDesc.base, val))
+        if(!writeMemSP16(sp + ssDesc.base, val))
             return false;
     }
 
@@ -7061,7 +7170,7 @@ bool CPU::doPop(uint32_t &val, bool op32, bool addr32, bool isSegmentReg)
     {
         if(!checkSegmentLimit(ssDesc, sp, 4, true))
             return false;
-        if(!readMem32(sp + ssDesc.base, val))
+        if(!readMemSP32(sp + ssDesc.base, val))
             return false;
     }
     else
@@ -7070,7 +7179,7 @@ bool CPU::doPop(uint32_t &val, bool op32, bool addr32, bool isSegmentReg)
             return false;
 
         uint16_t tmp;
-        if(!readMem16(sp + ssDesc.base, tmp))
+        if(!readMemSP16(sp + ssDesc.base, tmp))
             return false;
         val = tmp;
     }
@@ -7102,7 +7211,7 @@ bool CPU::doPeek(uint32_t &val, bool op32, bool addr32, int offset, int byteOffs
     {
         if(!checkSegmentLimit(ssDesc, sp, 4, true))
             return false;
-        if(!readMem32(sp + ssDesc.base, val))
+        if(!readMemSP32(sp + ssDesc.base, val))
             return false;
     }
     else
@@ -7111,7 +7220,7 @@ bool CPU::doPeek(uint32_t &val, bool op32, bool addr32, int offset, int byteOffs
             return false;
 
         uint16_t tmp;
-        if(!readMem16(sp + ssDesc.base, tmp))
+        if(!readMemSP16(sp + ssDesc.base, tmp))
             return false;
         val = tmp;
     }
