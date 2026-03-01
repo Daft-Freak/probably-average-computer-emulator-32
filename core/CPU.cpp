@@ -6192,8 +6192,8 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
     uint8_t descBytes[8];
 
     // FIXME: a page fault could happen here?
-    for(int i = 0; i < 8; i++)
-       readMem8(addr + i, descBytes[i], true);
+    readMem32(addr + 0, *reinterpret_cast<uint32_t *>(descBytes + 0), true);
+    readMem32(addr + 4, *reinterpret_cast<uint32_t *>(descBytes + 4), true);
 
     desc.base = descBytes[2]
               | descBytes[3] <<  8
