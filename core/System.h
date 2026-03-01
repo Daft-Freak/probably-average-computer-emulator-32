@@ -240,7 +240,7 @@ public:
     void writeMem16WithCallback(uint32_t addr, uint16_t data);
     void writeMem32WithCallback(uint32_t addr, uint32_t data);
 
-    const uint8_t *mapAddress(uint32_t addr) const;
+    uint8_t *mapAddress(uint32_t addr);
 
     uint8_t readIOPort(uint16_t addr);
     uint16_t readIOPort16(uint16_t addr);

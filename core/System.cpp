@@ -1741,7 +1741,7 @@ void RAM_FUNC(System::writeMem32WithCallback)(uint32_t addr, uint32_t data)
     }
 }
 
-const uint8_t *RAM_FUNC(System::mapAddress)(uint32_t addr) const
+uint8_t *RAM_FUNC(System::mapAddress)(uint32_t addr)
 {
     if(addr >= maxAddress)
         return nullptr;
