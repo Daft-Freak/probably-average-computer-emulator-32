@@ -7955,17 +7955,13 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
 
         addr += idtBase;
 
-        uint32_t offset;
-        uint16_t tmp;
-        uint16_t selector;
-        uint8_t access;
+        // getting a page fault here would be fatal...
+        uint8_t descBytes[8];
+        readDescriptorBytes(addr, descBytes);
 
-        readMem16(addr, offset, true);
-        readMem16(addr + 6, tmp, true);
-        readMem16(addr + 2, selector, true);
-        readMem8(addr + 5, access, true);
-
-        offset |= tmp << 16;
+        uint32_t offset = descBytes[0] | descBytes[1] << 8 | descBytes[6] << 16 | descBytes[7] << 24;
+        uint16_t selector = descBytes[2] | descBytes[3] << 8;
+        uint8_t access = descBytes[5];
 
         assert(access & (1 << 7)); // present
 
