@@ -189,6 +189,8 @@ private:
     bool writeMem16(uint32_t offset, uint16_t data, bool privileged = false);
     bool writeMem32(uint32_t offset, uint32_t data, bool privileged = false);
 
+    bool readDescriptorBytes(uint32_t offset, uint8_t data[8]);
+
     // fast path for opcode/immediate fetch
     bool readMemIP8(uint32_t offset, uint8_t &data);
     bool readMemIP8(uint32_t offset, int32_t &data); // sign extended

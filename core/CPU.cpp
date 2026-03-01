@@ -5615,6 +5615,29 @@ bool CPU::writeMem32(uint32_t offset, uint32_t data, bool privileged)
     return true;
 }
 
+bool CPU::readDescriptorBytes(uint32_t offset, uint8_t data[8])
+{
+    auto data32 = reinterpret_cast<uint32_t *>(data);
+
+    // break up access if crossing page boundary
+    if((offset & 0xFFF) > 0xFF8)
+    {
+        if(!readMem32(offset, data32[0], true) || !readMem32(offset + 4, data32[1], true))
+            return false;
+
+        return true;
+    }
+
+    uint32_t physAddr;
+    if(!getPhysicalAddress(offset, physAddr, false, true))
+        return false;
+
+    data32[0] = sys.readMem32(physAddr + 0);
+    data32[1] = sys.readMem32(physAddr + 4);
+
+    return true;
+}
+
 bool CPU::readMemIP8(uint32_t offset, uint8_t &data)
 {
     // check if we would cross a page boundary (even if not paging)
@@ -6192,8 +6215,7 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
     uint8_t descBytes[8];
 
     // FIXME: a page fault could happen here?
-    readMem32(addr + 0, *reinterpret_cast<uint32_t *>(descBytes + 0), true);
-    readMem32(addr + 4, *reinterpret_cast<uint32_t *>(descBytes + 4), true);
+    readDescriptorBytes(addr, descBytes);
 
     desc.base = descBytes[2]
               | descBytes[3] <<  8
