@@ -794,14 +794,6 @@ inline void CPU::doExecuteInstruction()
         return doPush(val, is32, stackAddrSize32, true);
     };
 
-    // for use when we've already validated SP
-    // doesn't currently skip any validation
-    auto pushPreChecked = [&push](uint32_t val, bool is32)
-    {
-        [[maybe_unused]] bool ok = push(val, is32);
-        assert(ok);
-    };
-
     auto pop = [this](bool is32, uint32_t &v)
     {
         return doPop(v, is32, stackAddrSize32);
@@ -1346,16 +1338,40 @@ inline void CPU::doExecuteInstruction()
             if(!checkStackSpace(8, operandSize32, stackAddrSize32))
                 break;
 
-            auto sp = reg(Reg32::ESP);
+            uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
+            uint32_t esp = reg(Reg32::ESP); // we still need to push the whole thing
 
-            pushPreChecked(reg(Reg32::EAX), operandSize32);
-            pushPreChecked(reg(Reg32::ECX), operandSize32);
-            pushPreChecked(reg(Reg32::EDX), operandSize32);
-            pushPreChecked(reg(Reg32::EBX), operandSize32);
-            pushPreChecked(sp, operandSize32);
-            pushPreChecked(reg(Reg32::EBP), operandSize32);
-            pushPreChecked(reg(Reg32::ESI), operandSize32);
-            pushPreChecked(reg(Reg32::EDI), operandSize32);
+            auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+
+            bool mask = !stackAddrSize32 && sp < (8 * 4);
+
+            if(operandSize32)
+            {
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::EAX));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::ECX));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::EDX));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::EBX));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, esp            );
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::EBP));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::ESI));
+                sp -= 4; if(mask) sp &= 0xFFFF; writeMemSP32(sp + ssDesc.base, reg(Reg32::EDI));
+            }
+            else
+            {
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::EAX));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::ECX));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::EDX));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::EBX));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, esp            );
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::EBP));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::ESI));
+                sp -= 2; if(mask) sp &= 0xFFFF; writeMemSP16(sp + ssDesc.base, reg(Reg32::EDI));
+            }
+
+            if(stackAddrSize32)
+                reg(Reg32::ESP) = sp;
+            else
+                reg(Reg16::SP) = sp;
 
             break;
         }
@@ -1366,28 +1382,39 @@ inline void CPU::doExecuteInstruction()
             if(!peek(operandSize32, 7, v))
                 break;
 
+            uint32_t sp = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
+            auto &ssDesc = getCachedSegmentDescriptor(Reg16::SS);
+
+            bool mask = !stackAddrSize32 && sp > 0xFFFF - (8 * 2);
+
             if(operandSize32)
             {
-                popPreChecked(true, reg(Reg32::EDI));
-                popPreChecked(true, reg(Reg32::ESI));
-                popPreChecked(true, reg(Reg32::EBP));
-                popPreChecked(true, v); // skip sp
-                popPreChecked(true, reg(Reg32::EBX));
-                popPreChecked(true, reg(Reg32::EDX));
-                popPreChecked(true, reg(Reg32::ECX));
-                popPreChecked(true, reg(Reg32::EAX));
+                readMemSP32(sp + ssDesc.base, reg(Reg32::EDI)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, reg(Reg32::ESI)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, reg(Reg32::EBP)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, v              ); sp += 4; if(mask) sp &= 0xFFFF; // skip sp
+                readMemSP32(sp + ssDesc.base, reg(Reg32::EBX)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, reg(Reg32::EDX)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, reg(Reg32::ECX)); sp += 4; if(mask) sp &= 0xFFFF;
+                readMemSP32(sp + ssDesc.base, reg(Reg32::EAX)); sp += 4; if(mask) sp &= 0xFFFF;
             }
             else
             {
-                popPreChecked(false, v); reg(Reg16::DI) = v;
-                popPreChecked(false, v); reg(Reg16::SI) = v;
-                popPreChecked(false, v); reg(Reg16::BP) = v;
-                popPreChecked(false, v); // skip sp
-                popPreChecked(false, v); reg(Reg16::BX) = v;
-                popPreChecked(false, v); reg(Reg16::DX) = v;
-                popPreChecked(false, v); reg(Reg16::CX) = v;
-                popPreChecked(false, v); reg(Reg16::AX) = v;
+                uint16_t v16;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::DI)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::SI)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::BP)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, v16           ); sp += 2; if(mask) sp &= 0xFFFF; // skip sp
+                readMemSP16(sp + ssDesc.base, reg(Reg16::BX)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::DX)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::CX)); sp += 2; if(mask) sp &= 0xFFFF;
+                readMemSP16(sp + ssDesc.base, reg(Reg16::AX)); sp += 2; if(mask) sp &= 0xFFFF;
             }
+
+            if(stackAddrSize32)
+                reg(Reg32::ESP) = sp;
+            else
+                reg(Reg16::SP) = sp;
 
             break;
         }
