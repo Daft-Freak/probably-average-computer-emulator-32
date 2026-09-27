@@ -8108,11 +8108,10 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
                 clearFlags |= Flag_NT;
             }
         }
-        else
+        else if((newCSFlags & SD_DirConform) || newCSDPL == cpl)
         {
             // same privilege
             assert(!(flags & Flag_VM));
-            assert((newCSFlags & SD_DirConform) || newCSDPL == cpl);
 
             newCS = (selector & ~3) | cpl; // preserve cpl
             newIP = offset;
@@ -8122,6 +8121,12 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
                 clearFlags |= Flag_I;
     
             clearFlags |= Flag_NT;
+        }
+        else
+        {
+            // bad privilege level
+            fault(Fault::GP, (selector & ~3) | (isInt ? 0 : 1));
+            return;
         }
     }
     else
