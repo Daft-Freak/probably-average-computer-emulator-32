@@ -4436,7 +4436,10 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 case 0x4: // SMSW
                 {
                     reg(Reg32::EIP) += 1;
-                    writeRM16(rm, reg(Reg32::CR0));
+                    if(operandSize32)
+                        writeRM32(rm, reg(Reg32::CR0));
+                    else
+                        writeRM16(rm, reg(Reg32::CR0));
                     break;
                 }
 
