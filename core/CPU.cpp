@@ -8045,18 +8045,16 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
 
                 setSegmentReg(Reg16::SS, newSS);
 
-                assert(gate32);
-
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
                 else
                     reg(Reg16::SP) = newSP;
 
                 // big pile of extra pushes
-                pushSeg(reg(Reg16::GS), true);
-                pushSeg(reg(Reg16::FS), true);
-                pushSeg(reg(Reg16::DS), true);
-                pushSeg(reg(Reg16::ES), true);
+                pushSeg(reg(Reg16::GS), gate32);
+                pushSeg(reg(Reg16::FS), gate32);
+                pushSeg(reg(Reg16::DS), gate32);
+                pushSeg(reg(Reg16::ES), gate32);
 
                 // reset segments
                 setSegmentReg(Reg16::GS, 0);
@@ -8064,13 +8062,13 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
                 setSegmentReg(Reg16::DS, 0);
                 setSegmentReg(Reg16::ES, 0);
 
-                pushSeg(tmpSS, true);
-                push(tmpSP, true);
+                pushSeg(tmpSS, gate32);
+                push(tmpSP, gate32);
 
                 // continue to the usual pushes
                 newCS = selector;
                 newIP = offset;
-                push32 = true;
+                push32 = gate32;
 
                 if(!trapGate)
                     clearFlags |= Flag_I;
