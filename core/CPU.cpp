@@ -7344,7 +7344,11 @@ void CPU::farCall(uint32_t newCS, uint32_t newIP, uint32_t retAddr, bool operand
 
                     auto codeSegOffset = newDesc.limit;
 
-                    if(is32) // reconstruct from wrong layout (we parsed it as a code segment, not a gate...)
+                    // reconstruct from wrong layout (we parsed it as a code segment, not a gate...)
+                    if(newDesc.flags & SD_Granularity)
+                        codeSegOffset >>= 12; // un-apply granularity
+
+                    if(is32)
                         codeSegOffset |=  (newDesc.flags & 0xF000) << 8 | (newDesc.base & 0xFF000000);
                     else
                         codeSegOffset &= 0xFFFF;
