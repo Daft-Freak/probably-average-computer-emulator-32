@@ -4694,6 +4694,7 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
 
                 // also invalidate our special IP cache
                 ipPtrBase = 0;
+                spPtrBase = 0;
             }
 
             reg(Reg32::EIP) += 2;
