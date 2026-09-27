@@ -8115,7 +8115,12 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
         else if((newCSFlags & SD_DirConform) || newCSDPL == cpl)
         {
             // same privilege
-            assert(!(flags & Flag_VM));
+            // virtual-8086 is not valid here
+            if((flags & Flag_VM))
+            {
+                fault(Fault::GP, (selector & ~3) | (isInt ? 0 : 1));
+                return;
+            }
 
             newCS = (selector & ~3) | cpl; // preserve cpl
             newIP = offset;
