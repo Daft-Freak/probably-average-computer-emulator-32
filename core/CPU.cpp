@@ -8015,6 +8015,10 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
         bool gate32 = access & 8;
         bool trapGate = access & 1;
 
+        // 16-bit gates only have 16-bit IP
+        if(!gate32)
+            offset &= 0xFFFF;
+
         auto newCSFlags = loadSegmentDescriptor(selector).flags;
         int newCSDPL = (newCSFlags & SD_PrivilegeLevel) >> 21;
 
