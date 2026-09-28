@@ -6631,7 +6631,7 @@ bool CPU::checkStackSpace(int words, bool op32, bool addr32)
     return checkStackSpace(sp, getCachedSegmentDescriptor(Reg16::SS), words, op32, addr32);
 }
 
-bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32)
+bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32, bool pagePriv)
 {
     int wordSize = op32 ? 4 : 2;
 
@@ -6679,12 +6679,12 @@ bool CPU::checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int word
     sp += ssDesc.base;
 
     uint32_t temp;
-    if(!getPhysicalAddress(sp, temp, true))
+    if(!getPhysicalAddress(sp, temp, true, pagePriv))
         return false;
 
     // check again if we crossed a page boundary
     endSP += ssDesc.base;
-    return (endSP >> 12 == sp >> 12) || getPhysicalAddress(endSP, temp, true);
+    return (endSP >> 12 == sp >> 12) || getPhysicalAddress(endSP, temp, true, pagePriv);
 }
 
 void CPU::validateSegmentsForReturn()
@@ -8122,17 +8122,25 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 if(!getTSSStackPointer(newCSDPL, newSP, newSS))
                     return;
 
-                // avoid faults in setSegmentReg
-                // FIXME: faults here should be TS
-                // FIXME: ... and actually handled...
-                cpl = selector & 3;
+                // FIXME: fault code EXT 
+                if(!checkSegmentSelector(Reg16::SS, newSS, selector & 3, 0, Fault::TS))
+                    return;
 
-                setSegmentReg(Reg16::SS, newSS);
+                // check stack space
+                // (using privileged flag for paging to avoid faults)
+                auto newSSDesc = loadSegmentDescriptor(newSS);
+                if(!checkStackSpace(newSP, newSSDesc, 9 + (withFaultCode ? 1 : 0), gate32, newSSDesc.flags & SD_Size, true))
+                    return;
+
+                setSegmentReg(Reg16::SS, newSS, false);
 
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
                 else
                     reg(Reg16::SP) = newSP;
+
+                // avoid faults in page lookups
+                cpl = selector & 3;
 
                 // big pile of extra pushes
                 pushSeg(reg(Reg16::GS), gate32);
@@ -8168,15 +8176,26 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 if(!getTSSStackPointer(newCSDPL, newSP, newSS))
                     return;
 
-                // same as above
-                cpl = newCSDPL;
+                // FIXME: fault code EXT 
+                if(!checkSegmentSelector(Reg16::SS, newSS, newCSDPL, 0, Fault::TS))
+                    return;
 
-                setSegmentReg(Reg16::SS, newSS);
+                // check stack space
+                // (using privileged flag for paging to avoid faults)
+                auto newSSDesc = loadSegmentDescriptor(newSS);
+                if(!checkStackSpace(newSP, newSSDesc, 5 + (withFaultCode ? 1 : 0), gate32, newSSDesc.flags & SD_Size, true))
+                    return;
+
+                // can simplify this...
+                setSegmentReg(Reg16::SS, newSS, false);
 
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
                 else
                     reg(Reg16::SP) = newSP;
+
+                // same as above
+                cpl = newCSDPL;
 
                 push(tmpSS, gate32);
                 push(tmpSP, gate32);
@@ -8212,6 +8231,9 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 clearFlags |= Flag_I;
     
             clearFlags |= Flag_NT;
+
+            if(!checkStackSpace(3 + (withFaultCode ? 1 : 0), gate32, stackAddrSize32))
+                return;
         }
         else
         {

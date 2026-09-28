@@ -231,7 +231,7 @@ private:
     bool checkSegmentAccess(Reg16 segment, uint32_t offset, int width, bool write);
 
     bool checkStackSpace(int words, bool op32, bool addr32);
-    bool checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32);
+    bool checkStackSpace(uint32_t sp, const SegmentDescriptor &ssDesc, int words, bool op32, bool addr32, bool pagePriv=false);
 
     void validateSegmentsForReturn();
 
