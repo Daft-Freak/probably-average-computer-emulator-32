@@ -305,10 +305,11 @@ private:
 
     bool taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource source);
 
-    void serviceInterrupt(uint8_t vector, bool isInt = false);
+    void serviceInterrupt(uint8_t vector, bool isInt = false, bool withFaultCode = false);
 
-    void fault(Fault fault);
+    void fault(Fault fault, bool withCode = false);
     void fault(Fault fault, uint32_t code);
+    void fault(Fault fault, int code) {this->fault(fault, uint32_t(code));} // disambiguate fault(..., 0)
 
     // internal state
 

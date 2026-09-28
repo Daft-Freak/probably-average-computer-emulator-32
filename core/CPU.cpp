@@ -8018,7 +8018,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     return true;
 }
 
-void CPU::serviceInterrupt(uint8_t vector, bool isInt)
+void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
 {
     auto push = [this](uint32_t val, bool is32)
     {
@@ -8253,16 +8253,17 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
     halted = false;
 }
 
-void CPU::fault(Fault fault)
+void CPU::fault(Fault fault, bool withCode)
 {
     reg(Reg32::EIP) = faultIP; // return address should be at the start of the instruction
-    serviceInterrupt(static_cast<int>(fault));
+    serviceInterrupt(static_cast<int>(fault), false, withCode);
 }
 
 void CPU::fault(Fault fault, uint32_t code)
 {
-    this->fault(fault);
+    bool withCode = isProtectedMode();
+    this->fault(fault, withCode);
     // might have changed the stack address size
-    if(isProtectedMode())
+    if(withCode)
         doPush(code, isOperandSize32(false), stackAddrSize32);
 }
