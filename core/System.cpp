@@ -334,7 +334,7 @@ void Chipset::write(uint16_t addr, uint8_t data)
                     if(mode != 1 && mode != 5)
                     {
                         if(channel == 2)
-                            updateSpeaker(sys.getCycleCount());
+                            updateSpeaker(pit.lastUpdateCycle);
 
                         pit.active |= (1 << channel);
                         pit.counter[channel] = pit.reload[channel];
@@ -546,8 +546,9 @@ void Chipset::dmaWrite(int ch, uint8_t data)
 void Chipset::updateForDisplay()
 {
     // PIT may update speaker, so we need to run that first
+    // use the last updated cycle from the PIT to avoid getting ahead
     updatePIT();
-    updateSpeaker(sys.getCycleCount());
+    updateSpeaker(pit.lastUpdateCycle);
 }
 
 void Chipset::dmaRequest(int ch, bool active, IODevice *dev)
