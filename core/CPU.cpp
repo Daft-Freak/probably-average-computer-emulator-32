@@ -8108,7 +8108,7 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
 
         if(!(newCSFlags & SD_DirConform) && newCSDPL < cpl)
         {
-            if(flags & Flag_VM) // from virtual-8006
+            if(flags & Flag_VM) // from virtual-8086
             {
                 // clear VM early
                 flags &= ~Flag_VM;
@@ -8132,7 +8132,10 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 if(!checkStackSpace(newSP, newSSDesc, 9 + (withFaultCode ? 1 : 0), gate32, newSSDesc.flags & SD_Size, true))
                     return;
 
-                setSegmentReg(Reg16::SS, newSS, false);
+                // set new SS
+                getCachedSegmentDescriptor(Reg16::SS) = newSSDesc;
+                reg(Reg16::SS) = newSS;
+                stackAddrSize32 = newSSDesc.flags & SD_Size;
 
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
@@ -8186,8 +8189,10 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 if(!checkStackSpace(newSP, newSSDesc, 5 + (withFaultCode ? 1 : 0), gate32, newSSDesc.flags & SD_Size, true))
                     return;
 
-                // can simplify this...
-                setSegmentReg(Reg16::SS, newSS, false);
+                // set new SS
+                getCachedSegmentDescriptor(Reg16::SS) = newSSDesc;
+                reg(Reg16::SS) = newSS;
+                stackAddrSize32 = newSSDesc.flags & SD_Size;
 
                 if(stackAddrSize32)
                     reg(Reg32::ESP) = newSP;
