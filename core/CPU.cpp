@@ -1397,6 +1397,11 @@ inline void CPU::doExecuteInstruction()
                 readMemSP32(sp + ssDesc.base, reg(Reg32::EDX)); sp += 4; if(mask) sp &= 0xFFFF;
                 readMemSP32(sp + ssDesc.base, reg(Reg32::ECX)); sp += 4; if(mask) sp &= 0xFFFF;
                 readMemSP32(sp + ssDesc.base, reg(Reg32::EAX)); sp += 4; if(mask) sp &= 0xFFFF;
+
+                // the SP value is actually popped, but the final value overrides it
+                // this is only noticeable if the stack address size is smaller than the operand size
+                if(!stackAddrSize32)
+                    reg(Reg32::ESP) = v;
             }
             else
             {
