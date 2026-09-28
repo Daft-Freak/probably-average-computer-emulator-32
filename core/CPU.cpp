@@ -7844,14 +7844,29 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
 
     assert(!(curTSSDesc.flags & SD_Type));
     assert(curTSSType == SD_SysTypeBusyTSS16 || curTSSType == SD_SysTypeBusyTSS32); // the current TSS should be busy?
-    
-    if(curTSSType == SD_SysTypeBusyTSS32 || curTSSType == SD_SysTypeTSS32 || sysType == SD_SysTypeTSS32)
-    {
-        printf("task switch 32\n");
-        exit(1);
-    }
 
-    if(curTSSType == SD_SysTypeTSS16 || curTSSType == SD_SysTypeBusyTSS16)
+    if(curTSSType == SD_SysTypeBusyTSS32 || curTSSType == SD_SysTypeTSS32)
+    {
+        writeMem32(curTSSDesc.base + 0x20, retAddr, true); // IP
+        writeMem32(curTSSDesc.base + 0x24, getFlags(), true);
+
+        writeMem32(curTSSDesc.base + 0x28, reg(Reg32::EAX), true);
+        writeMem32(curTSSDesc.base + 0x2C, reg(Reg32::ECX), true);
+        writeMem32(curTSSDesc.base + 0x30, reg(Reg32::EDX), true);
+        writeMem32(curTSSDesc.base + 0x34, reg(Reg32::EBX), true);
+        writeMem32(curTSSDesc.base + 0x38, reg(Reg32::ESP), true);
+        writeMem32(curTSSDesc.base + 0x3C, reg(Reg32::EBP), true);
+        writeMem32(curTSSDesc.base + 0x40, reg(Reg32::ESI), true);
+        writeMem32(curTSSDesc.base + 0x44, reg(Reg32::EDI), true);
+
+        writeMem32(curTSSDesc.base + 0x48, reg(Reg16::ES), true);
+        writeMem32(curTSSDesc.base + 0x4C, reg(Reg16::CS), true);
+        writeMem32(curTSSDesc.base + 0x50, reg(Reg16::SS), true);
+        writeMem32(curTSSDesc.base + 0x54, reg(Reg16::DS), true);
+        writeMem32(curTSSDesc.base + 0x58, reg(Reg16::FS), true);
+        writeMem32(curTSSDesc.base + 0x5C, reg(Reg16::GS), true);
+    }
+    else if(curTSSType == SD_SysTypeTSS16 || curTSSType == SD_SysTypeBusyTSS16)
     {
         writeMem16(curTSSDesc.base + 0x0e, retAddr, true); // IP
         writeMem16(curTSSDesc.base + 0x10, getFlags(), true);
@@ -7900,7 +7915,45 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
         writeMem16(tssDesc.base + 0, oldTR);
 
     // load registers from new task
-    if(sysType == SD_SysTypeTSS16)
+    if(sysType == SD_SysTypeTSS32)
+    {
+        uint32_t tmp;
+        readMem32(tssDesc.base + 0x24, tmp, true);
+        updateFlags(tmp, 0xFFFFFFFF, true);
+
+        readMem32(tssDesc.base + 0x28, reg(Reg32::EAX), true);
+        readMem32(tssDesc.base + 0x2C, reg(Reg32::ECX), true);
+        readMem32(tssDesc.base + 0x30, reg(Reg32::EDX), true);
+        readMem32(tssDesc.base + 0x34, reg(Reg32::EBX), true);
+        readMem32(tssDesc.base + 0x38, reg(Reg32::ESP), true);
+        readMem32(tssDesc.base + 0x3C, reg(Reg32::EBP), true);
+        readMem32(tssDesc.base + 0x40, reg(Reg32::ESI), true);
+        readMem32(tssDesc.base + 0x44, reg(Reg32::EDI), true);
+
+        // load CR3 if paging enabled
+        if(reg(Reg32::CR0) & (1 << 31))
+            readMem32(tssDesc.base + 0x1C, reg(Reg32::CR3), true);
+
+        readMem32(tssDesc.base + 0x20, reg(Reg32::EIP), true);
+
+        // load LDT before the segment selectors so local selectors use the correct table
+        if(!readMem16(tssDesc.base + 0x60, tmp) || !setLDT(tmp))
+            return false;
+
+        if(!readMem16(tssDesc.base + 0x48, tmp, true) || !setSegmentReg(Reg16::ES, tmp))
+            return false;
+        if(!readMem16(tssDesc.base + 0x4C, tmp, true) || !setSegmentReg(Reg16::CS, tmp))
+            return false;
+        if(!readMem16(tssDesc.base + 0x50, tmp, true) || !setSegmentReg(Reg16::SS, tmp))
+            return false;
+        if(!readMem16(tssDesc.base + 0x54, tmp, true) || !setSegmentReg(Reg16::DS, tmp))
+            return false;
+        if(!readMem16(tssDesc.base + 0x58, tmp, true) || !setSegmentReg(Reg16::FS, tmp))
+            return false;
+        if(!readMem16(tssDesc.base + 0x5C, tmp, true) || !setSegmentReg(Reg16::GS, tmp))
+            return false;
+    }
+    else if(sysType == SD_SysTypeTSS16)
     {
         uint16_t tmp;
         readMem16(tssDesc.base + 0x10, tmp, true);
