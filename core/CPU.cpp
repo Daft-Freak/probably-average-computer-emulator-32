@@ -7915,6 +7915,16 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
         readMem16(tssDesc.base + 0x1e, reg(Reg16::SI), true);
         readMem16(tssDesc.base + 0x20, reg(Reg16::DI), true);
 
+        // upper bits of registers are not preserved
+        reg(Reg32::EAX) |= 0xFFFF0000;
+        reg(Reg32::ECX) |= 0xFFFF0000;
+        reg(Reg32::EDX) |= 0xFFFF0000;
+        reg(Reg32::EBX) |= 0xFFFF0000;
+        reg(Reg32::ESP) |= 0xFFFF0000;
+        reg(Reg32::EBP) |= 0xFFFF0000;
+        reg(Reg32::ESI) |= 0xFFFF0000;
+        reg(Reg32::EDI) |= 0xFFFF0000;
+
         readMem16(tssDesc.base + 0x0e, tmp, true);
         reg(Reg32::EIP) = tmp;
 
@@ -7931,6 +7941,9 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
             return false;
         if(!readMem16(tssDesc.base + 0x28, tmp, true) || !setSegmentReg(Reg16::DS, tmp))
             return false;
+
+        setSegmentReg(Reg16::FS, 0);
+        setSegmentReg(Reg16::GS, 0);
     }
 
     // check ip
