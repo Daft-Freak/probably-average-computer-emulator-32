@@ -8076,10 +8076,19 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt)
             return;
         }
 
-        if(gateType == 0x5)
+        // task gate
+        if(gateType == SD_SysTypeTaskGate >> 16)
         {
-            printf("protected mode interrupt task gate selector %04X\n", selector);
-            exit(1);
+            // must be in GDT
+            if((selector & 4)/*local*/ || (selector | 7) > gdtLimit)
+            {
+                fault(Fault::TS, selector & ~3);
+                return;
+            }
+
+            taskSwitch(selector, reg(Reg32::EIP), TaskSwitchSource::Call);
+
+            return;
         }
 
         bool gate32 = access & 8;
