@@ -8020,14 +8020,31 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
 
 void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
 {
-    auto push = [this](uint32_t val, bool is32)
+    uint32_t newSP = stackAddrSize32 ? reg(Reg32::ESP) : reg(Reg16::SP);
+    uint32_t newSSBase = getCachedSegmentDescriptor(Reg16::SS).base;
+
+    // simplified push helpers
+    auto push = [&, this](uint32_t val, bool op32)
     {
-        doPush(val, is32, stackAddrSize32);
+        if(newSP == 0 && !stackAddrSize32)
+            newSP = op32 ? 0xFFFC : 0xFFFE; // 16-bit wrap if SP was 0
+        else
+            newSP -= op32 ? 4 : 2;
+
+        if(op32)
+            writeMemSP32(newSP + newSSBase, val);
+        else
+            writeMemSP16(newSP + newSSBase, val);
     };
 
-    auto pushSeg = [this](uint32_t val, bool is32)
+    auto pushSeg = [&, this](uint32_t val, bool op32)
     {
-        doPush(val, is32, stackAddrSize32, true);
+        if(newSP == 0 && !stackAddrSize32)
+            newSP = op32 ? 0xFFFC : 0xFFFE; // 16-bit wrap if SP was 0
+        else
+            newSP -= op32 ? 4 : 2;
+
+        writeMemSP16(newSP + newSSBase, val);
     };
 
     auto tempFlags = getFlags();
@@ -8117,7 +8134,6 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 auto tmpSP = reg(Reg32::ESP);
 
                 // restore SS:ESP from TSS
-                uint32_t newSP;
                 uint16_t newSS;
                 if(!getTSSStackPointer(newCSDPL, newSP, newSS))
                     return;
@@ -8136,11 +8152,7 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 getCachedSegmentDescriptor(Reg16::SS) = newSSDesc;
                 reg(Reg16::SS) = newSS;
                 stackAddrSize32 = newSSDesc.flags & SD_Size;
-
-                if(stackAddrSize32)
-                    reg(Reg32::ESP) = newSP;
-                else
-                    reg(Reg16::SP) = newSP;
+                newSSBase = newSSDesc.base;
 
                 // avoid faults in page lookups
                 cpl = selector & 3;
@@ -8174,7 +8186,6 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 auto tmpSP = reg(Reg32::ESP);
 
                 // restore SS:ESP from TSS
-                uint32_t newSP;
                 uint16_t newSS;
                 if(!getTSSStackPointer(newCSDPL, newSP, newSS))
                     return;
@@ -8193,11 +8204,7 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
                 getCachedSegmentDescriptor(Reg16::SS) = newSSDesc;
                 reg(Reg16::SS) = newSS;
                 stackAddrSize32 = newSSDesc.flags & SD_Size;
-
-                if(stackAddrSize32)
-                    reg(Reg32::ESP) = newSP;
-                else
-                    reg(Reg16::SP) = newSP;
+                newSSBase = newSSDesc.base;
 
                 // same as above
                 cpl = newCSDPL;
@@ -8276,6 +8283,12 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
 
     setSegmentReg(Reg16::CS, newCS);
     reg(Reg32::EIP) = newIP;
+
+    // set stack now that we're done pushing things
+    if(stackAddrSize32)
+        reg(Reg32::ESP) = newSP;
+    else
+        reg(Reg16::SP) = newSP;
 
     halted = false;
 }
