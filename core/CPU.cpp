@@ -7904,7 +7904,7 @@ bool CPU::taskSwitch(uint16_t selector, uint32_t retAddr, TaskSwitchSource sourc
     {
         uint16_t tmp;
         readMem16(tssDesc.base + 0x10, tmp, true);
-        updateFlags(tmp, 0xFFFF, true);
+        updateFlags(tmp, 0xFFFF | Flag_VM, true); // make sure we clear VM
 
         readMem16(tssDesc.base + 0x12, reg(Reg16::AX), true);
         readMem16(tssDesc.base + 0x14, reg(Reg16::CX), true);
