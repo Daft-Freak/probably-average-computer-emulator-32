@@ -198,7 +198,7 @@ static void seesaw_alarm_callback(uint alarm_num)
     }
 }
 
-void seesaw_init()
+static void seesaw_init()
 {
     // state
     gpioState = ~0;
@@ -286,7 +286,7 @@ void seesaw_init()
     seesaw_alarm_callback(alarmNum);
 }
 
-void seesaw_update()
+static void seesaw_update()
 {
     // dont do anything while we're still updating
     if(state != SeesawState::Done)
@@ -323,3 +323,8 @@ void seesaw_update()
     state = SeesawState::GPIORequest;
     seesaw_alarm_callback(alarmNum);
 }
+
+const I2CDriver seesawDriver
+{
+    seesaw_init, seesaw_update
+};

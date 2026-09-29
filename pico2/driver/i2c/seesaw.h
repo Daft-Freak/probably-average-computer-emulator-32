@@ -1,4 +1,5 @@
 #pragma once
 
-void seesaw_init();
-void seesaw_update();
+#include "i2c.h"
+
+extern const I2CDriver seesawDriver;

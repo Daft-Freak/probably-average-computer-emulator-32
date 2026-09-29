@@ -74,6 +74,11 @@ static int rtcSeconds = 0;
 
 static bool wifiConnected = false;
 
+static const I2CDriver *i2cDrivers[]
+{
+    &seesawDriver
+};
+
 static void initWifi(const char *ssid, const char *pass);
 
 static void ntpRequest(const char *addr);
@@ -448,8 +453,9 @@ static void initHardware()
     gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
 
-    // TODO: put these in a list (when there's more than one driver)
-    seesaw_init();
+    // init i2c drivers
+    for(auto &driver : i2cDrivers)
+        driver->init();
 #endif
 
     init_display();
@@ -655,8 +661,8 @@ int main()
         }
 
 #ifdef DEFAULT_I2C_CLOCK
-        // TODO: put these in a list (when there's more than one driver)
-        seesaw_update();
+        for(auto &driver : i2cDrivers)
+            driver->update();
 #endif
 
         tuh_task();
