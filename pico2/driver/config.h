@@ -1,18 +1,5 @@
 #pragma once
 
-// PSRAM config first as that only depends on the board
-// and not any additional thing it's plugged into
-#ifdef PIMORONI_PICO_PLUS2_RP2350
-#define PSRAM_CS_PIN PIMORONI_PICO_PLUS2_PSRAM_CS_PIN
-#elif defined(PIMORONI_PICO_PLUS2_W_RP2350)
-#define PSRAM_CS_PIN PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
-#elif defined(SOLDERPARTY_RP2350_STAMP_XL)
-#define PSRAM_CS_PIN 8
-#elif defined(ADAFRUIT_FRUIT_JAM)
-#define PSRAM_CS_PIN 47
-#elif !defined(DISABLE_PSRAM)
-#error "No PSRAM CS!"
-#endif
 
 #ifdef EXTRA_BOARD_STAMP_CARRIER
 #define DVI_CLK_P 14

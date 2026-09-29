@@ -8,6 +8,7 @@
 #include "hardware/dma.h"
 #include "hardware/i2c.h"
 #include "hardware/irq.h"
+#include "hardware/psram.h"
 #include "hardware/timer.h"
 #include "hardware/vreg.h"
 #include "pico/multicore.h"
@@ -19,7 +20,6 @@
 #include "fatfs/ff.h"
 
 #include "config.h"
-#include "psram.h"
 
 // need to include this after config.h
 #ifdef PIO_USB_HOST
@@ -43,6 +43,8 @@
 #include "Scancode.h"
 #include "System.h"
 #include "VGACard.h"
+
+#define PSRAM_LOCATION (XIP_BASE + _u(0x1000000))
 
 // if any of the LED pins are defined, all of them should be
 #ifdef DISK_IO_FD0_LED_PIN
@@ -455,7 +457,10 @@ static void initHardware()
 
     initPreBIOSVGA();
 
-    size_t psramSize = psram_init(PSRAM_CS_PIN);
+    // we just messed with the clocks so reconfigure psram
+    psram_configure_params(PICO_DEFAULT_PSRAM_MAX_FREQ, PICO_DEFAULT_PSRAM_MAX_SELECT, PICO_DEFAULT_PSRAM_MIN_DESELECT);
+    psram_reinitialize();
+    size_t psramSize = psram_get_size();
 
     vgaPrintf(0, 0, "Detected %i bytes PSRAM", psramSize);
 

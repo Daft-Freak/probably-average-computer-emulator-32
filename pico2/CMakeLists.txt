@@ -112,6 +112,7 @@ target_link_libraries(PACEPico2
     hardware_dma
     hardware_i2c
     hardware_pio
+    hardware_psram
     hardware_pwm
     hardware_spi
 
