@@ -34,6 +34,7 @@
 #include "Display.h"
 #include "wifi_nina.h"
 
+#include "i2c/ds3231m.h"
 #include "i2c/seesaw.h"
 
 #include "ATAController.h"
@@ -71,11 +72,13 @@ static FileATAIO ataPrimaryIO;
 static FileFloppyIO floppyIO;
 
 static int rtcSeconds = 0;
+RTCDateTime rtcInitTime = {};
 
 static bool wifiConnected = false;
 
 static const I2CDriver *i2cDrivers[]
 {
+    &ds3231mDriver,
     &seesawDriver
 };
 
@@ -612,7 +615,10 @@ static void initEmulator()
     sys.reset();
 
     // set an initial time
-    sys.getChipset().setRTC(28, 21, 14, 11, 9, 2025);
+    if(rtcInitTime.year)
+        sys.getChipset().setRTC(rtcInitTime.seconds, rtcInitTime.minutes, rtcInitTime.hours, rtcInitTime.days, rtcInitTime.month, rtcInitTime.year);
+    else
+        sys.getChipset().setRTC(28, 21, 14, 11, 9, 2025);
 
     if(!readConfigFile())
     {

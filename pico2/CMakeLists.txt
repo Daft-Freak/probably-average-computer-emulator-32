@@ -12,6 +12,7 @@ add_executable(PACEPico2
     USBHID.cpp
 
     driver/wifi_nina.cpp
+    driver/i2c/ds3231m.cpp
     driver/i2c/seesaw.cpp
 
     fatfs/ff.c
