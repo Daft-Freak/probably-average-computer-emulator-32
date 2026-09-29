@@ -101,8 +101,7 @@ pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/driver/i2s.pio)
 pico_generate_pio_header(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/spi.pio)
 
 #custom linker script (puts all of CPU.cpp in RAM)
-set_target_properties(PACEPico2 PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
-pico_add_link_depend(PACEPico2 ${CMAKE_CURRENT_LIST_DIR}/memmap.ld)
+pico_add_linker_script_override_path(PACEPico2 ${CMAKE_CURRENT_LIST_DIR})
 
 # usual setup
 target_link_libraries(PACEPico2
