@@ -20,4 +20,4 @@ struct RTCDateTime
     uint16_t year;
 };
 
-extern RTCDateTime rtcInitTime;
+extern RTCDateTime rtcSyncTime;

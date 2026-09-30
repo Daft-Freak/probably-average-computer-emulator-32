@@ -72,7 +72,7 @@ static FileATAIO ataPrimaryIO;
 static FileFloppyIO floppyIO;
 
 static int rtcSeconds = 0;
-RTCDateTime rtcInitTime = {};
+RTCDateTime rtcSyncTime = {};
 
 static bool wifiConnected = false;
 
@@ -217,6 +217,20 @@ static void core1Main()
         {
             rtcSeconds--; // probably overkill as we shouldn't get stuck in the CPU for a second...
             sys.getChipset().updateRTC();
+        
+            // also check if we need to sync with the real RTC
+            if(sys.getChipset().getRTCDirty())
+            {
+                int sec, min, hour, day, mon, year;
+                sys.getChipset().getRTC(sec, min, hour, day, mon, year);
+                rtcSyncTime.seconds = sec;
+                rtcSyncTime.minutes = min;
+                rtcSyncTime.hours = hour;
+                rtcSyncTime.days = day;
+                rtcSyncTime.month = mon;
+                rtcSyncTime.year = year;
+                sys.getChipset().clearRTCDirty();
+            }
         }
     }
 }
@@ -615,10 +629,12 @@ static void initEmulator()
     sys.reset();
 
     // set an initial time
-    if(rtcInitTime.year)
-        sys.getChipset().setRTC(rtcInitTime.seconds, rtcInitTime.minutes, rtcInitTime.hours, rtcInitTime.days, rtcInitTime.month, rtcInitTime.year);
+    if(rtcSyncTime.year)
+        sys.getChipset().setRTC(rtcSyncTime.seconds, rtcSyncTime.minutes, rtcSyncTime.hours, rtcSyncTime.days, rtcSyncTime.month, rtcSyncTime.year);
     else
         sys.getChipset().setRTC(28, 21, 14, 11, 9, 2025);
+
+    rtcSyncTime = {};
 
     if(!readConfigFile())
     {
@@ -669,6 +685,9 @@ int main()
 #ifdef DEFAULT_I2C_CLOCK
         for(auto &driver : i2cDrivers)
             driver->update();
+
+        // clear rtc sync time
+        rtcSyncTime = {};
 #endif
 
         tuh_task();
