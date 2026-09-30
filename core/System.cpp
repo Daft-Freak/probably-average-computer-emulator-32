@@ -453,8 +453,11 @@ void Chipset::write(uint16_t addr, uint8_t data)
         }
         case 0x71: // CMOS data
         {
-            printf("CMOS W %x = %02X\n", cmosIndex, data);
             cmosRam[cmosIndex] = data;
+
+            if(cmosIndex <= 9 || cmosIndex == 0x32)
+                rtcDirty = true;
+
             break;
         }
 
@@ -875,6 +878,27 @@ void Chipset::setTotalMemory(uint32_t size)
     cmosRam[0x31] = extMemKB >> 8;
 }
 
+void Chipset::getRTC(int &seconds, int &minutes, int &hours, int &days, int &month, int &year)
+{
+    bool bcd = !(cmosRam[0xB] & (1 << 2));
+    auto getRTCVal = [this, bcd](int index)
+    {
+        uint8_t ret = cmosRam[index];
+
+        if(bcd)
+            ret = (ret & 0xF) + (ret >> 4) * 10;
+
+        return ret;
+    };
+
+    seconds = getRTCVal(0);
+    minutes = getRTCVal(2);
+    hours = getRTCVal(4);
+    days = getRTCVal(7);
+    month = getRTCVal(8);
+    year = getRTCVal(9) + getRTCVal(0x32) * 100;
+}
+
 void Chipset::setRTC(int seconds, int minutes, int hours, int days, int month, int year)
 {
     bool bcd = !(cmosRam[0xB] & (1 << 2));
@@ -992,6 +1016,16 @@ void Chipset::updateRTC()
         cmosRam[0xC] |= 1 << 4;
         flagPICInterrupt(8);
     }
+}
+
+bool Chipset::getRTCDirty() const
+{
+    return rtcDirty;
+}
+
+void Chipset::clearRTCDirty()
+{
+    rtcDirty = false;
 }
 
 uint8_t Chipset::PIC::read(int index)

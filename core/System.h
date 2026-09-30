@@ -85,8 +85,11 @@ public:
     void setFixedDiskPresent(int index, bool present);
     void setTotalMemory(uint32_t size);
 
+    void getRTC(int &seconds, int &minutes, int &hours, int &days, int &month, int &year);
     void setRTC(int seconds, int minutes, int hours, int days, int month, int year);
     void updateRTC();
+    bool getRTCDirty() const;
+    void clearRTCDirty();
 
 private:
     struct DMA
@@ -186,6 +189,7 @@ private:
 
     uint8_t cmosIndex = 0; // 70
     uint8_t cmosRam[128];
+    bool rtcDirty = false; // if time has been written
 
     uint8_t systemControlA = 0; // 92
     uint8_t systemControlB = 0; // 61
