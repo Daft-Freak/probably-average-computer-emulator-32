@@ -144,3 +144,12 @@ if(COOK_MY_CHIPS)
     pico_set_boot_stage2(PACEPico2 flash_clkdiv4)
     target_compile_definitions(PACEPico2 PRIVATE OVERCLOCK_500)
 endif()
+
+# overclock to 360Mhz at 1.3v using USB PLL
+if(WARM_MY_CHIPS)
+    pico_define_boot_stage2(flash_clkdiv3 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+    target_compile_definitions(flash_clkdiv3 PRIVATE PICO_FLASH_SPI_CLKDIV=3 PICO_FLASH_SPI_RXDELAY=3)
+
+    pico_set_boot_stage2(PACEPico2 flash_clkdiv3)
+    target_compile_definitions(PACEPico2 PRIVATE OVERCLOCK_360)
+endif()

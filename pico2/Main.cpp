@@ -428,6 +428,57 @@ static int vgaPrintf(int x, int y, const char *format, ...)
     return ret;
 }
 
+#if defined(OVERCLOCK_360)
+static void reconfigureSysToUSBPLL()
+{
+    // PLL_USB = 720MHz, CLK_SYS = 360MHz, CLK_PERI = 180MHz
+    const unsigned usbVCO = 1440 * MHZ;
+    const unsigned usbPostDiv1 = 2;
+    const unsigned usbPostDiv2 = 1;
+    const unsigned usbPLLHz = usbVCO / usbPostDiv1 / usbPostDiv2;
+
+    const unsigned clkSysHz = usbPLLHz / 2;
+
+    // stop clocks that might be using the USB PLL
+    clock_stop(clk_usb);
+    clock_stop(clk_adc);
+    clock_stop(clk_peri);
+
+    // reinit usb PLL
+    pll_init(pll_usb, PLL_USB_REFDIV, usbVCO, usbPostDiv1, usbPostDiv2);
+
+    // move clk_sys
+    clock_configure(clk_sys,
+        CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+        CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+        usbPLLHz, clkSysHz
+    );
+
+    // set usb and adc back to 48MHz
+    clock_configure(clk_usb,
+        0, // No GLMUX
+        CLOCKS_CLK_USB_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+        usbPLLHz,
+        USB_CLK_HZ
+    );
+
+    clock_configure(clk_adc,
+        0, // No GLMUX
+        CLOCKS_CLK_USB_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+        usbPLLHz,
+        USB_CLK_HZ
+    );
+
+    // set peri to sys/2 (we don't rely on it being fast)
+    clock_configure(clk_peri,
+        0, // No GLMUX
+        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+        clkSysHz,
+        clkSysHz / 2
+    );
+}
+#endif
+
 static void initHardware()
 {
 #ifdef OVERCLOCK_500
@@ -436,6 +487,13 @@ static void initHardware()
     vreg_set_voltage(VREG_VOLTAGE_1_60);
     sleep_ms(10);
     set_sys_clock_khz(504000, true);
+#elif defined(OVERCLOCK_360)
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
+    sleep_ms(10);
+    set_sys_clock_khz(252000, false); // keep using the "original" clock for display
+
+    // shuffle clocks and PLLs around to get 360MHz CLK_SYS
+    reconfigureSysToUSBPLL();
 #else
     // PIO USB wants a multiple of 12, HSTX wants a multiple of ~125 (25.175 * 10 / 2)
     set_sys_clock_khz(252000, false);
