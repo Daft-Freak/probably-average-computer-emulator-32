@@ -162,6 +162,36 @@ static bool rtcTimerCallback(repeating_timer *t)
     return true;
 }
 
+// core 1 main emulator loop
+static void __no_inline_not_in_flash_func(core1Loop)()
+{
+    while(true)
+    {
+        sys.getCPU().run(10);
+        sys.getChipset().updateForDisplay();
+
+        if(rtcSeconds)
+        {
+            rtcSeconds--; // probably overkill as we shouldn't get stuck in the CPU for a second...
+            sys.getChipset().updateRTC();
+        
+            // also check if we need to sync with the real RTC
+            if(sys.getChipset().getRTCDirty())
+            {
+                int sec, min, hour, day, mon, year;
+                sys.getChipset().getRTC(sec, min, hour, day, mon, year);
+                rtcSyncTime.seconds = sec;
+                rtcSyncTime.minutes = min;
+                rtcSyncTime.hours = hour;
+                rtcSyncTime.days = day;
+                rtcSyncTime.month = mon;
+                rtcSyncTime.year = year;
+                sys.getChipset().clearRTCDirty();
+            }
+        }
+    }
+}
+
 static void core1Main()
 {
     // configure clock PIO program
@@ -208,31 +238,7 @@ static void core1Main()
 #endif
 
     // run
-    while(true)
-    {
-        sys.getCPU().run(10);
-        sys.getChipset().updateForDisplay();
-
-        if(rtcSeconds)
-        {
-            rtcSeconds--; // probably overkill as we shouldn't get stuck in the CPU for a second...
-            sys.getChipset().updateRTC();
-        
-            // also check if we need to sync with the real RTC
-            if(sys.getChipset().getRTCDirty())
-            {
-                int sec, min, hour, day, mon, year;
-                sys.getChipset().getRTC(sec, min, hour, day, mon, year);
-                rtcSyncTime.seconds = sec;
-                rtcSyncTime.minutes = min;
-                rtcSyncTime.hours = hour;
-                rtcSyncTime.days = day;
-                rtcSyncTime.month = mon;
-                rtcSyncTime.year = year;
-                sys.getChipset().clearRTCDirty();
-            }
-        }
-    }
+    core1Loop();
 }
 
 static bool readConfigFile()
