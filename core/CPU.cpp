@@ -3375,6 +3375,10 @@ inline void CPU::doExecuteInstruction()
             break;
         }
 
+        case 0xD6: // SALC
+            reg(Reg8::AL) = (statusFlags & Flag_C) ? 0xFF : 0;
+            break;
+
         case 0xD7: // XLAT
         {
             uint32_t memAddr;
