@@ -8090,7 +8090,12 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
         uint16_t selector = descBytes[2] | descBytes[3] << 8;
         uint8_t access = descBytes[5];
 
-        assert(access & (1 << 7)); // present
+        // valid gate type (5-7, E, F)
+        if((access & 7) <= 4)
+        {
+            fault(Fault::GP, addr | 2 | (isInt ? 0 : 1));
+            return;
+        }
 
         auto gateType = access & 0xF;
         int gateDPL = (access >> 5) & 3;
@@ -8099,6 +8104,13 @@ void CPU::serviceInterrupt(uint8_t vector, bool isInt, bool withFaultCode)
         if(isInt && gateDPL < cpl)
         {
             fault(Fault::GP, vector << 3 | 2/*IDT*/);
+            return;
+        }
+
+        // present
+        if(!(access & (1 << 7)))
+        {
+            fault(Fault::NP, vector << 3 | 2/*IDT*/ | (isInt ? 0 : 1));
             return;
         }
 
