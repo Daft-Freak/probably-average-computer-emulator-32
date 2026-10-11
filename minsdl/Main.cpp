@@ -37,6 +37,8 @@ static FileATAIO ataPrimaryIO;
 
 static std::list<std::string> nextFloppyImage;
 
+static SDL_TimerID rtcTimerId = 0;
+
 static ATScancode scancodeMap[SDL_SCANCODE_COUNT]
 {
     ATScancode::Invalid,
@@ -329,6 +331,12 @@ static Uint64 systemTimerCallback(void *userdata, SDL_TimerID timerID, Uint64 in
     return interval;
 }
 
+static Uint64 rtcTimerCallback(void *userdata, SDL_TimerID timerID, Uint64 interval)
+{
+    reinterpret_cast<System *>(userdata)->getChipset().setPICInput(8, true);
+    return interval;
+}
+
 static void pollEvents()
 {
     const int escMod = SDL_KMOD_RCTRL | SDL_KMOD_RSHIFT;
@@ -447,6 +455,18 @@ static void speakerCallback(int8_t sample)
     SDL_PutAudioStreamData(audioStream, &sample16, sizeof(sample16));
 }
 
+static void rtcInterruptConfigCallback(bool enabled, int freq)
+{
+    if(rtcTimerId)
+    {
+        SDL_RemoveTimer(rtcTimerId);
+        rtcTimerId = 0;
+    }
+
+    if(enabled)
+        rtcTimerId = SDL_AddTimerNS(1000000000/freq, rtcTimerCallback, &sys);
+}
+
 int main(int argc, char *argv[])
 {
     int screenWidth = 640;
@@ -509,6 +529,7 @@ int main(int argc, char *argv[])
     sys.addMemory(0, sizeof(ram), ram);
 
     sys.getChipset().setSpeakerAudioCallback(speakerCallback);
+    sys.getChipset().setRTCInterruptConfigCallback(rtcInterruptConfigCallback);
 
     std::ifstream biosFile(basePath + biosPath, std::ios::binary);
 
