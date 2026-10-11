@@ -161,6 +161,9 @@ uint8_t Chipset::read(uint16_t addr)
         case 0x71: // CMOS data
             if(cmosIndex == 0xA)
                 cmosRam[cmosIndex] ^= 0x80; // flip the "update in progress" bit every read
+            // reading reg C clears interrupts
+            if(cmosIndex == 0x0C)
+                setPICInput(8, 0);
 
             return cmosRam[cmosIndex];
 
