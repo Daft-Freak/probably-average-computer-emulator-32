@@ -6254,8 +6254,9 @@ CPU::SegmentDescriptor CPU::loadSegmentDescriptor(uint16_t selector)
 
     uint8_t descBytes[8];
 
-    // FIXME: a page fault could happen here?
-    readDescriptorBytes(addr, descBytes);
+    // a page fault could happen here, return a clearly invalid descriptor
+    if(!readDescriptorBytes(addr, descBytes))
+        return {~0u, 0, 0};
 
     desc.base = descBytes[2]
               | descBytes[3] <<  8
