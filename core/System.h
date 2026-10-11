@@ -37,6 +37,8 @@ class Chipset final : public IODevice
 public:
     using SpeakerAudioCallback = void(*)(int8_t sample);
 
+    using RTCInterruptConfigCallback = void(*)(bool enabled, int freq);
+
     Chipset(System &sys);
 
     uint8_t read(uint16_t addr) override;
@@ -90,6 +92,7 @@ public:
     void updateRTC();
     bool getRTCDirty() const;
     void clearRTCDirty();
+    void setRTCInterruptConfigCallback(RTCInterruptConfigCallback cb);
 
 private:
     struct DMA
@@ -190,6 +193,8 @@ private:
     uint8_t cmosIndex = 0; // 70
     uint8_t cmosRam[128];
     bool rtcDirty = false; // if time has been written
+
+    RTCInterruptConfigCallback rtcIntrConfigCb = nullptr;
 
     uint8_t systemControlA = 0; // 92
     uint8_t systemControlB = 0; // 61

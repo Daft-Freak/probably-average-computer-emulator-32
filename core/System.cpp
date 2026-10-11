@@ -453,6 +453,15 @@ void Chipset::write(uint16_t addr, uint8_t data)
         }
         case 0x71: // CMOS data
         {
+            auto changed = cmosRam[cmosIndex] ^ data;
+
+            if(cmosIndex == 0xB && (changed & (1 << 6)))
+            {
+                // FIXME: values of 1/2 should be 256/128Hz
+                if(rtcIntrConfigCb)
+                    rtcIntrConfigCb(!!(data & (1 << 6)), 32768 >> ((cmosRam[0xA] & 0xF) - 1));
+            }
+
             cmosRam[cmosIndex] = data;
 
             if(cmosIndex <= 9 || cmosIndex == 0x32)
@@ -1026,6 +1035,11 @@ bool Chipset::getRTCDirty() const
 void Chipset::clearRTCDirty()
 {
     rtcDirty = false;
+}
+
+void Chipset::setRTCInterruptConfigCallback(RTCInterruptConfigCallback cb)
+{
+    rtcIntrConfigCb = cb;
 }
 
 uint8_t Chipset::PIC::read(int index)
