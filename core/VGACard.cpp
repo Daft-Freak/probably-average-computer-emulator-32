@@ -434,7 +434,7 @@ uint8_t VGACard::read(uint16_t addr)
 
             // claim we're in vblank between drawing last line and going back to first
             return lastOutputLine == outputH - 1 ? (1 << 3) : 0 |
-                   inDraw ? 0 : 1;
+                   (inDraw ? 0 : 1);
 
         case 0x3C0: // attribute address
             return attributeIndex;
