@@ -62,9 +62,12 @@ private:
     uint8_t crtcRegs[25];
 
     // attribute controller
-    uint8_t attribPalette[16]; // 0-F
-    uint8_t attribMode = 0;
+    uint8_t attribPalette[16];     // 0-F
+    uint8_t attribMode = 0;        // 10
+    uint8_t attribOverscanCol = 0; // 11
     uint8_t attribPlaneEnable = 0; // 12
+    uint8_t attribHorizPan = 0;    // 13
+    uint8_t attribColourSel = 0;   // 14
 
     // sequencer
     uint8_t seqClockMode = 0; // 1

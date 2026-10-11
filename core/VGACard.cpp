@@ -446,8 +446,14 @@ uint8_t VGACard::read(uint16_t addr)
                 return attribPalette[index];
             else if(index == 0x10)
                 return attribMode;
+            else if(index == 0x11)
+                return attribOverscanCol;
             else if(index == 0x12)
                 return attribPlaneEnable;
+            else if(index == 0x13)
+                return attribHorizPan;
+            else if(index == 0x14)
+                return attribColourSel;
             else
                 printf("VGA R attrib %02X\n", index);
 
@@ -473,6 +479,9 @@ uint8_t VGACard::read(uint16_t addr)
 
         case 0x3C9: // DAC data
             return dacPalette[dacIndexRead++];
+
+        case 0x3CA: // feature control
+            return 0; // "reserved"
 
         case 0x3CC: // misc output
             return miscOutput;
@@ -535,8 +544,22 @@ void VGACard::write(uint16_t addr, uint8_t data)
                 }
                 else if(attributeIndex == 0x10)
                     attribMode = data;
+                else if(attributeIndex == 0x11)
+                    attribOverscanCol = data;
                 else if(attributeIndex == 0x12)
                     attribPlaneEnable = data;
+                else if(attributeIndex == 0x13)
+                {
+                    if(data)
+                        printf("VGA horiz pan = %02X\n", data);
+                    attribHorizPan = data;
+                }
+                else if(attributeIndex == 0x14)
+                {
+                    if(data)
+                        printf("VGA colour select = %02X\n", data);
+                    attribColourSel = data;
+                }
                 else
                     printf("VGA W attrib %02X = %02X\n", attributeIndex, data);
             }
