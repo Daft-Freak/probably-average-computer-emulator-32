@@ -7066,6 +7066,13 @@ void CPU::doStringOp(bool addressSize32, Reg16 segmentOverride, bool rep)
             }
 
             count--;
+
+            // trap on each iteration
+            if(flags & Flag_T)
+            {
+                serviceInterrupt(1);
+                break;
+            }
         }
 
         if(addressSize32)
