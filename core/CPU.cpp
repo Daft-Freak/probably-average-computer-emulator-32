@@ -6309,6 +6309,10 @@ bool CPU::checkSegmentSelector(Reg16 r, uint16_t value, unsigned cpl, int flags,
     // TODO: just get flags?
     auto desc = loadSegmentDescriptor(value);
 
+    // fail if load faulted
+    if(desc.flags == ~0u)
+        return false;
+
     // check data/code
     // (unless this is a call/jump)
     if(!(desc.flags & SD_Type) && !(flags & Selector_AllowSys))
