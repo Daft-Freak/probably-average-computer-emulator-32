@@ -1421,6 +1421,27 @@ void Chipset::write8042DeviceCommand(uint8_t data, int devIndex)
             }
             break;
 
+        case 0xE9: // status request
+        {
+            if(devIndex == 1)
+            {
+                i8042Queue.push(0xFA | devIndex << 8); // ACK
+
+                bool enabled = i8042DeviceSendEnabled & (1 << devIndex);
+                i8042Queue.push(
+                    0 << 6 | // remote mode
+                    (enabled ? (1 << 5) : 0) |
+                    0 << 4 | // scaling
+                    (mouseButtons & 1) << 2 | // left
+                    mouseButtons >> 1 | // middle, right
+                    devIndex << 8
+                );
+                i8042Queue.push(i8042MouseResolution | devIndex << 8); // resolution
+                i8042Queue.push(i8042MouseSampleRate | devIndex << 8); // sample rate
+            }
+            break;
+        }
+
         case 0xED: // set LEDs
         case 0xF0: // get/set code set
             if(devIndex == 0)
@@ -1515,11 +1536,13 @@ void Chipset::write8042DeviceData(uint8_t data, int devIndex)
         {
             case 0xE8: // set resolution
                 printf("8042 mouse resolution %i\n", data);
+                i8042MouseResolution = data;
                 i8042Queue.push(0x1FA); // ACK
                 break;
 
             case 0xF3: // set sample rate
                 printf("8042 mouse sample rate %i\n", data);
+                i8042MouseSampleRate = data;
                 i8042Queue.push(0x1FA); // ACK
                 break;
         }
