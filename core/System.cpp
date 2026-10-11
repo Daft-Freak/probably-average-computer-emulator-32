@@ -152,6 +152,7 @@ uint8_t Chipset::read(uint16_t addr)
             bool hasOutputData = !i8042Queue.empty();
             bool port2 = hasOutputData ? (i8042Queue.peek() >> 8) : false;
             return (hasOutputData ? 1 << 0 : 0)
+                 | (i8042Configuration & (1 << 2)) // "system flag" bit
                  | (port2 ? 1 << 5 : 0);
         } 
 
