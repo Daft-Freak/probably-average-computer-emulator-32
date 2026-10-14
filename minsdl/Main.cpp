@@ -655,6 +655,24 @@ int main(int argc, char *argv[])
 
         auto [outputW, outputH] = vgaCard.getOutputResolution();
 
+        // resize output for 800x600
+        // (other resolutions scale to 640x480)
+        if((outputW == 800) != (screenWidth == 800))
+        {
+            if(outputW == 800)
+            {
+                screenWidth = 800;
+                screenHeight = 600;
+            }
+            else
+            {
+                screenWidth = 640;
+                screenHeight = 480;
+            }
+
+            SDL_SetRenderLogicalPresentation(renderer, screenWidth, screenHeight, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+        }
+
         SDL_Surface *surface;
         SDL_LockTextureToSurface(texture, nullptr, &surface);
 
