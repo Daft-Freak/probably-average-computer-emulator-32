@@ -41,6 +41,14 @@ endif()
 string(TOUPPER ${EXTRA_BOARD} EXTRA_BOARD_UPPER)
 target_compile_definitions(PACEPico2 PRIVATE EXTRA_BOARD_${EXTRA_BOARD_UPPER}=1 VGA_RGB565)
 
+# workaround missing PSRAM defines
+if(PICO_BOARD STREQUAL "solderparty_rp2350_stamp_xl")
+    target_compile_definitions(PACEPico2 PRIVATE
+        PICO_PSRAM_CS_PIN=8
+        PICO_AUTO_DETECT_PSRAM_SIZE=1
+    )
+endif()
+
 # driver selection based on boards
 set(AUDIO_DRIVER none)
 
