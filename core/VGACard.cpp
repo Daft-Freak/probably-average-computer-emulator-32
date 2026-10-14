@@ -610,6 +610,7 @@ void VGACard::write(uint16_t addr, uint8_t data)
                     break;
                 case 2: // map mask
                     seqMapMask = data;
+                    seqMapMask32 = expandMaskTo32(data);
                     break;
 
                 case 4: // memory mode
@@ -644,9 +645,11 @@ void VGACard::write(uint16_t addr, uint8_t data)
             {
                 case 0: // set/reset
                     gfxSetReset = data;
+                    gfxSetReset32 = expandMaskTo32(data);
                     break;
                 case 1: // enable set/reset
                     gfxEnableSetRes = data;
+                    gfxEnableSetRes32 = expandMaskTo32(data);
                     break;
                 case 2: // colour compare
                     colourCompare = data;
@@ -876,57 +879,51 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
 
     int logicOp = (gfxDataRotate >> 3) & 3;
 
-    // TODO: unroll the plane loop
-    auto ram8 = reinterpret_cast<uint8_t *>(ram);
+    // build mask for planes
+    uint32_t mapMask32 = seqMapMask32;
 
-    for(int i = 0; i < 4; i++)
+    // odd/even selects plane based on (original) low bit
+    // 0/1 and 2/3 should have the same masks in this case
+    if(oddEven)
+        mapMask32 &= 0x00FF00FF << ((planeAddr & 1) * 8);
+
+    // chain4 uses the low two bits to select plane
+    if(chain4)
+        mapMask32 &= 0xFF << ((planeAddr & 3) * 8);
+
+    // expand data to all planes
+    uint32_t planeData = data * 0x01010101;
+
+    // set/reset for mode 0
+    if(writeMode == 0)
+        planeData = (planeData & ~gfxEnableSetRes32) | (gfxSetReset32 & gfxEnableSetRes32);
+    // expand bit for mode 2
+    else if(writeMode == 2)
+        planeData = expandMaskTo32(data);
+
+    uint32_t gfxBitMask32 = gfxBitMask * 0x01010101;
+
+    if(writeMode == 0 || writeMode == 2)
     {
-        if(!(seqMapMask & (1 << i)))
-            continue;
+        // apply logic op
+        if(logicOp == 1)
+            planeData &= latch;
+        else if(logicOp == 2)
+            planeData |= latch;
+        else if(logicOp == 3)
+            planeData ^= latch;
 
-        // odd/even selects plane based on (original) low bit
-        // 0/1 and 2/3 should have the same masks in this case
-        if(oddEven && (i & 1) != (planeAddr & 1))
-            continue;
-
-        // chain4 uses the low two bits to select plane
-        if(chain4 && i != (planeAddr & 3))
-            continue;
-
-        uint8_t planeData = data;
-
-        // set/reset for mode 0
-        if(writeMode == 0)
-        {
-            if(gfxEnableSetRes & (1 << i))
-                planeData = (gfxSetReset & (1 << i)) ? 0xFF : 0;
-        }
-        // expand bit for mode 2
-        else if(writeMode == 2)
-            planeData = ((data >> i) & 1) * 0xFF;
-
-        uint8_t latchValue = latch >> (i * 8);
-
-        if(writeMode == 0 || writeMode == 2)
-        {
-            // apply logic op
-            if(logicOp == 1)
-                planeData &= latchValue;
-            else if(logicOp == 2)
-                planeData |= latchValue;
-            else if(logicOp == 3)
-                planeData ^= latchValue;
-
-            ram8[mappedAddr * 4 + i] = (planeData & gfxBitMask) | (latchValue & ~gfxBitMask);
-        }
-        else if(writeMode == 1)
-            ram8[mappedAddr * 4 + i] = latchValue;
-        else // mode 3
-        {
-            auto mask = planeData & gfxBitMask;
-            auto setRes = (gfxSetReset & (1 << i)) ? 0xFF : 0;
-
-            ram8[mappedAddr * 4 + i] = (setRes & mask) | (latchValue & ~mask);
-        }
+        planeData = (planeData & gfxBitMask32) | (latch & ~gfxBitMask32);
     }
+    else if(writeMode == 1)
+        planeData = latch;
+    else // mode 3
+    {
+        auto mask = planeData & gfxBitMask32;
+
+        planeData = (gfxSetReset32 & mask) | (latch & ~mask);
+    }
+
+    // write to unmasked planes
+    ram[mappedAddr] = (ram[mappedAddr] & ~mapMask32) | (planeData & mapMask32);
 }

@@ -91,7 +91,10 @@ private:
     uint8_t miscOutput = 0;
 
     // expanded masks for speed
+    uint32_t seqMapMask32 = 0;
     uint32_t attribPlaneEnable32 = 0;
+    uint32_t gfxSetReset32 = 0;
+    uint32_t gfxEnableSetRes32 = 0;
 
     uint32_t latch;
 
