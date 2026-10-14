@@ -356,7 +356,7 @@ static void initPreBIOSVGA()
     for(int c = 0; c < 256; c++)
     {
         for(int i = 0; i < 16; i++)
-            vgaRAM[0x20000 + c * 32 + i] = vgaBIOS[fontOffset + c * 16 + i];
+            vgaRAM[(c * 32 + i) * 4 + 2] = vgaBIOS[fontOffset + c * 16 + i];
     }
 
     vga.write(0x3C4, 1); vga.write(0x3C5, 1); // 8px wide chars
@@ -397,8 +397,8 @@ static void vgaPrint(int x, int y, const char *text)
 
     for(size_t i = 0; i < len; i++)
     {
-        vgaRAM[(offset + i) * 2] = text[i]; // char
-        vgaRAM[0x10000 + (offset + i) * 2] = 1; // attrib (bg=0, fg=1)
+        vgaRAM[((offset + i) * 2) * 4 + 0] = text[i]; // char
+        vgaRAM[((offset + i) * 2) * 4 + 1] = 1; // attrib (bg=0, fg=1)
     }
 }
 

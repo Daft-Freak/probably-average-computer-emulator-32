@@ -107,9 +107,6 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
     if(crtcRegs[0x9] & 0x80)
         line /= 2;
 
-    auto plane0 = ram;
-    auto plane2 = ram + 0x20000;
-
     if(!(gfxMisc & (1 << 0)))
     {
         if(line == 0)
@@ -125,16 +122,16 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         if(textWidthHack)
             charWidth = 8; // HACK: we don't support 720 wide modes yet
 
-        auto charPtr = plane0 + startAddr * 2 + offset * 4 * (line / charHeight);
+        auto ptr = ram + startAddr * 2 + offset * 4 * (line / charHeight);
 
         int charLine = line % charHeight;
-        auto fontPtr = plane2 + charLine;
+        auto fontPtr = ram + charLine;
 
         bool blinkEn = attribMode & (1 << 3);
 
         // cursor setup
         bool cursorLine = (frame & 8) && charLine >= (crtcRegs[0xA/*cursor start*/] & 0x1F) && charLine <= (crtcRegs[0xB/*cursor end*/] & 0x1F);
-        uint8_t *cursorPtr = nullptr;
+        uint32_t *cursorPtr = nullptr;
 
         if(cursorLine)
         {
@@ -142,14 +139,15 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
             // +2 because we check after incrementing
             // set to null if not cursor line
-            cursorPtr = plane0 + cursorAddr * 2 + 2;
+            cursorPtr = ram + cursorAddr * 2 + 2;
         }
 
         for(int i = 0; i < hDispChars; i++)
         {
-            auto ch = *charPtr;
-            auto attr = charPtr[0x10000]; // same addr, next plane
-            charPtr += 2;
+            auto data = *ptr;
+            uint8_t ch = data; // plane 0
+            uint8_t attr = data >> 8; // plane 1
+            ptr += 2;
 
             int bg = attr >> 4;
             int fg = attr & 0xF;
@@ -162,14 +160,14 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
             auto fgCol = paletteLookup16(fg);
 
             // TODO: char sets
-            uint16_t fontLine = fontPtr[ch * 32] << 8;
+            uint16_t fontLine = (fontPtr[ch * 32] >> 16 & 0xFF) << 8;
 
             // copy last bit for line graphics
             if(ch >= 0xC0 && ch < 0xE0 && (attribMode & (1 << 2)/*LGE*/))
                 fontLine |= (fontLine >> 1) & 0x80;
 
             // cursor
-            if(charPtr == cursorPtr)
+            if(ptr == cursorPtr)
             {
                 for(int x = 0; x < charWidth; x++)
                     outputPixel(fgCol);
@@ -202,14 +200,15 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         bool byteAccess = crtcRegs[0x17] & (1 << 6);
 
-        auto ptr0 = plane0 + startAddr + offset * (byteAccess ? 2 : 8) * (line / charHeight);
+        auto ptr0 = ram + startAddr + offset * (byteAccess ? 2 : 8) * (line / charHeight);
 
         for(int i = 0; i < hDispChars; i++)
         {
-            uint8_t byte0 = (attribPlaneEnable & (1 << 0)) ? ptr0[0x00000] : 0;
-            uint8_t byte1 = (attribPlaneEnable & (1 << 1)) ? ptr0[0x10000] : 0;
-            uint8_t byte2 = (attribPlaneEnable & (1 << 2)) ? ptr0[0x20000] : 0;
-            uint8_t byte3 = (attribPlaneEnable & (1 << 3)) ? ptr0[0x30000] : 0;
+            auto data = *ptr0;
+            uint8_t byte0 = (attribPlaneEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
+            uint8_t byte1 = (attribPlaneEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
+            uint8_t byte2 = (attribPlaneEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
+            uint8_t byte3 = (attribPlaneEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
             ptr0 += byteAccess ? 1 : 4;
 
             outputPixel2(paletteLookup256(byte0));
@@ -227,7 +226,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         uint8_t planeEnable = attribPlaneEnable;
 
-        uint8_t *ptr0 = plane0 + startAddr + offset * 4 * (line / charHeight);
+        auto *ptr0 = ram + startAddr + offset * 4 * (line / charHeight);
 
         // remap alternate lines for old modes
         if((crtcRegs[0x17] & 1) == 0 && (line & 1))
@@ -239,8 +238,9 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         // next four from plane 1 + 3
         for(; ptr0 != endPtr0; ptr0 += 2)
         {
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ptr0[0x00000] : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ptr0[0x20000] : 0;
+            auto data = *ptr0;
+            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
+            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
             for(int i = 0; i < 4; i++)
             {
                 int index = byte0 >> 6 | (byte2 >> 6) << 2;
@@ -250,8 +250,8 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
                 outputPixel(paletteLookup16(index));
             }
 
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ptr0[0x10000] : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ptr0[0x30000] : 0;
+            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
+            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
             for(int i = 0; i < 4; i++)
             {
                 int index = byte1 >> 6 | (byte3 >> 6) << 2;
@@ -270,9 +270,9 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         int offset = crtcRegs[0x13];
         int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
 
-        uint8_t *ptr0;
+        uint32_t *ptr0;
 
-        ptr0 = plane0 + startAddr + offset * 2 * (line / charHeight);
+        ptr0 = ram + startAddr + offset * 2 * (line / charHeight);
         // remap alternate lines for old modes
         if((crtcRegs[0x17] & 1) == 0 && (line & 1))
             ptr0 += 0x2000;
@@ -283,10 +283,11 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         for(; ptr0 != endPtr0; ptr0++)
         {
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ptr0[0x00000] : 0;
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ptr0[0x10000] : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ptr0[0x20000] : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ptr0[0x30000] : 0;
+            auto data = *ptr0;
+            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
+            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
+            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
+            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
@@ -325,9 +326,9 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         int offset = crtcRegs[0x13];
         int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
 
-        uint8_t *ptr0;
+        uint32_t *ptr0;
 
-        ptr0 = plane0 + startAddr + offset * 2 * (line / charHeight);
+        ptr0 = ram + startAddr + offset * 2 * (line / charHeight);
         // remap alternate lines for old modes
         if((crtcRegs[0x17] & 1) == 0 && (line & 1))
             ptr0 += 0x2000;
@@ -338,10 +339,11 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         for(; ptr0 != endPtr0; ptr0++)
         {
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ptr0[0x00000] : 0;
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ptr0[0x10000] : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ptr0[0x20000] : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ptr0[0x30000] : 0;
+            auto data = *ptr0;
+            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
+            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
+            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
+            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
@@ -801,8 +803,7 @@ uint8_t VGACard::readMem(uint32_t addr)
     //printf("VGA R %05X (%04X, sel %i)\n", addr, mappedAddr, gfxReadSel);
 
     // load latches
-    for(int i = 0; i < 4; i++)
-        latch[i] = ram[mappedAddr + i * 0x10000];
+    latch = ram[mappedAddr];
 
     if(readMode)
     {
@@ -818,14 +819,14 @@ uint8_t VGACard::readMem(uint32_t addr)
             {
                 int v = (colourCompare >> i) & 1;
                 // mask out any bit that doesn't match the value for this plane
-                res &= ~((v * 0xFF) ^ latch[i]);
+                res &= ~((v * 0xFF) ^ (latch >> (i * 8) & 0xFF));
             }
         }
 
         return res;
     }
 
-    return latch[plane];
+    return latch >> (plane * 8);
 }
 
 void VGACard::writeMem(uint32_t addr, uint8_t data)
@@ -864,6 +865,9 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
 
     int logicOp = (gfxDataRotate >> 3) & 3;
 
+    // TODO: unroll the plane loop
+    auto ram8 = reinterpret_cast<uint8_t *>(ram);
+
     for(int i = 0; i < 4; i++)
     {
         if(!(seqMapMask & (1 << i)))
@@ -890,26 +894,28 @@ void VGACard::writeMem(uint32_t addr, uint8_t data)
         else if(writeMode == 2)
             planeData = ((data >> i) & 1) * 0xFF;
 
+        uint8_t latchValue = latch >> (i * 8);
+
         if(writeMode == 0 || writeMode == 2)
         {
             // apply logic op
             if(logicOp == 1)
-                planeData &= latch[i];
+                planeData &= latchValue;
             else if(logicOp == 2)
-                planeData |= latch[i];
+                planeData |= latchValue;
             else if(logicOp == 3)
-                planeData ^= latch[i];
+                planeData ^= latchValue;
 
-            ram[mappedAddr + i * 0x10000] = (planeData & gfxBitMask) | (latch[i] & ~gfxBitMask);
+            ram8[mappedAddr * 4 + i] = (planeData & gfxBitMask) | (latchValue & ~gfxBitMask);
         }
         else if(writeMode == 1)
-            ram[mappedAddr + i * 0x10000] = latch[i];
+            ram8[mappedAddr * 4 + i] = latchValue;
         else // mode 3
         {
             auto mask = planeData & gfxBitMask;
             auto setRes = (gfxSetReset & (1 << i)) ? 0xFF : 0;
 
-            ram[mappedAddr + i * 0x10000] = (setRes & mask) | (latch[i] & ~mask);
+            ram8[mappedAddr * 4 + i] = (setRes & mask) | (latchValue & ~mask);
         }
     }
 }

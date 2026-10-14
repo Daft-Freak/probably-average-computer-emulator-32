@@ -14,7 +14,7 @@ public:
 
     void setTextWidthHack(bool enabled);
 
-    uint8_t *getRAM() {return ram;}
+    uint8_t *getRAM() {return reinterpret_cast<uint8_t *>(ram);}
 
     uint8_t read(uint16_t addr) override;
     uint16_t read16(uint16_t addr) override {return read(addr) | read(addr + 1) << 8;}
@@ -90,7 +90,7 @@ private:
 
     uint8_t miscOutput = 0;
 
-    uint8_t latch[4];
+    uint32_t latch;
 
     int outputW = 0, outputH = 0;
     ResolutionChangeCallback resChangeCb = nullptr;
@@ -108,5 +108,6 @@ private:
 #endif
 #endif
 
-    uint8_t ram[256 * 1024];
+    // 4 interleaved planes for performance reasons
+    uint32_t ram[(256 * 1024) / 4];
 };
