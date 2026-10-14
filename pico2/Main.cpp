@@ -672,7 +672,9 @@ static void ntpRequest(const char *addr)
 static void initEmulator()
 {
     auto psram = reinterpret_cast<uint8_t *>(PSRAM_LOCATION);
-    sys.addMemory(0, 8 * 1024 * 1024, psram);
+    auto psramSize = psram_get_size();
+    sys.addMemory(0, psramSize, psram);
+    sys.getChipset().setTotalMemory(psramSize);
 
     sys.getChipset().setSpeakerAudioCallback(speakerCallback);
 
