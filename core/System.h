@@ -93,6 +93,7 @@ public:
     bool getRTCDirty() const;
     void clearRTCDirty();
     void setRTCInterruptConfigCallback(RTCInterruptConfigCallback cb);
+    void flagRTCPeriodicInterrupt();
 
 private:
     struct DMA

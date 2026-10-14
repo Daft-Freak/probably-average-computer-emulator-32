@@ -161,10 +161,16 @@ uint8_t Chipset::read(uint16_t addr)
 
         case 0x71: // CMOS data
             if(cmosIndex == 0xA)
-                cmosRam[cmosIndex] ^= 0x80; // flip the "update in progress" bit every read
+                cmosRam[cmosIndex] ^= 0x80; // HACK: flip the "update in progress" bit every read
+
             // reading reg C clears interrupts
             if(cmosIndex == 0x0C)
+            {
                 setPICInput(8, 0);
+                auto value = cmosRam[cmosIndex];
+                cmosRam[cmosIndex] = 0;
+                return value;
+            }
 
             return cmosRam[cmosIndex];
 
@@ -1044,6 +1050,14 @@ void Chipset::clearRTCDirty()
 void Chipset::setRTCInterruptConfigCallback(RTCInterruptConfigCallback cb)
 {
     rtcIntrConfigCb = cb;
+}
+
+void Chipset::flagRTCPeriodicInterrupt()
+{
+    // this assumes it's being called from the callback (so the interrupt is enabled)
+
+    cmosRam[0xC] |= (1 << 7) | (1 << 6); // interrupt request flag and periodic interrupt flag
+    setPICInput(8, 1);
 }
 
 uint8_t Chipset::PIC::read(int index)

@@ -333,7 +333,7 @@ static Uint64 systemTimerCallback(void *userdata, SDL_TimerID timerID, Uint64 in
 
 static Uint64 rtcTimerCallback(void *userdata, SDL_TimerID timerID, Uint64 interval)
 {
-    reinterpret_cast<System *>(userdata)->getChipset().setPICInput(8, true);
+    reinterpret_cast<System *>(userdata)->getChipset().flagRTCPeriodicInterrupt();
     return interval;
 }
 
