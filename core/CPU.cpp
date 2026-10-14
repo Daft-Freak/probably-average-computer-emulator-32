@@ -4541,6 +4541,11 @@ void CPU::executeInstruction0F(uint32_t addr, bool operandSize32)
                 // reorder the bits
                 auto access = (desc.flags & 0xFF0000) >> 8 | (desc.flags & 0xF000) << 8;
 
+                // the manual states
+                // "the four bits corresponding to the upper four bits of the limit are undefined in the value loaded by LAR"
+                // in practice though, at least windows 95 depends on those being loaded
+                access |= desc.limit & 0xF0000;
+
                 if(operandSize32)
                     reg(rm.reg32()) = access;
                 else
