@@ -90,6 +90,9 @@ private:
 
     uint8_t miscOutput = 0;
 
+    // expanded masks for speed
+    uint32_t attribPlaneEnable32 = 0;
+
     uint32_t latch;
 
     int outputW = 0, outputH = 0;

@@ -4,6 +4,14 @@
 
 #include "RAMFunc.h"
 
+static uint32_t expandMaskTo32(uint8_t mask)
+{
+    return ((mask & (1 << 0)) ? 0x000000FF : 0) |
+           ((mask & (1 << 1)) ? 0x0000FF00 : 0) |
+           ((mask & (1 << 2)) ? 0x00FF0000 : 0) |
+           ((mask & (1 << 3)) ? 0xFF000000 : 0);
+}
+
 VGACard::VGACard(System &sys) : sys(sys)
 {
     // FIXME: some could also be at 3Bx
@@ -204,11 +212,11 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
 
         for(int i = 0; i < hDispChars; i++)
         {
-            auto data = *ptr0;
-            uint8_t byte0 = (attribPlaneEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
-            uint8_t byte1 = (attribPlaneEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
-            uint8_t byte2 = (attribPlaneEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
-            uint8_t byte3 = (attribPlaneEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
+            auto data = *ptr0 & attribPlaneEnable32;
+            uint8_t byte0 =  data        & 0xFF;
+            uint8_t byte1 = (data >>  8) & 0xFF;
+            uint8_t byte2 = (data >> 16) & 0xFF;
+            uint8_t byte3 = (data >> 24) & 0xFF;
             ptr0 += byteAccess ? 1 : 4;
 
             outputPixel2(paletteLookup256(byte0));
@@ -224,7 +232,7 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         int offset = crtcRegs[0x13];
         int startAddr = crtcRegs[0xD] | crtcRegs[0xC] << 8;
 
-        uint8_t planeEnable = attribPlaneEnable;
+        uint32_t planeEnable = attribPlaneEnable32;
 
         auto *ptr0 = ram + startAddr + offset * 4 * (line / charHeight);
 
@@ -238,9 +246,9 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         // next four from plane 1 + 3
         for(; ptr0 != endPtr0; ptr0 += 2)
         {
-            auto data = *ptr0;
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
+            auto data = *ptr0 & planeEnable;
+            uint8_t byte0 =  data        & 0xFF;
+            uint8_t byte2 = (data >> 16) & 0xFF;
             for(int i = 0; i < 4; i++)
             {
                 int index = byte0 >> 6 | (byte2 >> 6) << 2;
@@ -250,8 +258,8 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
                 outputPixel(paletteLookup16(index));
             }
 
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
+            uint8_t byte1 = (data >>  8) & 0xFF;
+            uint8_t byte3 = (data >> 24) & 0xFF;
             for(int i = 0; i < 4; i++)
             {
                 int index = byte1 >> 6 | (byte3 >> 6) << 2;
@@ -277,17 +285,17 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         if((crtcRegs[0x17] & 1) == 0 && (line & 1))
             ptr0 += 0x2000;
 
-        uint8_t planeEnable = attribPlaneEnable;
+        uint32_t planeEnable = attribPlaneEnable32;
 
         auto endPtr0 = ptr0 + hDispChars;
 
         for(; ptr0 != endPtr0; ptr0++)
         {
-            auto data = *ptr0;
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
+            auto data = *ptr0 & planeEnable;
+            uint8_t byte0 =  data        & 0xFF;
+            uint8_t byte1 = (data >>  8) & 0xFF;
+            uint8_t byte2 = (data >> 16) & 0xFF;
+            uint8_t byte3 = (data >> 24) & 0xFF;
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
@@ -333,17 +341,17 @@ void RAM_FUNC(VGACard::drawScanline)(int line, uint8_t *output)
         if((crtcRegs[0x17] & 1) == 0 && (line & 1))
             ptr0 += 0x2000;
 
-        uint8_t planeEnable = attribPlaneEnable;
+        uint32_t planeEnable = attribPlaneEnable32;
 
         auto endPtr0 = ptr0 + hDispChars;
 
         for(; ptr0 != endPtr0; ptr0++)
         {
-            auto data = *ptr0;
-            uint8_t byte0 = (planeEnable & (1 << 0)) ? ( data        & 0xFF) : 0;
-            uint8_t byte1 = (planeEnable & (1 << 1)) ? ((data >>  8) & 0xFF) : 0;
-            uint8_t byte2 = (planeEnable & (1 << 2)) ? ((data >> 16) & 0xFF) : 0;
-            uint8_t byte3 = (planeEnable & (1 << 3)) ? ((data >> 24) & 0xFF) : 0;
+            auto data = *ptr0 & planeEnable;
+            uint8_t byte0 =  data        & 0xFF;
+            uint8_t byte1 = (data >>  8) & 0xFF;
+            uint8_t byte2 = (data >> 16) & 0xFF;
+            uint8_t byte3 = (data >> 24) & 0xFF;
 
             // interleave the four bytes
             uint32_t v0 = byte0, v1 = byte1, v2 = byte2, v3 = byte3;
@@ -549,7 +557,10 @@ void VGACard::write(uint16_t addr, uint8_t data)
                 else if(attributeIndex == 0x11)
                     attribOverscanCol = data;
                 else if(attributeIndex == 0x12)
+                {
                     attribPlaneEnable = data;
+                    attribPlaneEnable32 = expandMaskTo32(data);
+                }
                 else if(attributeIndex == 0x13)
                 {
                     if(data)
